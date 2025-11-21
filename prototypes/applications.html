@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot - Applications</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+    <!-- Nav -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-8">
+            <div class="font-bold text-xl text-primary-600 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                JobPilot
+            </div>
+            <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
+                <a href="applications.html" class="text-primary-600">Applications</a>
+                <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+            </a>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="flex-1 container mx-auto max-w-full p-6 overflow-x-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-900">My Applications</h1>
+            <button
+                class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">Switch
+                to List View</button>
+        </div>
+
+        <!-- Kanban Board -->
+        <div class="flex gap-6 min-w-max pb-4">
+
+            <!-- Column: Pending -->
+            <div class="w-80 shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-slate-700">Pending</h3>
+                    <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">2</span>
+                </div>
+                <div class="space-y-3">
+                    <!-- Card -->
+                    <a href="application_detail.html"
+                        class="block bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:shadow-md transition-shadow border-l-4 border-l-slate-400">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-slate-900">Senior Software Engineer</div>
+                        </div>
+                        <div class="text-sm text-slate-500 mb-3">Google</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Needs Tailoring</span>
+                            <span class="text-xs text-slate-400">2d ago</span>
+                        </div>
+                    </a>
+                    <!-- Card -->
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:shadow-md transition-shadow border-l-4 border-l-slate-400">
+                        <div class="font-bold text-slate-900 mb-1">Backend Developer</div>
+                        <div class="text-sm text-slate-500 mb-3">Amazon</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">Draft</span>
+                            <span class="text-xs text-slate-400">5h ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column: Applied -->
+            <div class="w-80 shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-slate-700">Applied</h3>
+                    <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">5</span>
+                </div>
+                <div class="space-y-3">
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+                        <div class="font-bold text-slate-900 mb-1">Frontend Engineer</div>
+                        <div class="text-sm text-slate-500 mb-3">Netflix</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">Applied</span>
+                            <span class="text-xs text-slate-400">1d ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column: Interview -->
+            <div class="w-80 shrink-0">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-slate-700">Interview</h3>
+                    <span class="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">1</span>
+                </div>
+                <div class="space-y-3">
+                    <div
+                        class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:shadow-md transition-shadow border-l-4 border-l-purple-500">
+                        <div class="font-bold text-slate-900 mb-1">Full Stack Dev</div>
+                        <div class="text-sm text-slate-500 mb-3">Airbnb</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">Technical Round</span>
+                            <span class="text-xs text-slate-400">3d ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</body>
+
+</html>

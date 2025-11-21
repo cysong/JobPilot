@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+    <!-- Nav -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-8">
+            <div class="font-bold text-xl text-primary-600 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                JobPilot
+            </div>
+            <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+                <a href="index.html" class="text-primary-600">Dashboard</a>
+                <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
+                <a href="applications.html" class="hover:text-primary-600">Applications</a>
+                <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+            </a>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="flex-1 container mx-auto max-w-6xl p-6">
+        <header class="mb-8">
+            <h1 class="text-2xl font-bold text-slate-900">Welcome back, Felix!</h1>
+            <p class="text-slate-500">Here's what's happening with your job search today.</p>
+        </header>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-sm font-medium text-slate-500 mb-1">Active Applications</div>
+                <div class="text-3xl font-bold text-slate-900">12</div>
+                <div class="text-xs text-green-600 mt-2 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                    +2 this week
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-sm font-medium text-slate-500 mb-1">Upcoming Interviews</div>
+                <div class="text-3xl font-bold text-slate-900">3</div>
+                <div class="text-xs text-slate-500 mt-2">Next: Google (Tomorrow)</div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-sm font-medium text-slate-500 mb-1">AI Credits</div>
+                <div class="text-3xl font-bold text-primary-600">850</div>
+                <div class="text-xs text-slate-500 mt-2">Resets in 12 days</div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-900">Recent Activity</h2>
+                <a href="#" class="text-sm text-primary-600 hover:underline">View All</a>
+            </div>
+            <div class="divide-y divide-slate-100">
+                <div class="p-4 flex gap-4 hover:bg-slate-50 transition-colors">
+                    <div
+                        class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-900 font-medium">Application sent to <span
+                                class="font-bold">Microsoft</span></p>
+                        <p class="text-xs text-slate-500">2 hours ago</p>
+                    </div>
+                </div>
+                <div class="p-4 flex gap-4 hover:bg-slate-50 transition-colors">
+                    <div
+                        class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-900 font-medium">Tailored resume for <span
+                                class="font-bold">Netflix</span></p>
+                        <p class="text-xs text-slate-500">Yesterday</p>
+                    </div>
+                </div>
+                <div class="p-4 flex gap-4 hover:bg-slate-50 transition-colors">
+                    <div
+                        class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-900 font-medium">New job match found: <span
+                                class="font-bold">Senior Frontend Dev at Airbnb</span></p>
+                        <p class="text-xs text-slate-500">2 days ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot - User Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-8">
+            <div class="font-bold text-xl text-primary-600 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                JobPilot
+            </div>
+            <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
+                <a href="applications.html" class="hover:text-primary-600">Applications</a>
+                <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+            </a>
+        </div>
+    </nav>
+
+    <div class="flex flex-1 container mx-auto max-w-6xl py-8 px-6 gap-8">
+
+        <!-- Sidebar -->
+        <aside class="w-64 shrink-0">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 text-center">
+                    <div class="w-20 h-20 mx-auto rounded-full bg-slate-100 mb-3 overflow-hidden">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+                    </div>
+                    <h2 class="font-bold text-slate-900">Felix Chen</h2>
+                    <p class="text-sm text-slate-500">Senior Developer</p>
+                </div>
+                <nav class="p-2">
+                    <a href="#"
+                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        General Info
+                    </a>
+                    <a href="#"
+                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        Resumes
+                    </a>
+                    <a href="#"
+                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg">
+                        <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        AI Preferences
+                    </a>
+                    <a href="#"
+                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z">
+                            </path>
+                        </svg>
+                        Billing
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                <div class="px-8 py-6 border-b border-slate-100">
+                    <h1 class="text-xl font-bold text-slate-900">AI Customization Preferences</h1>
+                    <p class="text-sm text-slate-500 mt-1">Configure how JobPilot's AI agent handles your applications
+                        by default.</p>
+                </div>
+
+                <div class="p-8 space-y-10">
+
+                    <!-- Default Tailoring Strategy -->
+                    <section>
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-900">Default Tailoring Strategy</h3>
+                                <p class="text-sm text-slate-500 mt-1">Choose the default level of customization for new
+                                    applications.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 rounded-lg p-1 inline-flex border border-slate-200">
+                            <button
+                                class="px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors"
+                                onclick="toggleStrategy(this, 'ask')">Always Ask</button>
+                            <button
+                                class="px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors"
+                                onclick="toggleStrategy(this, 'light')">Light Tailoring</button>
+                            <button
+                                class="px-4 py-2 text-sm font-medium rounded-md bg-white text-primary-700 shadow-sm ring-1 ring-slate-200 transition-all"
+                                onclick="toggleStrategy(this, 'deep')">Deep Tailoring</button>
+                        </div>
+
+                        <div
+                            class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800 flex gap-3">
+                            <svg class="w-5 h-5 shrink-0 text-blue-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p><strong>Deep Tailoring</strong> is selected. The AI will aggressively rewrite your resume
+                                content to match the job description. You can still override this per application.</p>
+                        </div>
+                    </section>
+
+                    <hr class="border-slate-100">
+
+                    <!-- Cover Letter Tone -->
+                    <section>
+                        <div class="mb-4">
+                            <h3 class="text-base font-semibold text-slate-900">Cover Letter Tone</h3>
+                            <p class="text-sm text-slate-500 mt-1">Select the default voice for your generated cover
+                                letters.</p>
+                        </div>
+
+                        <div class="max-w-md">
+                            <select
+                                class="w-full rounded-lg border-slate-300 border px-3 py-2 text-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none shadow-sm">
+                                <option>Professional & Formal (Standard)</option>
+                                <option>Enthusiastic & Passionate</option>
+                                <option>Confident & Direct</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <!-- Save Button -->
+                    <div class="pt-6 flex justify-end">
+                        <button
+                            class="px-6 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 shadow-sm shadow-primary-500/30 transition-all">Save
+                            Changes</button>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function toggleStrategy(btn, type) {
+            // Reset all buttons
+            const buttons = btn.parentElement.children;
+            for (let b of buttons) {
+                b.className = "px-4 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 transition-colors";
+            }
+            // Set active button
+            btn.className = "px-4 py-2 text-sm font-medium rounded-md bg-white text-primary-700 shadow-sm ring-1 ring-slate-200 transition-all";
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot - Resume Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Simple Markdown Preview Styles */
+        .preview h1 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            color: #1e293b;
+        }
+
+        .preview h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            color: #334155;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.2em;
+        }
+
+        .preview p {
+            margin-bottom: 1em;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        .preview ul {
+            list-style-type: disc;
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+            color: #475569;
+        }
+
+        .preview li {
+            margin-bottom: 0.2em;
+        }
+
+        .preview strong {
+            font-weight: 600;
+            color: #1e293b;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-8">
+            <div class="font-bold text-xl text-primary-600 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                JobPilot
+            </div>
+            <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
+                <a href="applications.html" class="hover:text-primary-600">Applications</a>
+                <a href="resumes.html" class="text-primary-600">Resumes</a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+            </a>
+        </div>
+    </nav>
+
+    <!-- Toolbar -->
+    <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="resumes.html" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+            </a>
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-xl font-bold text-slate-900">Full Stack Resume v2</h1>
+                    <span
+                        class="px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold border border-yellow-200">Draft</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Last edited 2 minutes ago</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- View Mode Switcher -->
+            <div class="bg-slate-100 p-1 rounded-lg flex text-sm font-medium text-slate-600 mr-4">
+                <button onclick="setViewMode('source')" id="btn-source"
+                    class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Source</button>
+                <button onclick="setViewMode('split')" id="btn-split"
+                    class="px-3 py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-colors">Split</button>
+                <button onclick="setViewMode('preview')" id="btn-preview"
+                    class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Preview</button>
+            </div>
+
+            <button
+                class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Download PDF
+            </button>
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+            <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Save
+                Draft</button>
+            <button
+                class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                Finalize Resume
+            </button>
+        </div>
+    </div>
+
+    <!-- Editor Area -->
+    <main class="flex-1 flex h-[calc(100vh-140px)] overflow-hidden">
+
+        <!-- Markdown Input -->
+        <div id="container-source"
+            class="w-1/2 border-r border-slate-200 flex flex-col bg-slate-50 transition-all duration-300">
+            <div
+                class="px-4 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between">
+                <span>Markdown Source</span>
+                <span class="text-slate-400">Markdown Supported</span>
+            </div>
+            <textarea
+                class="flex-1 w-full p-6 bg-slate-50 font-mono text-sm text-slate-800 resize-none focus:outline-none leading-relaxed"
+                spellcheck="false">
+# Felix Chen
+**Senior Software Engineer**
+San Francisco, CA | felix.chen@example.com | (555) 123-4567
+
+## Summary
+Experienced Full Stack Engineer with over 6 years of expertise in building scalable web applications using React, Node.js, and TypeScript. Proven track record of optimizing performance and leading cross-functional teams.
+
+## Experience
+
+**Senior Software Engineer** | TechCorp Inc.
+*Jan 2021 - Present*
+- Led the migration of a legacy monolith to a microservices architecture, reducing deployment time by 40%.
+- Mentored 3 junior developers and established code quality standards.
+- Optimized database queries, resulting in a 30% reduction in API latency.
+
+**Software Engineer** | StartupX
+*Jun 2018 - Dec 2020*
+- Developed key features for the flagship SaaS product using React and GraphQL.
+- Collaborated with product managers to define requirements and roadmap.
+
+## Skills
+- **Languages**: JavaScript (ES6+), TypeScript, Python, SQL
+- **Frontend**: React, Redux, Tailwind CSS, Next.js
+- **Backend**: Node.js, Express, PostgreSQL, Redis, Docker
+            </textarea>
+        </div>
+
+        <!-- Preview -->
+        <div id="container-preview" class="w-1/2 flex flex-col bg-white transition-all duration-300">
+            <div
+                class="px-4 py-2 bg-white border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                <span>Live Preview</span>
+                <div class="flex gap-2">
+                    <button class="p-1 hover:bg-slate-100 rounded"><svg class="w-4 h-4 text-slate-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                        </svg></button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-8 bg-white">
+                <div class="preview max-w-2xl mx-auto bg-white shadow-sm border border-slate-100 p-8 min-h-full">
+                    <h1>Felix Chen</h1>
+                    <p class="text-slate-600 mb-6"><strong>Senior Software Engineer</strong><br>San Francisco, CA |
+                        felix.chen@example.com | (555) 123-4567</p>
+
+                    <h2>Summary</h2>
+                    <p>Experienced Full Stack Engineer with over 6 years of expertise in building scalable web
+                        applications using React, Node.js, and TypeScript. Proven track record of optimizing performance
+                        and leading cross-functional teams.</p>
+
+                    <h2>Experience</h2>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between items-baseline mb-1">
+                            <strong>Senior Software Engineer</strong>
+                            <span class="text-sm text-slate-500">TechCorp Inc. | Jan 2021 - Present</span>
+                        </div>
+                        <ul>
+                            <li>Led the migration of a legacy monolith to a microservices architecture, reducing
+                                deployment time by 40%.</li>
+                            <li>Mentored 3 junior developers and established code quality standards.</li>
+                            <li>Optimized database queries, resulting in a 30% reduction in API latency.</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between items-baseline mb-1">
+                            <strong>Software Engineer</strong>
+                            <span class="text-sm text-slate-500">StartupX | Jun 2018 - Dec 2020</span>
+                        </div>
+                        <ul>
+                            <li>Developed key features for the flagship SaaS product using React and GraphQL.</li>
+                            <li>Collaborated with product managers to define requirements and roadmap.</li>
+                        </ul>
+                    </div>
+
+                    <h2>Skills</h2>
+                    <ul>
+                        <li><strong>Languages</strong>: JavaScript (ES6+), TypeScript, Python, SQL</li>
+                        <li><strong>Frontend</strong>: React, Redux, Tailwind CSS, Next.js</li>
+                        <li><strong>Backend</strong>: Node.js, Express, PostgreSQL, Redis, Docker</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        function setViewMode(mode) {
+            const source = document.getElementById('container-source');
+            const preview = document.getElementById('container-preview');
+            const btnSource = document.getElementById('btn-source');
+            const btnSplit = document.getElementById('btn-split');
+            const btnPreview = document.getElementById('btn-preview');
+
+            // Reset buttons
+            [btnSource, btnSplit, btnPreview].forEach(btn => {
+                btn.className = "px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors";
+            });
+
+            // Set active button style
+            const activeClass = "px-3 py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-colors";
+            if (mode === 'source') btnSource.className = activeClass;
+            if (mode === 'split') btnSplit.className = activeClass;
+            if (mode === 'preview') btnPreview.className = activeClass;
+
+            // Base classes
+            const sourceBase = "flex flex-col bg-slate-50 transition-all duration-300";
+            const previewBase = "flex flex-col bg-white transition-all duration-300";
+
+            // Handle Layout
+            if (mode === 'source') {
+                source.className = `${sourceBase} w-full max-w-4xl mx-auto border-x border-slate-200 shadow-sm`;
+                preview.className = `${previewBase} hidden`;
+            } else if (mode === 'preview') {
+                source.className = `${sourceBase} hidden`;
+                preview.className = `${previewBase} w-full max-w-4xl mx-auto border-x border-slate-200 shadow-sm`;
+            } else { // split
+                source.className = `${sourceBase} w-1/2 border-r border-slate-200`;
+                preview.className = `${previewBase} w-1/2`;
+            }
+        }
+    </script>
+</body>
+
+</html>
