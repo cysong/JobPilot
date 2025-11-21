@@ -45,6 +45,7 @@ JobPilot 采用 **Celery Canvas + 自定义状态机** 的混合架构：
 CREATE TABLE workflow_executions (
     id UUID PRIMARY KEY,
     workflow_type VARCHAR(50) NOT NULL,    -- 'job_analysis', 'application_generation'
+    config_version VARCHAR(20) NOT NULL DEFAULT 'v1.0.0', -- 工作流配置版本
     user_id UUID NOT NULL,
     entity_id UUID,                        -- job_id 或 application_id
     status VARCHAR(20),                    -- 'pending', 'running', 'completed', 'failed', 'cancelled'
@@ -61,6 +62,7 @@ CREATE TABLE workflow_executions (
 
 CREATE INDEX idx_workflow_user_status ON workflow_executions(user_id, status);
 CREATE INDEX idx_workflow_type_status ON workflow_executions(workflow_type, status);
+CREATE INDEX idx_workflow_version ON workflow_executions(workflow_type, config_version, created_at);
 ```
 
 **task_executions 表**（任务执行记录）：
@@ -751,81 +753,22 @@ Celery Canvas 原生不支持复杂的条件逻辑（if-else, switch-case）。
     - 无法优雅地保存断点
 ```
 
-### 3.6 版本管理和灰度发布困难
+### 3.6 版本管理需求
 
-**问题描述**：
+**需求描述**：
 
-工作流定义在代码中，无法同时运行多个版本。
+需要支持工作流版本管理，以便：
+- 记录每个执行使用的配置版本
+- 支持版本切换和回滚
+- 对比不同版本的性能指标
 
-**问题场景**：
+**解决方案**：
 
-```
-场景：优化了简历定制算法，想对 10% 用户灰度测试
-
-期望：
-  - 90% 用户使用 v1 算法（旧版）
-  - 10% 用户使用 v2 算法（新版）
-  - 对比两个版本的质量分数
-
-当前实现困难：
-  # 代码中只能有一个实现
-  def tailor_resume(job, resume):
-      # 用 v1 还是 v2？
-      if random.random() < 0.1:
-          return tailor_resume_v2(job, resume)  # 新算法
-      else:
-          return tailor_resume_v1(job, resume)  # 旧算法
-
-  问题：
-    - 代码混乱（v1/v2 逻辑混在一起）
-    - 无法追溯"这个简历用的是哪个版本"
-    - 回滚困难（需要再次部署代码）
-```
-
-### 3.7 任务粒度难以平衡
-
-**问题描述**：
-
-任务粒度太粗或太细都有问题。
-
-**粒度太粗的问题**：
-
-```python
-# 将整个流程放在一个任务里
-def analyze_job_all_in_one(job_url):
-    html = fetch_html(job_url)
-    md = html_to_markdown(html)
-    translated = translate(md)
-    skills = extract_skills(translated)
-    return skills
-
-问题：
-  - 任务执行时间长（15s+），容易超时
-  - 失败后重试成本高（所有步骤重新执行）
-  - 无法并行化
-  - 难以定位具体哪一步出错
-```
-
-**粒度太细的问题**：
-
-```python
-# 每个小步骤都是一个任务
-chain(
-    fetch_html.s(url),
-    extract_title.s(),        # 提取标题
-    extract_company.s(),      # 提取公司
-    extract_salary.s(),       # 提取薪资
-    extract_location.s(),     # 提取地点
-    extract_description.s(),  # 提取描述
-    ...
-)
-
-问题：
-  - 任务数量爆炸（单个工作流 20+ 任务）
-  - Celery 调度开销大
-  - 任务间数据传递频繁（Redis I/O 压力）
-  - workflow_executions 表记录膨胀
-```
+采用**简化版本管理方案**（详见 4.3 节）：
+- 基于 YAML 配置文件的版本管理
+- 通过 `registry.yaml` 手动切换 `active_version`
+- 数据库记录每次执行的 `config_version`
+- 支持版本性能对比分析
 
 ## 4. 扩展方案
 
@@ -1125,168 +1068,384 @@ app.conf.beat_schedule = {
 }
 ```
 
-### 4.3 流程变更管理
+### 4.3 版本管理方案
 
-#### 4.3.1 向后兼容的版本升级
+#### 4.3.1 目录结构
 
-**场景**: 在工作流中间插入新步骤
+```
+backend/
+├── workflows/
+│   ├── job_analysis/
+│   │   ├── v1.0.0.yaml
+│   │   ├── v1.1.0.yaml
+│   │   └── v2.0.0.yaml
+│   │
+│   ├── application_generation/
+│   │   ├── v1.0.0.yaml
+│   │   └── v1.1.0.yaml
+│   │
+│   └── registry.yaml              # 版本注册表
+```
+
+#### 4.3.2 版本注册表
+
+**workflows/registry.yaml**:
 
 ```yaml
-# workflows/job_analysis_v1.yaml（旧版）
-tasks:
-  - id: fetch_html
-  - id: html_to_markdown
-  - id: translate_job
-  - id: extract_skills
+# 工作流版本注册表
+workflows:
+  job_analysis:
+    active_version: "1.1.0"        # 当前使用的版本（手动修改这里切换版本）
+    description: "职位分析工作流"
 
-# workflows/job_analysis_v2.yaml（新版，插入审核步骤）
-tasks:
-  - id: fetch_html
-  - id: html_to_markdown
-  - id: translate_job
-  - id: content_moderation    # 新增
-    config:
-      optional: true           # 标记为可选，兼容旧版
-  - id: extract_skills
+  application_generation:
+    active_version: "1.0.0"
+    description: "申请材料生成工作流"
+
+  resume_tailor:
+    active_version: "1.0.0"
+    description: "简历定制工作流"
 ```
 
-**数据库迁移**:
+#### 4.3.3 数据库设计
 
 ```sql
--- 添加版本字段
-ALTER TABLE workflow_executions ADD COLUMN config_version VARCHAR(20) DEFAULT 'v1';
+-- workflow_executions 表只需要记录版本号
+ALTER TABLE workflow_executions
+ADD COLUMN config_version VARCHAR(20) NOT NULL DEFAULT 'v1.0.0';
 
--- 创建工作流版本表
-CREATE TABLE workflow_versions (
-    id UUID PRIMARY KEY,
-    workflow_type VARCHAR(50),
-    version VARCHAR(20),
-    config_yaml TEXT,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP,
-    UNIQUE(workflow_type, version)
-);
+-- 添加索引用于查询统计
+CREATE INDEX idx_workflow_version ON workflow_executions(workflow_type, config_version, created_at);
 ```
 
-**版本路由逻辑**:
+#### 4.3.4 版本加载器
+
+**app/core/workflow/version_loader.py**:
 
 ```python
-def create_workflow(workflow_type: str, user_id: str, input_data: Dict):
-    # 根据用户或实验分组选择版本
-    version = get_workflow_version_for_user(user_id, workflow_type)
+import yaml
+from pathlib import Path
+from typing import Dict, Optional
+from functools import lru_cache
 
+class WorkflowVersionLoader:
+    """工作流版本加载器"""
+
+    def __init__(self, workflows_dir: str = "workflows"):
+        self.workflows_dir = Path(workflows_dir)
+        self.registry = self._load_registry()
+
+    def _load_registry(self) -> Dict:
+        """加载版本注册表"""
+        registry_path = self.workflows_dir / "registry.yaml"
+        with open(registry_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+
+    def get_active_version(self, workflow_type: str) -> str:
+        """获取当前激活的版本"""
+        if workflow_type not in self.registry['workflows']:
+            raise ValueError(f"Unknown workflow type: {workflow_type}")
+
+        return self.registry['workflows'][workflow_type]['active_version']
+
+    @lru_cache(maxsize=32)
+    def load_workflow_config(self, workflow_type: str, version: Optional[str] = None) -> Dict:
+        """
+        加载工作流配置
+
+        Args:
+            workflow_type: 工作流类型
+            version: 指定版本，如果为 None 则使用 active_version
+        """
+        if version is None:
+            version = self.get_active_version(workflow_type)
+
+        config_path = self.workflows_dir / workflow_type / f"{version}.yaml"
+
+        if not config_path.exists():
+            raise FileNotFoundError(f"Workflow config not found: {config_path}")
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+
+        return config
+
+    def reload_registry(self):
+        """重新加载注册表（用于配置变更后热更新）"""
+        self.registry = self._load_registry()
+        # 清除缓存
+        self.load_workflow_config.cache_clear()
+
+
+# 全局单例
+_loader = None
+
+def get_version_loader() -> WorkflowVersionLoader:
+    """获取版本加载器单例"""
+    global _loader
+    if _loader is None:
+        _loader = WorkflowVersionLoader()
+    return _loader
+```
+
+#### 4.3.5 工作流执行器集成
+
+**app/core/workflow/executor.py**:
+
+```python
+from .version_loader import get_version_loader
+from .parser import WorkflowParser
+
+class WorkflowExecutor:
+    """工作流执行器"""
+
+    def __init__(self, workflow_type: str, version: Optional[str] = None):
+        """
+        初始化执行器
+
+        Args:
+            workflow_type: 工作流类型
+            version: 指定版本（可选），不指定则使用 registry 中的 active_version
+        """
+        self.workflow_type = workflow_type
+        self.loader = get_version_loader()
+
+        # 如果没有指定版本，使用 active_version
+        if version is None:
+            self.version = self.loader.get_active_version(workflow_type)
+        else:
+            self.version = version
+
+        # 加载配置
+        self.config = self.loader.load_workflow_config(workflow_type, self.version)
+        self.parser = WorkflowParser(self.config)
+
+    def execute(self, workflow_id: str, input_data: Dict):
+        """执行工作流"""
+        # 构建任务 DAG
+        tasks_dag = self.parser.build_dag(input_data)
+
+        # 构建并执行 Celery Canvas
+        celery_tasks = self._build_celery_chain(workflow_id, tasks_dag)
+        celery_tasks.apply_async()
+
+    def _build_celery_chain(self, workflow_id: str, tasks_dag: List[Dict]):
+        """将 DAG 转换为 Celery Canvas"""
+        # ... 实现逻辑
+        pass
+```
+
+#### 4.3.6 API 集成
+
+**app/modules/jobs/router.py**:
+
+```python
+from app.core.workflow.executor import WorkflowExecutor
+from app.core.workflow.version_loader import get_version_loader
+
+@router.post("/jobs/analyze")
+async def analyze_job(
+    request: AnalyzeJobRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """分析职位"""
+
+    # 检查配额
+    if not check_user_quota(user):
+        raise HTTPException(403, "AI 分析次数已用完")
+
+    # 获取当前激活版本
+    loader = get_version_loader()
+    active_version = loader.get_active_version("job_analysis")
+
+    # 创建工作流记录
     workflow = WorkflowExecution(
-        workflow_type=workflow_type,
-        config_version=version,
-        user_id=user_id,
-        input_data=input_data
+        workflow_type="job_analysis",
+        config_version=active_version,  # 记录使用的版本
+        user_id=user.id,
+        entity_id=request.job_id,
+        status="pending",
+        input_data=request.dict()
     )
     db.add(workflow)
     db.commit()
 
-    # 使用对应版本的配置执行
-    executor = WorkflowExecutor(workflow_type, version)
-    executor.execute(workflow.id, input_data)
+    # 执行工作流（会自动使用 active_version）
+    executor = WorkflowExecutor("job_analysis")
+    executor.execute(str(workflow.id), request.dict())
 
-def get_workflow_version_for_user(user_id: str, workflow_type: str) -> str:
-    """根据实验分组返回版本"""
-    user = db.query(User).get(user_id)
-
-    # 实验分组逻辑
-    if user.experiment_group == 'control':
-        return 'v1'
-    elif user.experiment_group == 'treatment':
-        return 'v2'
-    else:
-        # 默认使用最新稳定版本
-        latest_version = db.query(WorkflowVersion).filter(
-            WorkflowVersion.workflow_type == workflow_type,
-            WorkflowVersion.is_active == True
-        ).order_by(WorkflowVersion.created_at.desc()).first()
-        return latest_version.version
+    return {
+        "workflow_id": str(workflow.id),
+        "version": active_version,
+        "status": "running"
+    }
 ```
 
-#### 4.3.2 灰度发布
+#### 4.3.7 版本切换流程
 
-**灰度发布策略**:
+**步骤 1: 修改配置文件**
+
+```yaml
+# 编辑 workflows/registry.yaml
+
+workflows:
+  job_analysis:
+    active_version: "2.0.0"  # 从 1.1.0 改为 2.0.0
+    description: "职位分析工作流"
+```
+
+**步骤 2: 热更新配置（可选）**
 
 ```python
-class WorkflowVersionRouter:
-    def __init__(self):
-        self.rollout_config = {
-            'job_analysis': {
-                'v1': {'weight': 90, 'max_users': None},      # 90% 流量
-                'v2': {'weight': 10, 'max_users': 1000}       # 10% 流量，最多 1000 用户
-            }
+# 方式 1: 提供管理 API（需要管理员权限）
+@router.post("/admin/workflows/reload-config")
+async def reload_workflow_config(
+    admin: User = Depends(require_admin)
+):
+    """重新加载工作流配置"""
+    loader = get_version_loader()
+    loader.reload_registry()
+    return {"message": "Configuration reloaded"}
+
+# 方式 2: 重启 Worker 进程
+# supervisorctl restart celery_worker
+```
+
+**步骤 3: 验证切换**
+
+```sql
+-- 查询最近创建的工作流使用的版本
+SELECT config_version, COUNT(*) as count
+FROM workflow_executions
+WHERE workflow_type = 'job_analysis'
+  AND created_at > NOW() - INTERVAL '1 hour'
+GROUP BY config_version;
+
+-- 预期结果：
+-- config_version | count
+-- ---------------+-------
+-- 2.0.0          | 15     <- 新创建的都是 2.0.0
+-- 1.1.0          | 3      <- 旧的可能还在执行中
+```
+
+#### 4.3.8 版本对比分析
+
+**app/modules/admin/analytics.py**:
+
+```python
+def compare_workflow_versions(
+    workflow_type: str,
+    version_a: str,
+    version_b: str,
+    days: int = 7
+):
+    """对比两个版本的性能"""
+
+    since = datetime.now() - timedelta(days=days)
+
+    result = db.query(
+        WorkflowExecution.config_version,
+        func.count().label('total'),
+        func.sum(
+            case((WorkflowExecution.status == 'completed', 1), else_=0)
+        ).label('success'),
+        func.avg(
+            extract('epoch', WorkflowExecution.completed_at - WorkflowExecution.created_at)
+        ).label('avg_duration')
+    ).filter(
+        WorkflowExecution.workflow_type == workflow_type,
+        WorkflowExecution.config_version.in_([version_a, version_b]),
+        WorkflowExecution.created_at >= since
+    ).group_by(
+        WorkflowExecution.config_version
+    ).all()
+
+    comparison = {}
+    for row in result:
+        comparison[row.config_version] = {
+            'total': row.total,
+            'success': row.success,
+            'success_rate': (row.success / row.total * 100) if row.total > 0 else 0,
+            'avg_duration': float(row.avg_duration) if row.avg_duration else 0
         }
 
-    def select_version(self, workflow_type: str, user_id: str) -> str:
-        config = self.rollout_config.get(workflow_type, {})
+    return comparison
 
-        # 检查用户是否已固定版本（保证一致性）
-        user_version = redis.get(f"user_workflow_version:{user_id}:{workflow_type}")
-        if user_version:
-            return user_version
-
-        # 基于用户 ID 哈希的一致性路由
-        user_hash = int(hashlib.md5(user_id.encode()).hexdigest(), 16) % 100
-
-        cumulative_weight = 0
-        for version, settings in config.items():
-            cumulative_weight += settings['weight']
-            if user_hash < cumulative_weight:
-                # 检查版本用户数限制
-                if settings['max_users']:
-                    version_users = redis.scard(f"workflow_version_users:{workflow_type}:{version}")
-                    if version_users >= settings['max_users']:
-                        continue  # 超过限制，尝试下一个版本
-
-                # 记录用户版本（7 天过期）
-                redis.setex(f"user_workflow_version:{user_id}:{workflow_type}", 604800, version)
-                redis.sadd(f"workflow_version_users:{workflow_type}:{version}", user_id)
-                return version
-
-        return 'v1'  # 默认版本
+# 使用示例
+stats = compare_workflow_versions("job_analysis", "1.1.0", "2.0.0", days=7)
+# {
+#     "1.1.0": {"total": 8520, "success": 8102, "success_rate": 95.1, "avg_duration": 12.3},
+#     "2.0.0": {"total": 950, "success": 912, "success_rate": 96.0, "avg_duration": 10.8}
+# }
 ```
 
 ## 5. 实施建议
 
-### 5.1 MVP 阶段（0-3 个月）
+### 5.1 初期实施（推荐方案）
 
-**采用方案**：
-- 基础 Celery Canvas + PostgreSQL 状态表
-- 硬编码工作流定义
-- 基础监控（Flower + 数据库查询）
+**核心组件**：
+- Celery Canvas + PostgreSQL 状态表（任务编排和状态持久化）
+- YAML 配置文件 + 版本注册表（工作流定义和版本管理）
+- 基础监控（Celery Flower + 数据库查询）
 
-**理由**：
-- 快速上线，验证业务模型
-- 工作流相对稳定，变更少
-- 团队规模小，沟通成本低
+**实施步骤**：
 
-### 5.2 成长阶段（3-12 个月）
+1. **搭建基础架构**
+   - 配置 PostgreSQL 数据库（创建 workflow_executions 和 task_executions 表）
+   - 部署 Redis（Celery broker）
+   - 启动 Celery Workers
 
-**优化重点**：
-1. 实施 YAML 配置化（工作流配置化）
-2. 部署 Prometheus + Grafana（监控）
-3. 集成 Sentry（错误追踪）
-4. 实现僵尸任务清理（异常恢复）
+2. **创建工作流配置**
+   - 创建 `workflows/` 目录结构
+   - 编写初始版本的 YAML 配置文件（v1.0.0）
+   - 配置 `registry.yaml` 注册表
 
-**收益**：
-- 支持 A/B 测试不同工作流
-- 可视化监控降低运维成本
-- 提高系统稳定性
+3. **实现核心模块**
+   - 开发 `WorkflowVersionLoader`（版本加载器）
+   - 开发 `WorkflowParser`（配置解析器）
+   - 开发 `WorkflowExecutor`（执行器）
 
-### 5.3 成熟阶段（12 个月后）
+4. **集成 API**
+   - 在业务 API 中集成工作流执行
+   - 实现状态查询接口
+   - 添加版本对比分析功能
 
-**考虑迁移**：
+**优势**：
+- 简单直接，易于理解和维护
+- 支持版本管理和性能对比
+- 修改工作流只需编辑 YAML 文件
+- 回滚简单（修改 registry.yaml 即可）
 
-如果出现以下情况，考虑迁移到 Temporal.io 或 Prefect：
-- 工作流变更频繁（每周多次）
-- 需要复杂条件分支和循环
-- 需要人工审核节点（暂停/恢复）
-- 团队规模扩大（多个团队并行开发工作流）
+### 5.2 监控和运维
 
-**迁移成本**：
-- 2-3 个开发月
-- 需要重写所有工作流定义
-- 需要迁移历史数据
+**基础监控**：
+- Celery Flower（任务执行监控）
+- PostgreSQL 查询（工作流状态统计）
+- 日志聚合（ELK/Loki）
+
+**告警机制**：
+- 僵尸任务检测（定时扫描长时间未更新的任务）
+- 失败率告警（超过阈值时通知）
+- 队列积压告警（任务堆积监控）
+
+**性能优化**：
+- 定期清理历史数据（归档旧的执行记录）
+- 优化任务粒度（避免过粗或过细）
+- 调整 Worker 并发数（根据负载动态调整）
+
+### 5.3 未来扩展
+
+**何时考虑升级**：
+
+如果出现以下情况，可考虑升级到更复杂的工作流引擎（如 Temporal.io 或 Prefect）：
+- 需要复杂的条件分支和循环逻辑
+- 需要人工审核节点（暂停/恢复工作流）
+- 工作流定义变更非常频繁（每周多次）
+- 需要可视化的 DAG 编辑器
+
+**当前方案适用场景**：
+- 工作流结构相对稳定
+- 主要是串行和简单并行（chain/chord）
+- 团队规模中小型（< 20 人）
+- 重视简洁性和可维护性
