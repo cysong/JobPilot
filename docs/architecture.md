@@ -395,7 +395,7 @@ async findAll(filters: JobFiltersDto, userId: string) {
         analysis: true,
         matches: {
           where: { userId },
-          select: { matchScore: true, urgencyScore: true }
+          select: { matchScore: true, urgencyScore: true, bestMatchedResumeId: true }
         }
       },
       orderBy: { publishedAt: 'desc' },
@@ -451,7 +451,10 @@ async create(userId: string, createDto: CreateApplicationDto) {
     data: {
       userId,
       jobId: createDto.jobId,
-      selectedResumeId: createDto.resumeId,
+      userId,
+      jobId: createDto.jobId,
+      sourceResumeId: createDto.resumeId,
+      tailoringLevel: createDto.tailoringLevel || 'Light', // Default to Light if not specified
       status: 'Pending',
       timeline: {
         create: {
@@ -607,6 +610,7 @@ export class AiAgentService {
       case 'translate_text':
         return this.translationTools.translate(input);
       case 'tailor_resume':
+        // input should include { strategy: 'Deep' | 'Light' }
         return this.resumeTools.tailor(input);
       case 'generate_cover_letter':
         return this.coverLetterTools.generate(input);
@@ -1033,10 +1037,12 @@ model JobMatch {
   jobId        Int      @map("job_id") // 关联到Job.id (Int类型)
   matchScore   Decimal  @db.Decimal(5, 2) // 0-100 匹配度
   urgencyScore Decimal? @db.Decimal(5, 2) // 0-100 紧急度
+  bestMatchedResumeId String? @map("best_matched_resume_id") // 系统推荐的最佳简历ID
   updatedAt    DateTime @default(now()) @map("updated_at")
 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  bestMatchedResume Resume? @relation(fields: [bestMatchedResumeId], references: [id])
 
   @@unique([userId, jobId])
   @@index([userId, matchScore(sort: Desc)])
@@ -1052,7 +1058,8 @@ model Application {
   id                      String            @id @default(cuid())
   userId                  String            @map("user_id")
   jobId                   Int               @map("job_id") // 关联到Job.id (Int类型)
-  selectedResumeId        String            @map("selected_resume_id") // 用户选择的简历模板
+  sourceResumeId          String            @map("source_resume_id") // 用户选择的简历模板 (作为定制来源)
+  tailoringLevel          String?           @map("tailoring_level") // 定制深度: "Deep", "Light"
   status                  ApplicationStatus @default(Pending)
 
   // 定制简历和求职信（直接存储documentId）
@@ -1070,7 +1077,7 @@ model Application {
 
   user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   job                     Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  selectedResume          Resume            @relation(fields: [selectedResumeId], references: [id])
+  sourceResume            Resume            @relation(fields: [sourceResumeId], references: [id])
 
   // 关联到定制文档
   resumeDocument          Document?         @relation("TailoredResumeDocument", fields: [resumeDocumentId], references: [id], onDelete: SetNull)
