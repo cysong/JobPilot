@@ -299,121 +299,36 @@ backend/
 ### 1. Auth Module (认证授权)
 
 **功能覆盖**：
-- ✅ 用户注册/登录
-- ✅ JWT Token管理
-- ✅ 角色权限控制 (普通用户/VIP/管理员)
-- ✅ 配额验证
+- 用户注册/登录
+- JWT Token 管理
+- 角色权限控制 (USER/VIP/ADMIN)
+- 配额验证和追踪
 
-**关键代码**：
-```typescript
-// auth.guard.ts
-@Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {}
-
-@Injectable()
-export class RolesGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.get<Role[]>('roles', context.getHandler());
-    const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.some(role => user.role === role);
-  }
-}
-
-// quota.guard.ts
-@Injectable()
-export class QuotaGuard implements CanActivate {
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-
-    // 检查配额
-    const usage = await this.quotaService.getMonthlyUsage(user.id);
-    const limit = await this.quotaService.getQuotaLimit(user.role);
-
-    if (usage.applications >= limit.maxApplications) {
-      throw new ForbiddenException('Monthly application quota exceeded');
-    }
-
-    return true;
-  }
-}
-```
+**核心机制**：
+- 使用 JWT 进行无状态认证
+- 基于角色的访问控制 (RBAC)
+- 月度配额检查 (拦截器模式)
 
 ---
 
 ### 2. Job Module (职位管理)
 
 **功能覆盖**：
-- ✅ Job列表/详情 (只读)
-- ✅ 服务器端分页 (每页20条)
-- ✅ 多维度筛选 (地点/类型/公司/时间)
-- ✅ 关键词搜索 (PostgreSQL全文搜索)
-- ✅ 匹配度/紧急度展示
+- Job 列表查询 (只读)
+- 服务器端分页 (每页 20 条)
+- 多维度筛选 (地点/类型/公司/时间)
+- PostgreSQL 全文搜索
+- 匹配度/紧急度展示
+- 相似职位推荐
 
-**API设计**：
-```typescript
-// jobs.controller.ts
-@Controller('jobs')
-export class JobsController {
-  @Get()
-  async findAll(@Query() filters: JobFiltersDto, @CurrentUser() user: User) {
-    return this.jobsService.findAll(filters, user.id);
-  }
+**数据来源**：
+- 外部爬虫系统维护 `seek_jobs` 表
+- JobPilot 只读访问
+- 通过 `JobAnalysis` 表存储 AI 分析结果
 
-  @Get(':id')
-  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.jobsService.findOne(id, user.id);
-  }
-
-  @Get(':id/similar')
-  async findSimilar(@Param('id') id: string) {
-    return this.jobsService.findSimilarJobs(id);
-  }
-}
-
-// jobs.service.ts
-async findAll(filters: JobFiltersDto, userId: string) {
-  const { page = 1, limit = 20, location, type, company, keyword } = filters;
-
-  const where = {
-    deletedAt: null,
-    ...(location && { location: { in: location } }),
-    ...(type && { employmentType: type }),
-    ...(company && { company: { in: company } }),
-    ...(keyword && {
-      OR: [
-        { title: { search: keyword } },
-        { descriptionMarkdown: { search: keyword } }
-      ]
-    })
-  };
-
-  const [jobs, total] = await Promise.all([
-    this.prisma.job.findMany({
-      where,
-      include: {
-        analysis: true,
-        matches: {
-          where: { userId },
-          select: { matchScore: true, urgencyScore: true, bestMatchedResumeId: true }
-        }
-      },
-      orderBy: { publishedAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    this.prisma.job.count({ where })
-  ]);
-
-  return {
-    data: jobs,
-    meta: {
-      total,
-      page,
-      lastPage: Math.ceil(total / limit)
-    }
-  };
-}
+**查询流程**：
+```
+用户请求 → 应用过滤条件 → 联表查询 JobMatch (获取匹配度) → 分页返回
 ```
 
 ---
@@ -421,322 +336,296 @@ async findAll(filters: JobFiltersDto, userId: string) {
 ### 3. Application Module (申请管理)
 
 **功能覆盖**：
-- ✅ 申请CRUD
-- ✅ 状态流转 (Pending → Tailoring → Ready → Applied → Interviewing → Offer/Rejected)
-- ✅ 时间线记录
-- ✅ 批量操作 (批量标记Applied)
-- ✅ 材料版本化
+- 申请 CRUD 操作
+- 状态流转管理
+- 时间线记录
+- 批量操作 (批量标记状态)
+- 申请材料版本化
+- 软删除和恢复
 
-**关键实现**：
-```typescript
-// applications.service.ts
-async create(userId: string, createDto: CreateApplicationDto) {
-  // 1. 检查唯一性
-  const existing = await this.prisma.application.findUnique({
-    where: {
-      userId_jobId: { userId, jobId: createDto.jobId }
-    }
-  });
+**状态流转**：
+```
+Pending → Tailoring → Ready → Applied → ResumeScreened → PhoneScreen → Interviewing → Offer/Rejected
+         ↓                                                                    ↓
+       (AI生成中)                                                        (触发面试准备)
+```
 
-  if (existing) {
-    if (existing.deletedAt) {
-      // 恢复软删除的申请
-      return this.restore(existing.id);
-    }
-    throw new ConflictException('Application already exists');
-  }
+**核心操作流程**：
 
-  // 2. 创建申请
-  const application = await this.prisma.application.create({
-    data: {
-      userId,
-      jobId: createDto.jobId,
-      userId,
-      jobId: createDto.jobId,
-      sourceResumeId: createDto.resumeId,
-      tailoringLevel: createDto.tailoringLevel || 'Light', // Default to Light if not specified
-      status: 'Pending',
-      timeline: {
-        create: {
-          event: 'created',
-          timestamp: new Date(),
-        }
-      }
-    }
-  });
+**创建申请**：
+```
+1. 检查唯一性 (user_id + job_id)
+2. 创建 Application 记录 (status: Pending)
+3. 记录时间线事件 (created)
+4. 触发工作流 (入队 Celery)
+```
 
-  // 3. 触发AI工作流 (入队到BullMQ)
-  await this.queueService.addApplicationJob({
-    applicationId: application.id,
-    resumeId: createDto.resumeId,
-    customRequirements: createDto.customRequirements
-  });
-
-  return application;
-}
-
-async updateStatus(id: string, status: ApplicationStatus, note?: string) {
-  const application = await this.prisma.application.update({
-    where: { id },
-    data: {
-      status,
-      timeline: {
-        create: {
-          event: `status_changed_to_${status}`,
-          note,
-          timestamp: new Date(),
-        }
-      }
-    }
-  });
-
-  // 如果状态变为Interviewing,触发面试准备
-  if (status === 'Interviewing') {
-    await this.queueService.addInterviewPrepJob({
-      applicationId: id,
-      userId: application.userId,
-      jobId: application.jobId
-    });
-  }
-
-  return application;
-}
-
-async batchUpdateStatus(ids: string[], status: ApplicationStatus) {
-  return this.prisma.application.updateMany({
-    where: { id: { in: ids } },
-    data: { status }
-  });
-}
+**状态更新**：
+```
+1. 更新 Application.status
+2. 记录时间线事件 (status_changed)
+3. 触发后续动作 (如 Interviewing → 生成面试准备材料)
 ```
 
 ---
 
-### 4. AI Agent Module (核心AI能力)
+### 4. Resume Module (简历管理)
 
 **功能覆盖**：
-- ✅ Job分析 (HTML→Markdown、翻译、技能提取)
-- ✅ 简历定制
-- ✅ Cover Letter生成
-- ✅ 质量检查
-- ✅ 面试准备材料生成
-- ✅ 简历推荐
+- 简历模板管理 (CRUD)
+- 草稿/正式版本控制
+- 软删除和恢复
+- 简历内容版本历史
+- 与申请关联追踪
 
-**Claude Agent实现**：
-```typescript
-// ai-agent.service.ts
-import Anthropic from '@anthropic-ai/sdk';
+**数据模型设计**：
 
-@Injectable()
-export class AiAgentService {
-  private anthropic: Anthropic;
+**三层结构**：
+```
+Resume (简历元数据)
+  └── Document (文档内容)
+        └── DocumentVersion[] (版本历史)
+```
 
-  constructor(
-    private configService: ConfigService,
-    private usageTracker: UsageTrackerService
-  ) {
-    this.anthropic = new Anthropic({
-      apiKey: this.configService.get('ANTHROPIC_API_KEY'),
-    });
-  }
+**Document 统一管理**：
+- `docType`: Resume / TailoredResume / CoverLetter
+- `sourceDocumentId`: 追溯源文档
+- `latestVersionNum` + `latestVersionContent`: 快速访问最新版本
+- `DocumentVersion[]`: 完整历史记录
 
-  async runAgent(config: AgentConfig) {
-    const { systemPrompt, messages, tools, userId } = config;
+**定制简历生成流程**：
+```
+1. 读取源简历 (Resume → Document)
+2. AI 定制内容
+3. 创建新 Document (docType: TailoredResume, sourceDocumentId: 原简历ID)
+4. 创建 DocumentVersion (versionNum: 1)
+5. 关联到 Application.resumeDocumentId
+```
 
-    let continueLoop = true;
-    const toolResults: any[] = [];
+**版本管理策略**：
+- 用户手动编辑 → 创建新 DocumentVersion
+- AI 重新生成 → 创建新 DocumentVersion
+- 保留 `changeSummary` 字段记录修改原因
 
-    while (continueLoop) {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages,
-        tools,
-      });
+---
 
-      // 追踪使用量
-      await this.usageTracker.track(userId, {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-      });
+### 5. AI Agent Module (核心 AI 能力)
 
-      if (response.stop_reason === 'tool_use') {
-        // 处理工具调用
-        for (const content of response.content) {
-          if (content.type === 'tool_use') {
-            const result = await this.executeTool(content.name, content.input);
+**功能覆盖**：
+- Job 分析 (HTML→Markdown、翻译、技能提取)
+- 简历定制 (Deep/Light 两种策略)
+- Cover Letter 生成
+- 质量检查
+- 面试准备材料生成
+- 简历推荐
 
-            messages.push({
-              role: 'assistant',
-              content: response.content
-            });
+**模型选择策略**：
+- **DeepSeek**: 翻译、简单文本处理
+- **OpenAI GPT-4**: 复杂任务 (简历定制、求职信生成、面试准备)
 
-            messages.push({
-              role: 'user',
-              content: [{
-                type: 'tool_result',
-                tool_use_id: content.id,
-                content: JSON.stringify(result)
-              }]
-            });
+**Agent 工作流模式**：
+```
+1. 接收任务参数
+2. 调用 AI 模型 (OpenAI Agents SDK)
+3. 可选工具调用 (skill_extractor, translator, quality_check)
+4. 保存结果到数据库
+5. 记录 token 使用量 (AiUsage 表)
+```
 
-            toolResults.push({ tool: content.name, result });
-          }
-        }
-      } else {
-        continueLoop = false;
+**配额管理**：
+- 按用户追踪 AI 使用量 (输入/输出 tokens)
+- 预估成本计算
+- 按操作类型分类统计
 
-        const finalText = response.content
-          .filter(c => c.type === 'text')
-          .map(c => c.text)
-          .join('\n');
+---
 
-        return {
-          success: true,
-          response: finalText,
-          toolResults,
-          usage: response.usage
-        };
-      }
-    }
-  }
+### 6. Workflow Module (工作流管理)
 
-  private async executeTool(toolName: string, input: any) {
-    // 工具路由分发
-    switch (toolName) {
-      case 'extract_skills':
-        return this.jobAnalysisTools.extractSkills(input);
-      case 'translate_text':
-        return this.translationTools.translate(input);
-      case 'tailor_resume':
-        // input should include { strategy: 'Deep' | 'Light' }
-        return this.resumeTools.tailor(input);
-      case 'generate_cover_letter':
-        return this.coverLetterTools.generate(input);
-      case 'quality_check':
-        return this.qualityCheckTools.check(input);
-      default:
-        throw new Error(`Unknown tool: ${toolName}`);
-    }
-  }
-}
+**功能覆盖**：
+- 工作流定义和执行
+- 任务依赖管理 (串行/并行)
+- 状态持久化和恢复
+- 失败重试机制
+- 版本管理
+- 执行历史追踪
+
+**架构分层**：
+```
+API Layer (FastAPI)
+  ↓ 创建工作流
+Orchestration Layer (Workflow Service)
+  ↓ 构建 DAG
+Execution Layer (Celery Workers)
+  ↓ 执行任务
+Storage Layer (PostgreSQL + Redis)
+```
+
+**核心工作流类型**：
+
+**1. Job Analysis Workflow**：
+```
+fetch_html → html_to_markdown → translate_job → extract_skills → 更新 Job 表
+```
+
+**2. Application Generation Workflow** (并行执行)：
+```
+                ┌─ tailor_resume ─┐
+开始 ─┤                          ├─ quality_check → 完成
+                └─ generate_cover_letter ─┘
+```
+
+**工作流状态**：
+- `pending`: 等待执行
+- `running`: 执行中
+- `completed`: 已完成
+- `failed`: 失败
+- `cancelled`: 已取消
+
+**任务状态**：
+- `pending`: 等待执行
+- `running`: 执行中
+- `success`: 成功
+- `failed`: 失败
+- `retry`: 重试中
+
+**执行流程**：
+```
+1. API 接收请求
+2. 创建 WorkflowExecution 记录 (status: pending)
+3. 创建所有 TaskExecution 记录 (预占位)
+4. 加载工作流配置 (从 YAML)
+5. 构建 Celery Canvas (chain/chord)
+6. 提交执行 (apply_async)
+7. Worker 逐步执行任务，更新状态
+8. WebSocket 推送进度通知
+9. 完成后更新 WorkflowExecution (status: completed)
+```
+
+**版本管理方案**：
+
+**目录结构**：
+```
+workflows/
+├── job_analysis/
+│   ├── v1.0.0.yaml
+│   ├── v1.1.0.yaml
+│   └── v2.0.0.yaml
+├── application_generation/
+│   ├── v1.0.0.yaml
+│   └── v1.1.0.yaml
+└── registry.yaml  # 版本注册表 (记录 active_version)
+```
+
+**版本切换**：
+```
+1. 编辑 registry.yaml (修改 active_version)
+2. 重启 Worker 或调用热更新 API
+3. 新创建的工作流自动使用新版本
+4. 数据库记录每次执行的 config_version
+```
+
+**异常处理**：
+
+**任务级重试** (Celery 原生)：
+- 指数退避策略 (60s, 120s, 240s)
+- 可配置最大重试次数
+- 区分可重试错误 (RateLimitError) 和不可重试错误 (InvalidAPIKey)
+
+**僵尸任务清理**：
+- 定时任务扫描 (每 5 分钟)
+- 检测超时未更新的 `running` 任务
+- 对比 PostgreSQL 和 Celery 状态
+- 自动标记失败并告警
+
+---
+
+### 7. WebSocket Gateway (实时通信)
+
+**功能覆盖**：
+- 任务进度实时推送
+- 申请状态变更通知
+- 配额预警
+- 房间管理 (按 application_id 分组)
+
+**通信模式**：
+```
+客户端 → join-application(applicationId) → 加入房间
+Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客户端
+```
+
+**消息类型**：
+- `progress`: 任务进度更新 (百分比、当前阶段)
+- `status-change`: 状态变更通知
+- `quota-warning`: 配额预警
+- `error`: 错误通知
+
+---
+
+## 模块间协作流程
+
+### 完整申请流程示例
+
+```
+1. 用户在 Job 详情页点击"申请"
+   ↓
+2. Application Module 创建申请 (status: Pending)
+   ↓
+3. Workflow Module 启动 application_generation 工作流
+   ↓
+4. AI Agent Module 并行执行：
+   - 简历定制 (基于用户选择的 Resume)
+   - 求职信生成
+   ↓
+5. Resume Module 创建定制文档：
+   - 创建 Document (docType: TailoredResume)
+   - 创建 Document (docType: CoverLetter)
+   - 创建 DocumentVersion (记录初始版本)
+   ↓
+6. AI Agent Module 质量检查
+   ↓
+7. Application Module 更新状态 (status: Ready)
+   - 关联定制文档 (resumeDocumentId, coverLetterDocumentId)
+   - 记录时间线事件
+   ↓
+8. WebSocket Gateway 推送完成通知
+   ↓
+9. 前端跳转到申请详情页，展示定制材料
 ```
 
 ---
 
-### 5. Queue Module (任务队列)
+## 核心设计模式
 
-**功能覆盖**：
-- ✅ Job分析定时任务
-- ✅ 申请材料生成
-- ✅ 面试准备生成
-- ✅ 匹配度预计算
-- ✅ 失败重试
-
-**BullMQ集成**：
-```typescript
-// queue.module.ts
-@Module({
-  imports: [
-    BullModule.forRoot({
-      connection: {
-        host: 'localhost',
-        port: 6379,
-      },
-    }),
-    BullModule.registerQueue(
-      { name: 'job-analysis' },
-      { name: 'application' },
-      { name: 'interview-prep' },
-      { name: 'match-score' }
-    ),
-  ],
-  providers: [
-    JobAnalysisProcessor,
-    ApplicationProcessor,
-    InterviewPrepProcessor,
-    MatchScoreProcessor,
-  ],
-})
-export class QueueModule {}
-
-// application.processor.ts
-@Processor('application')
-export class ApplicationProcessor {
-  @Process('generate-materials')
-  async handleApplicationGeneration(job: Job<ApplicationJobData>) {
-    const { applicationId, resumeId, customRequirements } = job.data;
-
-    try {
-      // 更新进度
-      await job.updateProgress({ stage: 'research', status: 'processing' });
-
-      // 运行Agent工作流
-      const result = await this.aiAgentService.generateApplicationMaterials({
-        applicationId,
-        resumeId,
-        customRequirements
-      });
-
-      // 保存结果
-      await this.prisma.application.update({
-        where: { id: applicationId },
-        data: {
-          status: 'Ready',
-          tailoredResumeContent: result.tailoredResume,
-          coverLetterContent: result.coverLetter,
-          qualityCheckResults: result.qualityCheck,
-        }
-      });
-
-      return result;
-
-    } catch (error) {
-      await job.log(`Failed: ${error.message}`);
-      throw error; // BullMQ会自动重试
-    }
-  }
-}
+**1. Document 统一管理模式**：
+```
+所有文档内容 (简历/求职信) 统一存储在 Document 表
+- 避免数据冗余
+- 统一版本管理
+- 支持文档间关联追溯 (sourceDocumentId)
 ```
 
----
+**2. 软删除模式**：
+```
+关键实体 (Application, Resume, Document) 采用软删除
+- isDeleted + deletedAt 字段
+- 支持恢复操作
+- 保留历史数据用于审计
+```
 
-### 6. WebSocket Gateway (实时通信)
+**3. 时间线记录模式**：
+```
+Application 关联 TimelineEvent[]
+- 记录所有状态变更
+- 记录用户备注
+- 支持审计追踪
+```
 
-**功能覆盖**：
-- ✅ 任务进度实时推送
-- ✅ 申请状态变更通知
-- ✅ 配额预警
-
-```typescript
-// websocket.gateway.ts
-@WebSocketGateway({
-  cors: { origin: 'http://localhost:5173' }
-})
-export class WebSocketGateway {
-  @WebSocketServer()
-  server: Server;
-
-  // 加入申请房间
-  @SubscribeMessage('join-application')
-  handleJoinApplication(
-    @MessageBody() applicationId: string,
-    @ConnectedSocket() client: Socket
-  ) {
-    client.join(`application:${applicationId}`);
-  }
-
-  // 发送进度更新
-  emitProgress(applicationId: string, progress: ProgressUpdate) {
-    this.server.to(`application:${applicationId}`).emit('progress', progress);
-  }
-
-  // 发送状态变更
-  emitStatusChange(applicationId: string, status: ApplicationStatus) {
-    this.server.to(`application:${applicationId}`).emit('status-change', status);
-  }
-}
+**4. 配置驱动工作流**：
+```
+工作流定义存储在 YAML 文件
+- 代码与配置分离
+- 支持版本管理
+- 无需重新部署即可修改流程
 ```
 
 ---
