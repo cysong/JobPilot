@@ -109,6 +109,7 @@ Complete specifications and architecture documentation:
 - **[Architecture](docs/architecture.md)** - System design and technical decisions
 - **[Execution Plan](docs/plan.md)** - Phased milestones and implementation roadmap
 - **[Development Progress](docs/progress.md)** - Worklogs and current status
+- **[Issues & Fixes](docs/issues.md)** - Problem tracking and solutions
 
 UI prototypes are available in [docs/prototypes/](docs/prototypes/index.html) for design reference.
 
