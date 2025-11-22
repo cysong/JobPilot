@@ -390,15 +390,15 @@ Resume (简历元数据：title, isDraft, 软删除标记)
 - 所有版本存储在同一张 `document` 表
 - `rootId`: 文档家族根ID（第一版自引用）
 - `parentId`: 内容来源（跨家族指向模板，同家族指向上一版本）
-- `docType`: ResumeTemplate / ResumeCustom / CoverLetter / Article
+- `format`: 文档格式（Markdown / HTML / PlainText）
 - `contentHash`: 内容哈希（幂等判断和缓存）
-- `metadata`: JSON 扩展字段（业务自定义）
+- `metadata`: JSON 扩展字段（业务自定义，可存储文档类型等业务信息）
 
 **定制简历生成流程**：
 ```
 1. 读取简历模板 (Resume → Document)
 2. AI 定制内容
-3. 创建新 Document (docType: ResumeCustom, parentId: 模板Document.id, rootId: 生成新的family)
+3. 创建新 Document (parentId: 模板Document.id, rootId: 生成新的family)
 4. 关联到 Application.resumeDocumentId
 ```
 
@@ -577,8 +577,8 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
    - 求职信生成
    ↓
 5. Resume Module 创建定制文档：
-   - 创建 Document (docType: ResumeCustom, parentId: 模板Document.id, rootId: 自身id)
-   - 创建 Document (docType: CoverLetter, parentId: null, rootId: 自身id)
+   - 创建 Document (parentId: 模板Document.id, rootId: 自身id)
+   - 创建 Document (parentId: null, rootId: 自身id)
    ↓
 6. AI Agent Module 质量检查
    ↓
@@ -673,11 +673,10 @@ enum ProficiencyLevel {
   Expert
 }
 
-enum DocumentType {
-  ResumeTemplate  // 简历模板
-  ResumeCustom    // 定制简历
-  CoverLetter     // 求职信
-  Article         // 通用文档
+enum DocumentFormat {
+  Markdown
+  HTML
+  PlainText
 }
 
 // ============================================
@@ -685,15 +684,15 @@ enum DocumentType {
 // ============================================
 
 model Document {
-  id              String       @id @default(cuid())
-  rootId          String       // 文档家族根ID（第一版自引用）
-  parentId        String?      // 内容来源（模板或上一版本）
-  docType         DocumentType // 文档类型
-  content         String       @db.Text
-  contentHash     String       // 内容哈希（幂等判断和缓存）
-  changeComments  String?      // 当前版本修改说明
-  metadata        Json?        // JSON扩展字段（业务自定义）
-  createdAt       DateTime     @default(now())
+  id              String         @id @default(cuid())
+  rootId          String         // 文档家族根ID（第一版自引用）
+  parentId        String?        // 内容来源（模板或上一版本）
+  format          DocumentFormat @default(Markdown) // 文档格式
+  content         String         @db.Text
+  contentHash     String         // 内容哈希（幂等判断和缓存）
+  changeComments  String?        // 当前版本修改说明
+  metadata        Json?          // JSON扩展字段（业务自定义）
+  createdAt       DateTime       @default(now())
   createdBy       String
 
   // 关联关系
@@ -708,7 +707,7 @@ model Document {
 
   @@index([rootId, createdAt(sort: Desc)])
   @@index([parentId])
-  @@index([docType, createdBy])
+  @@index([createdBy])
   @@index([contentHash])
   @@map("documents")
 }
