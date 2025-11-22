@@ -170,6 +170,7 @@ frontend/
 
 ```
 backend/
+├── .venv/                            # python虚拟环境目录
 ├── alembic/                          # 数据库迁移
 │   ├── versions/                     # 迁移版本文件
 │   └── env.py                        # Alembic 配置
