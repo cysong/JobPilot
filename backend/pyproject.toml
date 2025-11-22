@@ -1,0 +1,41 @@
+[project]
+name = "jobpilot-backend"
+version = "0.1.0"
+description = "JobPilot Backend API"
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+authors = [
+  { name = "JobPilot Team", email = "team@jobpilot.com" },
+]
+dependencies = [
+  "fastapi>=0.109.0,<0.110.0",
+  "uvicorn[standard]>=0.27.0,<0.28.0",
+  "sqlalchemy>=2.0.25,<3.0.0",
+  "asyncpg>=0.29.0,<0.30.0",
+  "alembic>=1.13.1,<2.0.0",
+  "pydantic[email]>=2.5.3,<3.0.0",
+  "pydantic-settings>=2.1.0,<3.0.0",
+  "python-jose[cryptography]>=3.3.0,<4.0.0",
+  "passlib[bcrypt]>=1.7.4,<2.0.0",
+  "python-multipart>=0.0.6,<0.1.0",
+  "celery[redis]>=5.3.6,<6.0.0",
+  "redis>=5.0.1,<6.0.0",
+  "openai>=1.10.0,<2.0.0",
+  "markdown>=3.5.2,<4.0.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=7.4.4,<8.0.0",
+  "pytest-asyncio>=0.23.3,<1.0.0",
+  "httpx>=0.26.0,<0.27.0",
+  "black>=24.1.1,<25.0.0",
+  "ruff>=0.1.14,<0.2.0",
+]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
