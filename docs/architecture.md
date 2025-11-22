@@ -378,6 +378,12 @@ Pending → Tailoring → Ready → Applied → ResumeScreened → PhoneScreen �
 - 简历内容版本历史
 - 与申请关联追踪
 
+**业务规则**：
+- **正式简历数量限制**: 由全局配置 `FORMAL_RESUME_LIMIT` 控制（非用户级字段）
+  * 默认值：所有角色统一限制（如 5 个）
+  * 可在系统配置文件或环境变量中调整
+  * 超过限制时，无法创建新的正式简历
+
 **数据模型设计**：
 
 **两层结构**：
@@ -404,7 +410,9 @@ Resume (简历元数据：title, isDraft, 软删除标记)
 
 **版本管理策略**：
 - 用户手动编辑 → 创建新 Document (parentId: 上一版本ID, rootId: 保持不变)
-- AI 重新生成 → 创建新 Document (parentId: 模板ID, rootId: 生成新的family)
+- AI 重新生成 → 创建新 Document (parentId: 模板ID, rootId: **保持不变**，属于同一文档家族)
+  * 说明：对同一申请的简历/求职信重新生成时，使用相同的 rootId，表示它们属于同一文档家族
+  * 不同申请即使使用同一模板，也会创建不同的 rootId (不同家族)
 - 保留 `changeComments` 字段记录修改原因
 
 ---
@@ -432,10 +440,37 @@ Resume (简历元数据：title, isDraft, 软删除标记)
 5. 记录 token 使用量 (AiUsage 表)
 ```
 
+**核心任务类型**：
+1. **job_analysis**: 分析职位描述，提取技能要求、经验要求等
+2. **tailor_resume**: 根据职位要求定制简历（Deep/Light两种深度）
+3. **generate_cover_letter**: 生成求职信
+4. **quality_check**: 质量检查定制后的简历和求职信
+5. **resume_recommendation**: 简历推荐
+   - 输入：用户所有简历 + 职位要求
+   - 输出：最佳匹配简历ID + 匹配详情
+   - 结果存储：`JobMatch.bestMatchedResumeId` 和 `JobMatch.matchDetails`
+   - 触发时机：Job 分析完成后，由工作流自动触发
+
 **配额管理**：
 - 按用户追踪 AI 使用量 (输入/输出 tokens)
 - 预估成本计算
 - 按操作类型分类统计
+
+**配额管理时机**：
+1. **检查时机** (API Layer)：
+   - 用户发起 AI 相关请求时（创建 Application、Job Analysis 等）
+   - 在工作流启动前检查配额是否充足
+   - 如配额不足，直接拒绝请求并返回错误
+
+2. **扣除时机** (Outbox Layer)：
+   - AI 任务成功完成后，在 Outbox Pattern 事件发布时扣除
+   - 基于实际使用的 tokens 进行扣除
+   - 如任务失败，不扣除配额
+   - 通过 `AiUsage` 表记录每次使用详情
+
+3. **配额重置**：
+   - 由定时任务（Celery Beat）每月重置配额
+   - 更新 `User.monthlyTokenLeft` 和 `User.quotaResetAt`
 
 ---
 
@@ -537,6 +572,33 @@ workflows/
 - 对比 PostgreSQL 和 Celery 状态
 - 自动标记失败并告警
 
+**定时任务协调**：
+
+系统使用 **Celery Beat** 作为定时任务调度器，负责触发周期性工作流：
+
+```python
+# celery_beat_schedule 配置示例
+{
+    'quota-reset-monthly': {
+        'task': 'tasks.quota.reset_monthly_quota',
+        'schedule': crontab(day_of_month='1', hour='0', minute='0'),
+    },
+    'zombie-task-cleanup': {
+        'task': 'tasks.workflow.cleanup_zombie_tasks',
+        'schedule': crontab(minute='*/5'),  # 每5分钟
+    },
+}
+```
+
+**工作流触发方式**：
+1. **用户操作触发**: API 接收请求后直接创建工作流（如创建 Application）
+2. **定时任务触发**: Celery Beat 按时间表触发（如配额重置、僵尸任务清理）
+3. **事件驱动触发**: 通过 Outbox Pattern 发布的事件触发后续工作流（如 Job 分析完成后触发简历推荐）
+
+**注意事项**：
+- 批量操作（如批量导入 Job）**不会自动触发工作流**，需要用户显式触发分析
+- 定时任务失败会记录到 `TaskExecution` 表，并通过告警系统通知管理员
+
 ---
 
 ### 7. WebSocket Gateway (实时通信)
@@ -558,6 +620,48 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 - `status-change`: 状态变更通知
 - `quota-warning`: 配额预警
 - `error`: 错误通知
+
+**消息格式示例**：
+
+```json
+// progress - 任务进度更新
+{
+  "type": "progress",
+  "applicationId": "app_123",
+  "workflowId": "wf_456",
+  "taskName": "tailor_resume",
+  "progress": 65,
+  "message": "正在定制简历..."
+}
+
+// status-change - 状态变更
+{
+  "type": "status-change",
+  "applicationId": "app_123",
+  "oldStatus": "Pending",
+  "newStatus": "Ready",
+  "timestamp": "2025-01-15T10:30:00Z"
+}
+
+// quota-warning - 配额预警
+{
+  "type": "quota-warning",
+  "userId": "user_123",
+  "quotaType": "monthlyToken",
+  "remaining": 5000,
+  "limit": 100000,
+  "message": "Token配额即将用尽（剩余5%）"
+}
+
+// error - 错误通知
+{
+  "type": "error",
+  "applicationId": "app_123",
+  "taskName": "generate_cover_letter",
+  "error": "API rate limit exceeded",
+  "retryable": true
+}
+```
 
 ---
 
@@ -723,6 +827,13 @@ model User {
   role              Role     @default(USER)
   preferences       Json?    // 定制需求预设 {resumeCustomization, coverLetterStyle}
   linkedinConnected Boolean  @default(false)
+
+  // 配额管理字段
+  monthlyJobLimit   Int      @default(0) // 每月Job分析配额
+  monthlyTokenLimit Int      @default(0) // 每月Token配额
+  monthlyTokenLeft  Int      @default(0) // 剩余Token数
+  quotaResetAt      DateTime? // 配额重置时间
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -874,34 +985,38 @@ model Job {
 }
 
 model JobAnalysis {
-  id              String    @id @default(cuid())
-  jobId           Int       @unique @map("job_id") // 关联到Job.id (Int类型)
-  requiredSkills  String[]  // 必备技能
-  optionalSkills  String[]  // 可选技能
-  softSkills      String[]  // 软技能
-  yearsExperience Int?      // 工作年限要求
-  deadline        DateTime? // 申请截止日期（用于计算紧急度）
-  analysisResult  String?   @db.VarChar(50) // success/failed/pending
-  errorMessage    String?   @db.Text
-  analyzedAt      DateTime?
+  id                  String    @id @default(cuid())
+  jobId               Int       @unique @map("job_id") // 关联到Job.id (Int类型)
+  requiredSkills      String[]  // 必备技能
+  optionalSkills      String[]  // 可选技能
+  softSkills          String[]  // 软技能
+  yearsExperience     Int?      // 工作年限要求
+  deadline            DateTime? // 申请截止日期（用于计算紧急度）
+  markdownContent     String?   @db.Text // 分析结果的Markdown格式内容
+  translatedContent   String?   @db.Text // 翻译后的内容（如需要）
+  originalLanguage    String?   @db.VarChar(10) // 原始语言代码（如zh, en）
+  analysisResult      String?   @db.VarChar(50) // success/failed/pending
+  errorMessage        String?   @db.Text
+  analyzedAt          DateTime?
 
-  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job                 Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_analysis")
 }
 
 model JobMatch {
-  id           String   @id @default(cuid())
-  userId       String
-  jobId        Int      @map("job_id") // 关联到Job.id (Int类型)
-  matchScore   Decimal  @db.Decimal(5, 2) // 0-100 匹配度
-  urgencyScore Decimal? @db.Decimal(5, 2) // 0-100 紧急度
-  bestMatchedResumeId String? @map("best_matched_resume_id") // 系统推荐的最佳简历ID
-  updatedAt    DateTime @default(now()) @map("updated_at")
+  id                  String   @id @default(cuid())
+  userId              String
+  jobId               Int      @map("job_id") // 关联到Job.id (Int类型)
+  matchScore          Decimal  @db.Decimal(5, 2) // 0-100 匹配度
+  urgencyScore        Decimal? @db.Decimal(5, 2) // 0-100 紧急度
+  bestMatchedResumeId String?  @map("best_matched_resume_id") // 系统推荐的最佳简历ID (Application创建时从此读取)
+  matchDetails        Json?    // 匹配详情（技能匹配、经验匹配等具体分析）
+  updatedAt           DateTime @default(now()) @map("updated_at")
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  bestMatchedResume Resume? @relation(fields: [bestMatchedResumeId], references: [id])
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  bestMatchedResume   Resume?  @relation(fields: [bestMatchedResumeId], references: [id])
 
   @@unique([userId, jobId])
   @@index([userId, matchScore(sort: Desc)])
@@ -1014,3 +1129,30 @@ model AiUsage {
   @@map("ai_usage")
 }
 ```
+
+---
+
+## 未来扩展功能
+
+### Interview Preparation (面试准备)
+
+**功能概述**: 基于职位要求和用户简历，自动生成面试准备材料，包括常见问题预测、STAR 方法答案建议、技术问题准备等。
+
+**实现要点**:
+- 新增 `InterviewPrep` 表存储面试准备材料
+- AI 任务类型：`interview_prep_generation`
+- 触发时机：Application 状态变为 Ready 后，用户手动触发
+- 输出内容：常见问题列表、建议回答、技术准备要点
+
+### Company Research (公司调研)
+
+**功能概述**: 自动收集和分析目标公司信息，帮助用户了解公司文化、产品、近期新闻等，为面试做准备。
+
+**实现要点**:
+- 新增 `CompanyResearch` 表存储调研结果
+- 集成外部数据源（公司官网、LinkedIn、新闻API等）
+- AI 任务类型：`company_research`
+- 触发时机：用户在 Application 详情页手动触发
+- 输出内容：公司概况、文化特点、产品分析、近期动态
+
+---
