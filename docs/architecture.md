@@ -380,32 +380,32 @@ Pending → Tailoring → Ready → Applied → ResumeScreened → PhoneScreen �
 
 **数据模型设计**：
 
-**三层结构**：
+**两层结构**：
 ```
-Resume (简历元数据)
-  └── Document (文档内容)
-        └── DocumentVersion[] (版本历史)
+Resume (简历元数据：title, isDraft, 软删除标记)
+  └── Document (文档内容 + 版本链)
 ```
 
-**Document 统一管理**：
-- `docType`: Resume / TailoredResume / CoverLetter
-- `sourceDocumentId`: 追溯源文档
-- `latestVersionNum` + `latestVersionContent`: 快速访问最新版本
-- `DocumentVersion[]`: 完整历史记录
+**Document 链式版本模型**：
+- 所有版本存储在同一张 `document` 表
+- `rootId`: 文档家族根ID（第一版自引用）
+- `parentId`: 内容来源（跨家族指向模板，同家族指向上一版本）
+- `docType`: ResumeTemplate / ResumeCustom / CoverLetter / Article
+- `contentHash`: 内容哈希（幂等判断和缓存）
+- `metadata`: JSON 扩展字段（业务自定义）
 
 **定制简历生成流程**：
 ```
-1. 读取源简历 (Resume → Document)
+1. 读取简历模板 (Resume → Document)
 2. AI 定制内容
-3. 创建新 Document (docType: TailoredResume, sourceDocumentId: 原简历ID)
-4. 创建 DocumentVersion (versionNum: 1)
-5. 关联到 Application.resumeDocumentId
+3. 创建新 Document (docType: ResumeCustom, parentId: 模板Document.id, rootId: 生成新的family)
+4. 关联到 Application.resumeDocumentId
 ```
 
 **版本管理策略**：
-- 用户手动编辑 → 创建新 DocumentVersion
-- AI 重新生成 → 创建新 DocumentVersion
-- 保留 `changeSummary` 字段记录修改原因
+- 用户手动编辑 → 创建新 Document (parentId: 上一版本ID, rootId: 保持不变)
+- AI 重新生成 → 创建新 Document (parentId: 模板ID, rootId: 生成新的family)
+- 保留 `changeComments` 字段记录修改原因
 
 ---
 
@@ -577,9 +577,8 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
    - 求职信生成
    ↓
 5. Resume Module 创建定制文档：
-   - 创建 Document (docType: TailoredResume)
-   - 创建 Document (docType: CoverLetter)
-   - 创建 DocumentVersion (记录初始版本)
+   - 创建 Document (docType: ResumeCustom, parentId: 模板Document.id, rootId: 自身id)
+   - 创建 Document (docType: CoverLetter, parentId: null, rootId: 自身id)
    ↓
 6. AI Agent Module 质量检查
    ↓
@@ -596,20 +595,22 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 
 ## 核心设计模式
 
-**1. Document 统一管理模式**：
+**1. Document 链式版本模式**：
 ```
 所有文档内容 (简历/求职信) 统一存储在 Document 表
-- 避免数据冗余
-- 统一版本管理
-- 支持文档间关联追溯 (sourceDocumentId)
+- 链式版本：rootId 聚合文档家族，parentId 追溯内容来源
+- 内容哈希去重：contentHash 支持幂等判断和缓存
+- 跨家族派生：定制简历的 parentId 指向模板，表示内容来源
+- 业务元数据分离：metadata JSON 字段由业务层自定义
 ```
 
 **2. 软删除模式**：
 ```
-关键实体 (Application, Resume, Document) 采用软删除
+关键业务实体 (Application, Resume) 采用软删除
 - isDeleted + deletedAt 字段
 - 支持恢复操作
 - 保留历史数据用于审计
+- Document 表不处理软删除，由业务层管理
 ```
 
 **3. 时间线记录模式**：
@@ -673,71 +674,43 @@ enum ProficiencyLevel {
 }
 
 enum DocumentType {
-  Resume         // 简历模板
-  TailoredResume // 定制简历
-  CoverLetter    // 求职信
-}
-
-enum DocumentFormat {
-  Markdown
-  HTML
-  PlainText
+  ResumeTemplate  // 简历模板
+  ResumeCustom    // 定制简历
+  CoverLetter     // 求职信
+  Article         // 通用文档
 }
 
 // ============================================
-// 核心文档管理模型
+// 核心文档管理模型（链式版本模型）
 // ============================================
 
 model Document {
-  id                   String         @id @default(cuid())
-  docType              DocumentType   // 文档类型（创建后不可变）
-  sourceDocumentId     String?        // 源文档ID（用于追溯）
-  sourceVersionId      String?        // 源文档版本ID
-  latestVersionNum     Int            @default(1)
-  latestVersionContent String         @db.Text
-  format               DocumentFormat @default(Markdown) // 格式（创建后不可变）
-
-  createdBy            String
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  updatedBy            String
-  isDeleted            Boolean        @default(false) // 软删除标记
-  deletedAt            DateTime?      // 软删除时间
+  id              String       @id @default(cuid())
+  rootId          String       // 文档家族根ID（第一版自引用）
+  parentId        String?      // 内容来源（模板或上一版本）
+  docType         DocumentType // 文档类型
+  content         String       @db.Text
+  contentHash     String       // 内容哈希（幂等判断和缓存）
+  changeComments  String?      // 当前版本修改说明
+  metadata        Json?        // JSON扩展字段（业务自定义）
+  createdAt       DateTime     @default(now())
+  createdBy       String
 
   // 关联关系
-  creator              User             @relation("DocumentCreator", fields: [createdBy], references: [id])
-  updater              User             @relation("DocumentUpdater", fields: [updatedBy], references: [id])
-  sourceDocument       Document?        @relation("DocumentDerivation", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
-  derivedDocuments     Document[]       @relation("DocumentDerivation")
-  versions             DocumentVersion[]
+  creator         User         @relation("DocumentCreator", fields: [createdBy], references: [id])
+  parent          Document?    @relation("DocumentChain", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Document[]   @relation("DocumentChain")
 
-  // 业务层关联（一对一）
+  // 业务层关联
   resume                       Resume?
   tailoredResumeApplications   Application[] @relation("TailoredResumeDocument")
   coverLetterApplications      Application[] @relation("CoverLetterDocument")
 
-  @@index([docType, isDeleted, createdBy])
-  @@index([sourceDocumentId])
-  @@index([createdAt(sort: Desc)])
-  @@index([isDeleted])
+  @@index([rootId, createdAt(sort: Desc)])
+  @@index([parentId])
+  @@index([docType, createdBy])
+  @@index([contentHash])
   @@map("documents")
-}
-
-model DocumentVersion {
-  id             String   @id @default(cuid())
-  documentId     String
-  versionNum     Int
-  content        String   @db.Text
-  changeSummary  String?  // AI修改摘要或用户备注
-  createdBy      String
-  createdAt      DateTime @default(now())
-
-  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  creator        User     @relation(fields: [createdBy], references: [id])
-
-  @@unique([documentId, versionNum])
-  @@index([documentId, createdAt(sort: Desc)])
-  @@map("document_versions")
 }
 
 // ============================================
@@ -762,10 +735,8 @@ model User {
   aiUsage              AiUsage[]
   interviewPrep        InterviewPrep[]
 
-  // 文档创建/更新关系
-  createdDocuments     Document[]        @relation("DocumentCreator")
-  updatedDocuments     Document[]        @relation("DocumentUpdater")
-  documentVersions     DocumentVersion[]
+  // 文档创建关系
+  createdDocuments     Document[] @relation("DocumentCreator")
 
   @@map("users")
 }
