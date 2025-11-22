@@ -79,68 +79,82 @@
                 JobPilot
             </div>
             <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
-                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
-                <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
-                <a href="applications.html" class="hover:text-primary-600">Applications</a>
-                <a href="resumes.html" class="text-primary-600">Resumes</a>
+                <a href="resumes.html" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-xl font-bold text-slate-900">Full Stack Resume v2</h1>
+                        <span
+                            class="px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold border border-yellow-200">Draft</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Last edited 2 minutes ago</p>
+                </div>
             </div>
-        </div>
-        <div class="flex items-center gap-4">
-            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
-            </a>
+            <div class="flex items-center gap-3">
+                <!-- View Mode Switcher -->
+                <div class="bg-slate-100 p-1 rounded-lg flex text-sm font-medium text-slate-600 mr-4">
+                    <button onclick="setViewMode('source')" id="btn-source"
+                        class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Source</button>
+                    <button onclick="setViewMode('split')" id="btn-split"
+                        class="px-3 py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-colors">Split</button>
+                    <button onclick="setViewMode('preview')" id="btn-preview"
+                        class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Preview</button>
+                </div>
+
+                <button
+                    class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Download PDF
+                </button>
+                <div class="h-6 w-px bg-slate-200 mx-1"></div>
+                <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Save
+                    Draft</button>
+                <button
+                    class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Finalize Resume
+                </button>
+
+                <!-- User Dropdown -->
+                <div class="relative group ml-4">
+                    <button
+                        class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div
+                        class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 hidden group-hover:block z-50">
+                        <div class="px-4 py-2 border-b border-slate-100 mb-1">
+                            <p class="text-sm font-bold text-slate-900">Felix Chen</p>
+                            <p class="text-xs text-slate-500 truncate">felix.chen@example.com</p>
+                        </div>
+                        <a href="profile.html"
+                            class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                            User Profile
+                        </a>
+                        <a href="#"
+                            class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                            Settings
+                        </a>
+                        <div class="border-t border-slate-100 my-1"></div>
+                        <a href="index.html"
+                            class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                            Sign out
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </nav>
-
-    <!-- Toolbar -->
-    <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-            <a href="resumes.html" class="text-slate-400 hover:text-slate-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-            </a>
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-xl font-bold text-slate-900">Full Stack Resume v2</h1>
-                    <span
-                        class="px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold border border-yellow-200">Draft</span>
-                </div>
-                <p class="text-xs text-slate-500 mt-1">Last edited 2 minutes ago</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <!-- View Mode Switcher -->
-            <div class="bg-slate-100 p-1 rounded-lg flex text-sm font-medium text-slate-600 mr-4">
-                <button onclick="setViewMode('source')" id="btn-source"
-                    class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Source</button>
-                <button onclick="setViewMode('split')" id="btn-split"
-                    class="px-3 py-1.5 rounded-md bg-white text-slate-900 shadow-sm transition-colors">Split</button>
-                <button onclick="setViewMode('preview')" id="btn-preview"
-                    class="px-3 py-1.5 rounded-md hover:text-slate-900 transition-colors">Preview</button>
-            </div>
-
-            <button
-                class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                Download PDF
-            </button>
-            <div class="h-6 w-px bg-slate-200 mx-1"></div>
-            <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Save
-                Draft</button>
-            <button
-                class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                Finalize Resume
-            </button>
-        </div>
-    </div>
 
     <!-- Editor Area -->
     <main class="flex-1 flex h-[calc(100vh-140px)] overflow-hidden">
@@ -204,7 +218,8 @@ Experienced Full Stack Engineer with over 6 years of expertise in building scala
 
                     <h2>Summary</h2>
                     <p>Experienced Full Stack Engineer with over 6 years of expertise in building scalable web
-                        applications using React, Node.js, and TypeScript. Proven track record of optimizing performance
+                        applications using React, Node.js, and TypeScript. Proven track record of optimizing
+                        performance
                         and leading cross-functional teams.</p>
 
                     <h2>Experience</h2>

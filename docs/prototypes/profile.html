@@ -47,21 +47,43 @@
                 JobPilot
             </div>
             <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
-                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="dashboard.html" class="hover:text-primary-600">Dashboard</a>
                 <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
                 <a href="applications.html" class="hover:text-primary-600">Applications</a>
                 <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+
+        <!-- User Dropdown -->
+        <div class="relative group">
+            <button
+                class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
-            </a>
+            </button>
+            <!-- Dropdown Menu -->
+            <div
+                class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 hidden group-hover:block z-50">
+                <div class="px-4 py-2 border-b border-slate-100 mb-1">
+                    <p class="text-sm font-bold text-slate-900">Felix Chen</p>
+                    <p class="text-xs text-slate-500 truncate">felix.chen@example.com</p>
+                </div>
+                <a href="profile.html"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    User Profile
+                </a>
+                <a href="#"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    Settings
+                </a>
+                <div class="border-t border-slate-100 my-1"></div>
+                <a href="index.html" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    Sign out
+                </a>
+            </div>
         </div>
     </nav>
 
-    <div class="flex flex-1 container mx-auto max-w-6xl py-8 px-6 gap-8">
-
+    <div class="flex-1 container mx-auto max-w-6xl p-6 flex gap-8">
         <!-- Sidebar -->
         <aside class="w-64 shrink-0">
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -116,7 +138,8 @@
             <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                 <div class="px-8 py-6 border-b border-slate-100">
                     <h1 class="text-xl font-bold text-slate-900">AI Customization Preferences</h1>
-                    <p class="text-sm text-slate-500 mt-1">Configure how JobPilot's AI agent handles your applications
+                    <p class="text-sm text-slate-500 mt-1">Configure how JobPilot's AI agent handles your
+                        applications
                         by default.</p>
                 </div>
 
@@ -126,8 +149,10 @@
                     <section>
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <h3 class="text-base font-semibold text-slate-900">Default Tailoring Strategy</h3>
-                                <p class="text-sm text-slate-500 mt-1">Choose the default level of customization for new
+                                <h3 class="text-base font-semibold text-slate-900">Default Tailoring Strategy
+                                </h3>
+                                <p class="text-sm text-slate-500 mt-1">Choose the default level of customization
+                                    for new
                                     applications.</p>
                             </div>
                         </div>
@@ -151,8 +176,10 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <p><strong>Deep Tailoring</strong> is selected. The AI will aggressively rewrite your resume
-                                content to match the job description. You can still override this per application.</p>
+                            <p><strong>Deep Tailoring</strong> is selected. The AI will aggressively rewrite
+                                your resume
+                                content to match the job description. You can still override this per
+                                application.</p>
                         </div>
                     </section>
 
@@ -162,7 +189,8 @@
                     <section>
                         <div class="mb-4">
                             <h3 class="text-base font-semibold text-slate-900">Cover Letter Tone</h3>
-                            <p class="text-sm text-slate-500 mt-1">Select the default voice for your generated cover
+                            <p class="text-sm text-slate-500 mt-1">Select the default voice for your generated
+                                cover
                                 letters.</p>
                         </div>
 

@@ -33,22 +33,45 @@
                 JobPilot
             </div>
             <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
-                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="dashboard.html" class="hover:text-primary-600">Dashboard</a>
                 <a href="jobs.html" class="hover:text-primary-600">Jobs</a>
                 <a href="applications.html" class="text-primary-600">Applications</a>
                 <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+
+        <!-- User Dropdown -->
+        <div class="relative group">
+            <button
+                class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
-            </a>
+            </button>
+            <!-- Dropdown Menu -->
+            <div
+                class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 hidden group-hover:block z-50">
+                <div class="px-4 py-2 border-b border-slate-100 mb-1">
+                    <p class="text-sm font-bold text-slate-900">Felix Chen</p>
+                    <p class="text-xs text-slate-500 truncate">felix.chen@example.com</p>
+                </div>
+                <a href="profile.html"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    User Profile
+                </a>
+                <a href="#"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    Settings
+                </a>
+                <div class="border-t border-slate-100 my-1"></div>
+                <a href="index.html" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    Sign out
+                </a>
+            </div>
         </div>
     </nav>
 
     <!-- Content -->
-    <main class="flex-1 container mx-auto max-w-full p-6 overflow-x-auto">
-        <div class="flex justify-between items-center mb-6">
+    <main class="flex-1 container mx-auto max-w-6xl p-6 overflow-x-auto">
+        <div class="flex justify-between items-center mb-8">
             <h1 class="text-2xl font-bold text-slate-900">My Applications</h1>
             <button
                 class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">Switch
@@ -73,7 +96,8 @@
                         </div>
                         <div class="text-sm text-slate-500 mb-3">Google</div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Needs Tailoring</span>
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Needs
+                                Tailoring</span>
                             <span class="text-xs text-slate-400">2d ago</span>
                         </div>
                     </a>
@@ -121,7 +145,8 @@
                         <div class="font-bold text-slate-900 mb-1">Full Stack Dev</div>
                         <div class="text-sm text-slate-500 mb-3">Airbnb</div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">Technical Round</span>
+                            <span class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">Technical
+                                Round</span>
                             <span class="text-xs text-slate-400">3d ago</span>
                         </div>
                     </div>

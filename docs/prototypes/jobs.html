@@ -48,16 +48,39 @@
                 JobPilot
             </div>
             <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
-                <a href="index.html" class="hover:text-primary-600">Dashboard</a>
+                <a href="dashboard.html" class="hover:text-primary-600">Dashboard</a>
                 <a href="jobs.html" class="text-primary-600">Jobs</a>
                 <a href="applications.html" class="hover:text-primary-600">Applications</a>
                 <a href="resumes.html" class="hover:text-primary-600">Resumes</a>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <a href="profile.html" class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+
+        <!-- User Dropdown -->
+        <div class="relative group">
+            <button
+                class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
-            </a>
+            </button>
+            <!-- Dropdown Menu -->
+            <div
+                class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 hidden group-hover:block z-50">
+                <div class="px-4 py-2 border-b border-slate-100 mb-1">
+                    <p class="text-sm font-bold text-slate-900">Felix Chen</p>
+                    <p class="text-xs text-slate-500 truncate">felix.chen@example.com</p>
+                </div>
+                <a href="profile.html"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    User Profile
+                </a>
+                <a href="#"
+                    class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary-600 transition-colors">
+                    Settings
+                </a>
+                <div class="border-t border-slate-100 my-1"></div>
+                <a href="index.html" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    Sign out
+                </a>
+            </div>
         </div>
     </nav>
 
@@ -91,7 +114,8 @@
                             class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">Search</button>
                     </div>
                 </div>
-                <div class="mt-4 text-xs text-slate-500 font-medium uppercase tracking-wider">24 Jobs Found</div>
+                <div class="mt-4 text-xs text-slate-500 font-medium uppercase tracking-wider">24 Jobs Found
+                </div>
             </div>
 
             <!-- Job List Container -->
@@ -109,7 +133,8 @@
                             <div class="flex flex-wrap gap-2 mt-2">
                                 <span
                                     class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded">Full-time</span>
-                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$180k -
+                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$180k
+                                    -
                                     $220k</span>
                             </div>
                             <p class="text-xs text-slate-400 mt-3">Posted 2 days ago</p>
@@ -130,7 +155,8 @@
                             <div class="flex flex-wrap gap-2 mt-2">
                                 <span
                                     class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded">Contract</span>
-                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$150k -
+                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$150k
+                                    -
                                     $190k</span>
                             </div>
                             <p class="text-xs text-slate-400 mt-3">Posted 5 hours ago</p>
@@ -151,7 +177,8 @@
                             <div class="flex flex-wrap gap-2 mt-2">
                                 <span
                                     class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded">Full-time</span>
-                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$140k -
+                                <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded">$140k
+                                    -
                                     $180k</span>
                             </div>
                             <p class="text-xs text-slate-400 mt-3">Posted 1 day ago</p>
@@ -171,7 +198,8 @@
                             class="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center text-2xl font-bold text-slate-700">
                             G</div>
                         <div>
-                            <h1 id="detail-title" class="text-2xl font-bold text-slate-900">Senior Software Engineer
+                            <h1 id="detail-title" class="text-2xl font-bold text-slate-900">Senior Software
+                                Engineer
                             </h1>
                             <div class="flex items-center gap-2 text-slate-500 mt-1">
                                 <span id="detail-company" class="font-medium text-slate-700">Google</span>
@@ -225,16 +253,20 @@
                 <div class="max-w-3xl">
                     <h3 class="text-lg font-bold text-slate-900 mb-3">About the Role</h3>
                     <p class="text-slate-600 leading-relaxed mb-6">
-                        We are looking for a Senior Software Engineer to join our Core Infrastructure team. You will be
-                        responsible for designing and building scalable systems that power our global products. You will
-                        work closely with product managers, designers, and other engineers to deliver high-quality
+                        We are looking for a Senior Software Engineer to join our Core Infrastructure team. You
+                        will be
+                        responsible for designing and building scalable systems that power our global products.
+                        You will
+                        work closely with product managers, designers, and other engineers to deliver
+                        high-quality
                         software.
                     </p>
 
                     <h3 class="text-lg font-bold text-slate-900 mb-3">Responsibilities</h3>
                     <ul class="list-disc pl-5 text-slate-600 leading-relaxed mb-6 space-y-2">
                         <li>Design, develop, and maintain robust, scalable, and secure software services.</li>
-                        <li>Collaborate with cross-functional teams to define, design, and ship new features.</li>
+                        <li>Collaborate with cross-functional teams to define, design, and ship new features.
+                        </li>
                         <li>Mentor junior engineers and drive engineering excellence.</li>
                         <li>Participate in code reviews and architectural discussions.</li>
                         <li>Troubleshoot and resolve production issues.</li>
