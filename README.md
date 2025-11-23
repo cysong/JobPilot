@@ -41,8 +41,7 @@ uv venv .venv
 # Install dependencies
 uv sync --group dev
 
-# Run database migrations (after Stage 1)
-# uv run alembic upgrade head
+# Initialize database (see Database Setup section below)
 
 # Start development server
 uv run uvicorn app.main:app --reload
@@ -54,6 +53,62 @@ uv run uvicorn app.main:app --reload
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
+
+### Database Setup
+
+#### Run Database Migrations
+
+```bash
+cd backend
+
+# Apply all migrations
+uv run alembic upgrade head
+
+# Verify migration status
+uv run alembic current
+```
+
+### Database Management
+
+#### Create New Migration
+
+When you modify SQLAlchemy models, create a migration:
+
+```bash
+cd backend
+
+# Auto-generate migration from model changes
+uv run alembic revision --autogenerate -m "description of changes"
+
+# Apply the new migration
+uv run alembic upgrade head
+```
+
+#### Migration Commands
+
+```bash
+# View migration history
+uv run alembic history
+
+# Check current migration version
+uv run alembic current
+
+# Upgrade to latest version
+uv run alembic upgrade head
+
+# Upgrade to specific version
+uv run alembic upgrade <revision_id>
+
+# Downgrade one version
+uv run alembic downgrade -1
+
+# Downgrade to specific version
+uv run alembic downgrade <revision_id>
+
+# Downgrade all migrations
+uv run alembic downgrade base
+```
+
 
 ### Frontend Setup
 
