@@ -34,6 +34,12 @@ Compose the UI using existing components from `src/components/ui`.
 - Use **React Query** (via custom hooks in `src/api/`) for data fetching.
 - Use **Zustand** (in `src/store/`) for global client state (like Auth).
 
+### Step 6: TypeScript Best Practices
+- **Type Imports**: Always use `import type` when importing interfaces or types. This is required by our build configuration (`verbatimModuleSyntax`).
+  ```tsx
+  import type { Job } from '@/types/job'
+  ```
+
 ---
 
 ## 2. Component Standards
