@@ -14,6 +14,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     print("🚀 JobPilot API is starting up...")
+    print(f"Allowed Origins: {settings.CORS_ORIGINS}")
     yield
     # Shutdown
     print("👋 JobPilot API is shutting down...")
