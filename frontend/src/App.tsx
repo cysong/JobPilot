@@ -3,6 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from '@/features/auth/Login'
 import Register from '@/features/auth/Register'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import MainLayout from '@/components/layout/MainLayout'
+import LandingPage from '@/features/landing/LandingPage'
+import PlaceholderPage from '@/features/common/PlaceholderPage'
+import JobListingPage from '@/features/jobs/JobListingPage'
+import JobDetailPage from '@/features/jobs/JobDetailPage'
+import { Toaster } from '@/components/ui/toaster'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,13 +18,6 @@ const queryClient = new QueryClient({
     },
   },
 })
-
-// Temporary home page component (will be replaced with actual Jobs page later)
-
-import { Toaster } from '@/components/ui/toaster'
-
-import JobListingPage from '@/features/jobs/JobListingPage'
-import JobDetailPage from '@/features/jobs/JobDetailPage'
 
 function App() {
   return (
@@ -31,32 +30,23 @@ function App() {
       >
         <Routes>
           {/* Public routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* Protected routes */}
-          <Route
-            path="/jobs"
-            element={
-              <ProtectedRoute>
-                <JobListingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jobs/:jobId"
-            element={
-              <ProtectedRoute>
-                <JobDetailPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<PlaceholderPage />} />
+            <Route path="/jobs" element={<JobListingPage />} />
+            <Route path="/jobs/:jobId" element={<JobDetailPage />} />
+            <Route path="/applications" element={<PlaceholderPage />} />
+            <Route path="/resumes" element={<PlaceholderPage />} />
+            <Route path="/profile" element={<PlaceholderPage />} />
+            <Route path="/settings" element={<PlaceholderPage />} />
+          </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/jobs" replace />} />
-
-          {/* Catch-all redirect to home */}
-          <Route path="*" element={<Navigate to="/jobs" replace />} />
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
       <Toaster />
