@@ -1,10 +1,9 @@
 import { MapPin, Building2, Clock, DollarSign } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import type { Job } from '@/types/job'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
     Card,
     CardContent,
@@ -17,13 +16,17 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
+    const [searchParams] = useSearchParams()
+
+    // Preserve current search params when navigating to detail page
+    const detailUrl = `/jobs/${job.id}?${searchParams.toString()}`
     return (
         <Card className="hover:shadow-md transition-shadow border-slate-200">
             <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-start gap-4">
                     <div className="space-y-1">
                         <Link
-                            to={`/jobs/${job.id}`}
+                            to={detailUrl}
                             className="font-semibold text-lg text-slate-900 hover:text-indigo-600 line-clamp-2"
                         >
                             {job.title}
@@ -77,13 +80,10 @@ export function JobCard({ job }: JobCardProps) {
                     )}
                 </div>
             </CardContent>
-            <CardFooter className="p-4 pt-0 flex justify-between items-center text-xs text-slate-400">
+            <CardFooter className="p-4 pt-0 text-xs text-slate-400">
                 <span>
                     Listed {job.listed_at ? formatDistanceToNow(new Date(job.listed_at), { addSuffix: true }) : 'recently'}
                 </span>
-                <Button variant="ghost" size="sm" asChild className="hover:text-indigo-600">
-                    <Link to={`/jobs/${job.id}`}>View Details</Link>
-                </Button>
             </CardFooter>
         </Card>
     )

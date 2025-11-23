@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import {
     Building2,
@@ -20,7 +20,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function JobDetailPage() {
     const { jobId } = useParams()
+    const [searchParams] = useSearchParams()
     const { data: job, isLoading, isError } = useJobDetail(parseInt(jobId || '0'))
+
+    // Restore search params when going back to listing page
+    const backUrl = `/jobs?${searchParams.toString()}`
 
     if (isLoading) {
         return (
@@ -56,7 +60,7 @@ export default function JobDetailPage() {
                         Failed to load job details. The job may have expired or been removed.
                     </AlertDescription>
                     <Button asChild variant="outline" className="mt-4 w-full">
-                        <Link to="/jobs">Back to Jobs</Link>
+                        <Link to={backUrl}>Back to Jobs</Link>
                     </Button>
                 </Alert>
             </div>
@@ -69,7 +73,7 @@ export default function JobDetailPage() {
             <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
                 <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                     <Button variant="ghost" size="sm" asChild className="-ml-2 text-slate-600">
-                        <Link to="/jobs">
+                        <Link to={backUrl}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Search
                         </Link>
@@ -79,10 +83,22 @@ export default function JobDetailPage() {
                             <Share2 className="h-4 w-4 mr-2" />
                             Share
                         </Button>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                            Apply Now
-                            <ExternalLink className="h-4 w-4 ml-2" />
-                        </Button>
+                        {job.share_link && (
+                            <Button
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                asChild
+                            >
+                                <a
+                                    href={job.share_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    View on Seek
+                                    <ExternalLink className="h-4 w-4 ml-2" />
+                                </a>
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
