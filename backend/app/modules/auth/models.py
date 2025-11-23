@@ -1,8 +1,12 @@
 """User authentication models"""
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Index
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import Role
+
+if TYPE_CHECKING:
+    from app.modules.resumes.models import Resume, Document
 
 
 class User(Base, TimestampMixin):
@@ -48,6 +52,10 @@ class User(Base, TimestampMixin):
         nullable=False,
         comment="Whether user account is active"
     )
+
+    # Relationships
+    resumes: Mapped[list["Resume"]] = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
+    created_documents: Mapped[list["Document"]] = relationship("Document", back_populates="creator", foreign_keys="Document.created_by")
 
     # Indexes
     __table_args__ = (
