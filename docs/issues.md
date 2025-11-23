@@ -1,5 +1,84 @@
 # 问题修复记录
 
+## ✅ 已修复：FastAPI 数据库异步驱动配置错误
+
+### 问题描述
+```
+sqlalchemy.exc.InvalidRequestError: The asyncio extension requires an async driver.
+The loaded 'psycopg2' is not async.
+```
+
+### 根本原因
+- `.env` 文件中的 `DATABASE_URL` 使用了 `postgresql://` 协议
+- 该协议默认使用同步驱动 `psycopg2`
+- 项目使用 `create_async_engine` 需要异步驱动
+- 异步引擎与同步驱动不兼容
+
+### 修复方案
+将数据库连接协议从同步改为异步驱动
+
+### 修复步骤
+
+#### 1. 更新 `.env` 文件
+```bash
+# 从:
+DATABASE_URL=postgresql://username:password@localhost:5432/jobpilot
+
+# 改为:
+DATABASE_URL=postgresql+asyncpg://username:password@localhost:5432/jobpilot
+```
+
+#### 2. 更新 `.env.example` 文件（如果需要）
+```bash
+DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/jobpilot
+```
+
+### 验证结果
+
+✅ **验证步骤**:
+```bash
+cd backend
+uv run uvicorn app.main:app --reload
+```
+
+✅ **预期效果**:
+- 服务正常启动，无 SQLAlchemy 异步驱动错误
+- 数据库连接成功
+- API 接口可正常访问
+
+### 技术说明
+
+**PostgreSQL 驱动对比**:
+
+| 驱动 | 协议 | 类型 | 使用场景 |
+|------|------|------|----------|
+| `psycopg2` | `postgresql://` | 同步 | 传统同步应用 |
+| `asyncpg` | `postgresql+asyncpg://` | 异步 | FastAPI 异步应用 |
+
+**项目配置**:
+- 引擎: `create_async_engine` ([app/core/database.py](../backend/app/core/database.py))
+- Session: `AsyncSession`
+- 依赖注入: `async def get_db()`
+
+### 后续注意事项
+
+1. **环境变量一致性**: 确保所有环境（开发/测试/生产）都使用 `postgresql+asyncpg://`
+2. **文档更新**: 已在 [README.md](../README.md) 的数据库配置部分说明
+3. **团队协作**: 提醒团队成员检查本地 `.env` 配置
+4. **依赖检查**: 确保 `asyncpg` 已安装在 `pyproject.toml` 中
+
+### 参考资源
+- [SQLAlchemy Async Documentation](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html)
+- [asyncpg Documentation](https://magicstack.github.io/asyncpg/)
+
+---
+
+**修复时间**: 2025-01-23
+**修复状态**: ✅ 完成
+**影响范围**: 后端数据库连接
+
+---
+
 ## ✅ 已修复：Tailwind CSS v4 PostCSS 配置问题
 
 ### 问题描述
