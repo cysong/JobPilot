@@ -5,10 +5,11 @@
 ### 前端
 - **框架**: React 18 + Vite 5
 - **语言**: TypeScript 5.x
-- **UI组件**: shadcn/ui + Tailwind CSS
+- **UI组件**: shadcn/ui + Tailwind CSS + Lucide React
 - **状态管理**: Zustand
 - **路由**: React Router v6
-- **表单**: React Hook Form + Zod
+- **表单**: React Hook Form + Zod + @hookform/resolvers
+- **工具库**: clsx, tailwind-merge, class-variance-authority
 - **HTTP客户端**: Axios + TanStack Query (React Query)
 - **实时通信**: Socket.IO Client
 - **Markdown编辑**: React-Markdown-Editor-Lite
