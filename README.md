@@ -160,6 +160,7 @@ Complete specifications and architecture documentation:
 
 - **[Requirements](docs/requirements.md)** - Feature requirements and specifications
 - **[UI Design Requirements](docs/ui_design_requirements.md)** - UI/UX design guidelines
+- **[Frontend Development Guide](docs/frontend_development_guide.md)** - Frontend workflow, component standards, and styling guidelines
 - **[Workflow Design](docs/workflow-design.md)** - Application workflow and state management
 - **[Architecture](docs/architecture.md)** - System design and technical decisions
 - **[Execution Plan](docs/plan.md)** - Phased milestones and implementation roadmap
