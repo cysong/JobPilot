@@ -2,14 +2,106 @@
 
 ## Current Status
 
-**Version:** v0.1.0 (Foundation)
-**Next Task:** Stage 2 - Job Browsing Module (Frontend Pages)
+**Version:** v0.2.0 (Job Browsing Module)
+**Next Task:** Stage 3 - Application Module
 
 ---
 
 ## Work Log
 
-### 2025-01-24 - Job Browsing Module Backend Completed
+### 2025-11-24 - Resume Management Module Backend Completed
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- ✅ Created Document model with chained version support ([app/modules/resumes/models.py](app/modules/resumes/models.py))
+  - Support for Markdown/HTML/PlainText formats
+  - Version chain via root_id and parent_id
+  - SHA-256 content hashing for deduplication
+  - JSON metadata field for extensibility
+- ✅ Created Resume model with draft/formal workflow ([app/modules/resumes/models.py](app/modules/resumes/models.py))
+  - Soft delete support (is_deleted, deleted_at)
+  - One-to-one relationship with Document
+  - Draft/formal status tracking
+- ✅ Implemented Pydantic schemas ([app/modules/resumes/schemas.py](app/modules/resumes/schemas.py))
+  - DocumentBase, DocumentVersion
+  - ResumeCreate, ResumeUpdate, ResumeTitleUpdate
+  - ResumeResponse, ResumeListItem, ResumeListResponse
+  - FormalResumeLimit
+- ✅ Built ResumeService with 9 core methods ([app/modules/resumes/service.py](app/modules/resumes/service.py))
+  - create_resume(): Creates document + resume with version tracking
+  - get_resumes(): Paginated list with draft/formal filtering
+  - get_resume_by_id(): Retrieve single resume with document content
+  - update_resume(): Creates new document version, updates content
+  - update_resume_title(): Title-only update
+  - finalize_resume(): Convert draft to formal with quota check (limit: 3)
+  - delete_resume(): Soft delete
+  - check_formal_resume_limit(): Quota check
+  - get_resume_versions(): Version history
+- ✅ Created Resume API endpoints ([app/modules/resumes/router.py](app/modules/resumes/router.py))
+  - POST /api/v1/resumes - Create resume
+  - GET /api/v1/resumes - List resumes (with pagination and filters)
+  - GET /api/v1/resumes/formal-limit - Check quota
+  - GET /api/v1/resumes/{resume_id} - Get resume detail
+  - PUT /api/v1/resumes/{resume_id} - Update content
+  - PATCH /api/v1/resumes/{resume_id}/title - Update title
+  - PATCH /api/v1/resumes/{resume_id}/finalize - Convert to formal
+  - DELETE /api/v1/resumes/{resume_id} - Soft delete
+  - GET /api/v1/resumes/{resume_id}/versions - Version history
+- ✅ Updated User model to add resume relationships ([app/modules/auth/models.py](app/modules/auth/models.py))
+- ✅ Created auth dependencies module ([app/modules/auth/dependencies.py](app/modules/auth/dependencies.py))
+- ✅ Registered Resume router in API v1 ([app/api/v1/router.py](app/api/v1/router.py))
+- ✅ Generated database migration for resumes and documents tables
+  - Migration file: `20251124_0050_2b8ba0e2d92a_add_resumes_and_documents_tables.py`
+
+**Key Features Implemented:**
+- Content deduplication via SHA-256 hashing
+- Version chain management (root_id → parent_id → children)
+- Formal resume quota system (max 3 per user)
+- Draft/formal workflow
+- Soft delete for resumes
+- Full JWT authentication on all endpoints
+
+**Issues Fixed:**
+- ✅ Added primary key fields to Document and Resume models
+- ✅ Fixed user_id type mismatch (String → int)
+- ✅ Fixed JSON column definition (dict → JSON)
+- ✅ Renamed reserved field name (metadata → extra_metadata)
+- ✅ Cleaned up auto-generated migration (removed unrelated table operations)
+
+**Pending:**
+- Apply database migration (user to execute manually)
+
+**Migration Command:**
+```bash
+cd backend
+.venv\Scripts\alembic.exe upgrade head
+```
+
+---
+
+### 2025-11-24 - Job Browsing Module Frontend Completed
+
+**Completed Tasks:**
+
+**Frontend Implementation:**
+- ✅ Created `docs/frontend_development_guide.md` for development standards
+- ✅ Built Core UI components (`Badge`, `Skeleton`, `Separator`, `Sheet`, `Checkbox`, `Select`, `Accordion`, `ScrollArea`)
+- ✅ Implemented `JobCard`, `JobSearch`, `JobFilters`, `JobPagination` components
+- ✅ Built `JobListingPage` with URL-based state management for filters
+- ✅ Built `JobDetailPage` with comprehensive job information display
+- ✅ Configured routes for `/jobs` and `/jobs/:jobId`
+- ✅ Resolved React Router v7 future flag warnings
+- ✅ Refined Auth UI (Alerts for errors, removed custom password strength bars)
+
+**Integration:**
+- ✅ Connected Frontend to Backend Job API
+- ✅ Verified build success
+
+**Issues Resolved:**
+- Fixed TypeScript `import type` errors for build compliance
+
+### 2025-11-24 - Job Browsing Module Backend Completed
 
 **Completed Tasks:**
 
@@ -56,7 +148,7 @@
 
 ---
 
-### 2025-01-23 - Authentication System Completed
+### 2025-11-23 - Authentication System Completed
 
 **Completed Tasks:**
 
@@ -128,35 +220,20 @@
 
 ## Next Steps
 
-### Stage 2: Job Browsing Module (Frontend Pages)
+### Stage 3: Application Module
+- **Backend**:
+  - Design Application model (user_id, job_id, resume_id, status)
+  - Create API endpoints for applying to jobs
+  - Implement file upload for resumes (if not already done)
+- **Frontend**:
+  - Build "Apply Now" modal/flow
+  - Create "My Applications" page
+  - Integrate Resume upload
 
-**Frontend Tasks (Pending):**
-- Build JobListing page component
-  - Job list layout with card display
-  - Filter panel with multi-select dropdowns
-  - Search bar with keyword input
-  - Pagination controls
-  - URL state management for shareable filter links
-- Build JobDetail page component
-  - Display complete job information
-  - Similar jobs section
-  - "Apply" button (connects to future Application module)
-  - External link navigation
-- Configure routes in App.tsx
-- Add loading states (Skeleton components)
-- Add error handling (Alert components)
-- Responsive design for mobile
-
-**Integration Testing (Pending):**
-- Test job listing with various filter combinations
-- Test full-text search functionality
-- Verify pagination navigation
-- Test filter state persistence in URL
-- Verify job detail page displays correctly
-- Test similar jobs recommendations
-- Verify API error handling
-
----
+### Stage 4: User Profile & Settings
+- **Frontend**:
+  - Build User Profile page
+  - Settings page (password change, notification prefs)
 
 ## Known Issues
 
