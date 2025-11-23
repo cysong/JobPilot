@@ -1,5 +1,129 @@
 # 问题修复记录
 
+## ✅ 已修复：登录失败时页面刷新导致错误信息消失
+
+### 问题描述
+用户在登录页输入错误的账号密码后：
+1. 点击登录按钮
+2. 页面突然刷新
+3. 错误信息一闪而过，无法查看
+4. 用户看到的是刷新后的空白登录页
+
+### 根本原因
+在 [client.ts:27-31](../frontend/src/api/client.ts#L27-L31) 的 Axios 响应拦截器中：
+
+```typescript
+if (error.response?.status === 401) {
+  localStorage.removeItem('access_token')
+  window.location.href = '/login'  // 强制刷新页面
+}
+```
+
+**问题分析**：
+1. 拦截器的原始目的是处理 **token 过期**场景
+2. 当用户已登录，访问需要认证的页面时 token 失效，自动重定向到登录页
+3. 但拦截器**无法区分**"登录失败 401"和"token 过期 401"
+4. 导致在登录页输入错误密码时，也触发了 `window.location.href = '/login'`
+5. 页面硬刷新导致所有 React state（包括 `error`）被清空
+
+### 修复方案
+检查当前路径，避免在登录/注册页重定向
+
+### 修复步骤
+
+#### 修改 `frontend/src/api/client.ts`
+
+```typescript
+// 从:
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+// 改为:
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Only redirect if not already on login/register page
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        localStorage.removeItem('access_token')
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+```
+
+### 验证结果
+
+✅ **验证步骤**:
+```bash
+cd frontend
+pnpm run dev
+```
+
+访问 `http://localhost:5173/login`，输入错误的账号密码
+
+✅ **预期效果**:
+- 登录失败时，页面**不刷新**
+- 错误信息正常显示：`Login failed. Please try again.` 或后端返回的具体错误
+- 用户可以完整阅读错误信息
+- 错误信息在再次提交时才清空
+
+✅ **其他场景验证**:
+- 注册页输入错误时，也不会刷新
+- 用户已登录，token 过期时，仍会正确重定向到登录页
+- 不影响其他需要认证的页面的行为
+
+### 技术说明
+
+**401 错误的两种场景**:
+
+| 场景 | 描述 | 应该的行为 | 修复前 | 修复后 |
+|------|------|-----------|--------|--------|
+| 登录失败 | 用户输入错误的账号密码 | 显示错误信息，不刷新 | ❌ 强制刷新 | ✅ 显示错误 |
+| Token 过期 | 已登录用户的 token 失效 | 重定向到登录页 | ✅ 正确重定向 | ✅ 正确重定向 |
+
+**路径检查逻辑**:
+- `/login` - 登录页，不触发重定向
+- `/register` - 注册页，不触发重定向
+- 其他路径 - 触发重定向（如 `/jobs`, `/dashboard` 等）
+
+### 相关修复
+
+此问题修复与之前的"错误信息一闪而过"问题相关：
+1. **之前修复**：删除了 `handleChange` 中的 `setError('')`，避免输入时清空错误
+2. **本次修复**：避免 401 错误时页面刷新，确保错误信息能够显示
+
+两个修复结合，完全解决了用户无法看到登录错误信息的问题。
+
+### 后续注意事项
+
+1. **新增认证页面**：如果添加了其他认证相关页面（如忘记密码、重置密码），需要在路径检查中添加
+2. **使用 React Router 导航**：未来可考虑重构，使用 `useNavigate` 替代 `window.location.href`，避免硬刷新
+3. **错误码细化**：后端可考虑区分不同的 401 场景（如 `LOGIN_FAILED` vs `TOKEN_EXPIRED`）
+
+### 参考资源
+- [Axios Interceptors Documentation](https://axios-http.com/docs/interceptors)
+- [React SPA Authentication Best Practices](https://react.dev/learn/synchronizing-with-effects)
+
+---
+
+**修复时间**: 2025-01-23
+**修复状态**: ✅ 完成
+**影响范围**: 前端认证流程、错误处理
+
+---
+
 ## ✅ 已修复：FastAPI 数据库异步驱动配置错误
 
 ### 问题描述
