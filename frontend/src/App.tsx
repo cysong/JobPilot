@@ -42,10 +42,17 @@ function HomePage() {
   )
 }
 
+import { Toaster } from '@/components/ui/toaster'
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
@@ -68,6 +75,7 @@ function App() {
           <Route path="*" element={<Navigate to="/jobs" replace />} />
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </QueryClientProvider>
   )
 }

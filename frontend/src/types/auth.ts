@@ -2,11 +2,13 @@
  * Authentication related TypeScript types
  */
 
-export enum Role {
-  USER = 'USER',
-  VIP = 'VIP',
-  ADMIN = 'ADMIN',
-}
+export const Role = {
+  USER: 'USER',
+  VIP: 'VIP',
+  ADMIN: 'ADMIN',
+} as const
+
+export type Role = (typeof Role)[keyof typeof Role]
 
 export interface User {
   id: number
