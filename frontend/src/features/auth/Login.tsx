@@ -62,7 +62,11 @@ export default function Login() {
       // Login and get token
       const { access_token } = await authApi.login(data)
 
-      // Get user info
+      // Store token in localStorage BEFORE calling getCurrentUser
+      // This ensures the axios interceptor can add the token to subsequent requests
+      localStorage.setItem('access_token', access_token)
+
+      // Get user info (now with token in header)
       const user = await authApi.getCurrentUser()
 
       // Update store
