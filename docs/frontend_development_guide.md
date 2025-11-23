@@ -40,6 +40,24 @@ Compose the UI using existing components from `src/components/ui`.
   import type { Job } from '@/types/job'
   ```
 
+### Step 7: Project Structure & Layouts
+- **Layout Components**: All layout-related components (Navigation, Sidebar, UserMenu) and containers (MainLayout) are located in `src/components/layout/`.
+- **Layout Usage**: Wrap your authenticated routes with `MainLayout` in `src/App.tsx`.
+  ```tsx
+  <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+    <Route path="/dashboard" element={<Dashboard />} />
+  </Route>
+  ```
+
+### Step 8: Utility Functions & Aliases
+- **`cn` Utility**: We use a custom alias for the `cn` utility function (merging Tailwind classes).
+- **Import Path**: Always import from `@/utils/cn`.
+  ```tsx
+  import { cn } from "@/utils/cn"
+  ```
+- **Configuration**: This is configured in `components.json` and `tsconfig.app.json`. When adding new shadcn components, they will automatically use this alias.
+
+
 ---
 
 ## 2. Component Standards
