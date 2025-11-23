@@ -32,14 +32,16 @@ class JobService:
         # Base query
         query = select(SeekJob).where(SeekJob.is_expired == False)
 
-        # Apply keyword search (title + abstract + content)
+        # Apply keyword search (title + abstract + content + company names)
         if filters.keyword:
             search_pattern = f"%{filters.keyword}%"
             query = query.where(
                 or_(
                     SeekJob.title.ilike(search_pattern),
                     SeekJob.abstract.ilike(search_pattern),
-                    SeekJob.content.ilike(search_pattern)
+                    SeekJob.content.ilike(search_pattern),
+                    SeekJob.advertiser_name.ilike(search_pattern),
+                    SeekJob.company_name.ilike(search_pattern)
                 )
             )
 
