@@ -123,7 +123,7 @@ export default function JobDetailPage() {
                                     <img
                                         src={job.company_logo}
                                         alt={job.advertiser_name || 'Company Logo'}
-                                        className="h-16 w-16 object-contain rounded-lg border border-slate-100"
+                                        className="h-16 w-16 object-contain rounded-lg"
                                     />
                                 )}
                             </div>
