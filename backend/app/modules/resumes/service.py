@@ -390,3 +390,64 @@ class ResumeService:
 
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def export_resume_to_pdf(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        template: Optional[str] = None,
+        font_size: int = 12,
+        include_metadata: bool = False
+    ) -> tuple[bytes, str, str]:
+        """
+        Export resume to PDF.
+
+        Args:
+            db: Database session
+            resume_id: Resume ID
+            user_id: User ID
+            template: Template name (modern/classic/minimal)
+            font_size: Base font size in pt
+            include_metadata: Include generation timestamp
+
+        Returns:
+            Tuple of (pdf_bytes, filename, template_used)
+
+        Raises:
+            HTTPException: If resume not found or export fails
+        """
+        from app.modules.resumes.export import DocumentExportService
+
+        # Get resume
+        resume = await ResumeService.get_resume_by_id(db, resume_id, user_id)
+        if not resume:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume not found"
+            )
+
+        # Export using universal service
+        try:
+            pdf_bytes, filename, template_used = DocumentExportService.export_to_pdf(
+                document_type="resume",
+                content=resume.document.content,
+                title=resume.title,
+                template=template,
+                font_size=font_size,
+                include_metadata=include_metadata
+            )
+
+            return pdf_bytes, filename, template_used
+
+        except ValueError as e:
+            # Template validation errors
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate PDF: {str(e)}"
+            )

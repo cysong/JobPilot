@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Document Export (Resume, Cover Letter, etc.)
+    EXPORT_DEFAULT_TEMPLATE: str = "modern"  # Default PDF template for all document types
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

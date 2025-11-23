@@ -1,0 +1,97 @@
+/**
+ * Classic template styles
+ * Traditional, elegant design suitable for conservative industries
+ */
+
+.classic-template {
+    font-family: 'Noto Serif SC', Georgia, serif;
+}
+
+.classic-template .resume-title {
+    font-size: 2.5em;
+    color: #2c3e50;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.classic-template .header-underline {
+    width: 100px;
+    height: 2px;
+    background: #2c3e50;
+    margin: 0.5em auto 1.5em;
+}
+
+.classic-template h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #34495e;
+    text-transform: uppercase;
+    font-size: 1.3em;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.classic-template h3 {
+    color: #34495e;
+    font-weight: 600;
+}
+
+.classic-template a {
+    color: #2c3e50;
+    border-bottom: 1px solid #95a5a6;
+}
+
+.classic-template strong {
+    color: #2c3e50;
+}
+
+.classic-template .footer-line {
+    width: 60px;
+    height: 1px;
+    background: #95a5a6;
+    margin: 0 auto 0.5em;
+}
+
+.classic-template .resume-footer {
+    border-top: 1px solid #bdc3c7;
+    text-align: center;
+    color: #7f8c8d;
+}
+
+/* Lists with traditional style */
+.classic-template ul {
+    list-style: disc;
+}
+
+.classic-template ol {
+    list-style: decimal;
+}
+
+/* Code blocks (less colorful) */
+.classic-template code {
+    background: #ecf0f1;
+    color: #2c3e50;
+    font-family: 'Courier New', monospace;
+}
+
+.classic-template pre {
+    background: #f8f9fa;
+    border: 1px solid #bdc3c7;
+}
+
+/* Tables */
+.classic-template th {
+    background: #ecf0f1;
+    color: #2c3e50;
+    border-bottom: 2px solid #34495e;
+}
+
+.classic-template td {
+    border-color: #bdc3c7;
+}
+
+/* Blockquotes */
+.classic-template blockquote {
+    border-left-color: #95a5a6;
+    font-family: 'Noto Serif SC', Georgia, serif;
+}

@@ -4,6 +4,7 @@ Resume API endpoints.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -18,7 +19,9 @@ from app.modules.resumes.schemas import (
     ResumeListResponse,
     ResumeListItem,
     FormalResumeLimit,
-    DocumentVersion
+    DocumentVersion,
+    ResumeExportRequest,
+    ResumeExportResponse
 )
 from app.modules.resumes.service import FORMAL_RESUME_LIMIT
 
@@ -197,3 +200,50 @@ async def get_resume_versions(
     versions = await service.ResumeService.get_resume_versions(db, resume_id, current_user.id)
 
     return [DocumentVersion.model_validate(doc) for doc in versions]
+
+
+@router.post("/{resume_id}/export", response_class=Response)
+async def export_resume_to_pdf(
+    resume_id: str,
+    export_request: ResumeExportRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Export resume to PDF format.
+
+    - **template**: Template name (modern/classic/minimal), uses default if not specified
+    - **font_size**: Base font size in pt (10-16)
+    - **include_metadata**: Include generation timestamp in footer
+
+    Returns PDF file as binary response with proper headers.
+    """
+    pdf_bytes, filename, template_used = await service.ResumeService.export_resume_to_pdf(
+        db=db,
+        resume_id=resume_id,
+        user_id=current_user.id,
+        template=export_request.template,
+        font_size=export_request.font_size,
+        include_metadata=export_request.include_metadata
+    )
+
+    # Return PDF as response with download headers
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Template-Used": template_used
+        }
+    )
+
+
+@router.get("/templates", response_model=list[str])
+async def get_available_templates():
+    """
+    Get list of available PDF templates for resumes.
+
+    Returns list of template names that can be used for resume export.
+    """
+    from app.modules.resumes.export import DocumentExportService
+    return DocumentExportService.get_available_templates("resume")

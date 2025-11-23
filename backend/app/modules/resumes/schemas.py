@@ -115,3 +115,21 @@ class FormalResumeLimit(BaseModel):
     current_count: int
     can_create_more: bool
     remaining: int
+
+
+# ============================================
+# Export Schemas
+# ============================================
+
+class ResumeExportRequest(BaseModel):
+    """Request schema for exporting resume to PDF"""
+    template: Optional[str] = Field(None, description="Template name (modern/classic/minimal)")
+    font_size: int = Field(default=12, ge=10, le=16, description="Base font size in pt")
+    include_metadata: bool = Field(default=False, description="Include creation date footer")
+
+
+class ResumeExportResponse(BaseModel):
+    """Response schema for resume export"""
+    message: str
+    filename: str
+    template_used: str

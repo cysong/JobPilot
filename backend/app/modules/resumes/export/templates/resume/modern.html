@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+</head>
+<body>
+    <div class="resume-container modern-template">
+        <!-- Header with accent bar -->
+        <header class="resume-header">
+            <div class="accent-bar"></div>
+            <h1 class="resume-title">{{ title }}</h1>
+        </header>
+
+        <!-- Content -->
+        <main class="resume-content">
+            {{ content|safe }}
+        </main>
+
+        <!-- Footer -->
+        {% if include_metadata %}
+        <footer class="resume-footer">
+            <p class="generated-date">Generated on {{ generated_at }}</p>
+        </footer>
+        {% endif %}
+    </div>
+</body>
+</html>

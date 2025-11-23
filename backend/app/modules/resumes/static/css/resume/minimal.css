@@ -1,0 +1,123 @@
+/**
+ * Minimal template styles
+ * Ultra-clean, modern minimalist design
+ */
+
+.minimal-template {
+    /* Minimal overrides - keep it simple */
+}
+
+.minimal-template .resume-title {
+    font-size: 2em;
+    color: #000;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    margin-bottom: 1em;
+}
+
+.minimal-template h2 {
+    color: #000;
+    border-bottom: 1px solid #000;
+    font-weight: 400;
+    text-transform: uppercase;
+    font-size: 1.2em;
+    letter-spacing: 0.1em;
+}
+
+.minimal-template h3 {
+    color: #333;
+    font-weight: 400;
+}
+
+.minimal-template h4 {
+    color: #666;
+    font-weight: 400;
+}
+
+.minimal-template a {
+    color: #000;
+    border-bottom: 1px solid #ccc;
+}
+
+.minimal-template a:hover {
+    border-bottom-color: #000;
+}
+
+.minimal-template strong {
+    color: #000;
+    font-weight: 500;
+}
+
+.minimal-template .resume-footer {
+    border-top: 1px solid #e0e0e0;
+    color: #999;
+    font-size: 0.75em;
+    text-align: center;
+}
+
+/* Lists - clean bullets */
+.minimal-template ul {
+    list-style: none;
+    margin-left: 1em;
+}
+
+.minimal-template ul li::before {
+    content: "–";
+    color: #000;
+    font-weight: 300;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+}
+
+.minimal-template ol {
+    list-style: decimal;
+    margin-left: 1.5em;
+}
+
+/* Code - minimal styling */
+.minimal-template code {
+    background: #f9f9f9;
+    color: #000;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+}
+
+.minimal-template pre {
+    background: #fafafa;
+    border-left: 2px solid #000;
+    padding-left: 1.2em;
+}
+
+/* Tables - clean lines */
+.minimal-template table {
+    border: none;
+}
+
+.minimal-template th {
+    background: none;
+    border-bottom: 2px solid #000;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-weight: 400;
+}
+
+.minimal-template td {
+    border-bottom: 1px solid #e0e0e0;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+/* Blockquotes */
+.minimal-template blockquote {
+    border-left: 2px solid #000;
+    color: #666;
+    font-style: normal;
+}
+
+/* Horizontal rules */
+.minimal-template hr {
+    border-top: 1px solid #e0e0e0;
+}
