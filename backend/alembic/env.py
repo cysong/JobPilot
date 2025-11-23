@@ -12,6 +12,9 @@ from alembic import context
 from app.shared.base_model import Base
 from app.core.config import settings
 
+# Import all models for Alembic autogenerate
+from app.modules.auth.models import User  # noqa: F401
+
 # This is the Alembic Config object
 config = context.config
 
