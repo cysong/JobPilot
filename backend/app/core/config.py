@@ -19,18 +19,20 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = 8
 
     # User Defaults
-    DEFAULT_USER_ROLE: str = "USER"  # Default role for new users (USER/VIP/ADMIN)
+    # Default role for new users (USER/VIP/ADMIN)
+    DEFAULT_USER_ROLE: str = "USER"
 
     # User Limits (by role)
     USER_FORMAL_RESUME_LIMIT: int = 3  # Free users: max 3 formal resumes
     VIP_FORMAL_RESUME_LIMIT: int = 10  # VIP users: max 10 formal resumes
-    USER_MONTHLY_APPLICATION_LIMIT: int = 20  # Free users: max 20 applications/month
+    # Free users: max 20 applications/month
+    USER_MONTHLY_APPLICATION_LIMIT: int = 20
 
     # AI Configuration
     OPENAI_API_KEY: str
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
-    DEEPSEEK_API_KEY: str = ""  # Optional: for translation tasks
-    DEEPSEEK_API_BASE: str = "https://api.deepseek.com/v1"
+    OPENROUTER_API_KEY: str = ""  # Preferred for DeepSeek via OpenRouter
+    OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
 
     # Job Analysis
     JOB_ANALYSIS_INTERVAL_HOURS: int = 1  # Run job analysis every N hours
@@ -52,7 +54,8 @@ class Settings(BaseSettings):
     MAX_PAGE_SIZE: int = 100
 
     # Document Export (Resume, Cover Letter, etc.)
-    EXPORT_DEFAULT_TEMPLATE: str = "modern"  # Default PDF template for all document types
+    # Default PDF template for all document types
+    EXPORT_DEFAULT_TEMPLATE: str = "modern"
 
     model_config = SettingsConfigDict(
         env_file=".env",

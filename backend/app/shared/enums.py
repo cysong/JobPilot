@@ -15,11 +15,35 @@ class ApplicationStatus(str, Enum):
     TAILORING = "Tailoring"          # AI customization in progress
     READY = "Ready"                  # Materials ready for submission
     APPLIED = "Applied"              # Application submitted
-    RESUME_SCREENED = "ResumeScreened"  # Resume screening passed
     PHONE_SCREEN = "PhoneScreen"     # Phone screening stage
     INTERVIEWING = "Interviewing"    # Interview stage
     OFFER = "Offer"                  # Offer received
     REJECTED = "Rejected"            # Application rejected
+
+
+class WorkflowStatus(str, Enum):
+    """Workflow execution status"""
+    PENDING = "Pending"
+    RUNNING = "Running"
+    COMPLETED = "Completed"
+    FAILED = "Failed"
+    CANCELLED = "Cancelled"
+
+
+class TaskStatus(str, Enum):
+    """Individual task execution status"""
+    PENDING = "Pending"
+    RUNNING = "Running"
+    SUCCESS = "Success"
+    FAILED = "Failed"
+    RETRY = "Retry"
+
+
+class AICallStatus(str, Enum):
+    """AI call execution status"""
+    PENDING = "Pending"
+    SUCCESS = "Success"
+    FAILED = "Failed"
 
 
 class DocumentFormat(str, Enum):
