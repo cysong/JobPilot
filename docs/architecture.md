@@ -801,7 +801,7 @@ CREATE TABLE users (
 );
 ```
 
-### documents (��ʽ�汾ģ��)
+### documents (链式版本模型)
 ```sql
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,
@@ -845,7 +845,7 @@ CREATE INDEX idx_resumes_user_draft_deleted ON resumes (user_id, is_draft, is_de
 CREATE INDEX idx_resumes_user_deleted ON resumes (user_id, is_deleted);
 ```
 
-### seek_jobs (ֻ����Դ��)
+### seek_jobs (只读数据源)
 ```sql
 CREATE TABLE seek_jobs (
   id BIGSERIAL PRIMARY KEY,
