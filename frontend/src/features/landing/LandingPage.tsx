@@ -1,31 +1,41 @@
 import { Link } from 'react-router-dom'
 import { Check, ArrowRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/store/authStore'
 
 export default function LandingPage() {
+    const { isAuthenticated } = useAuthStore()
     return (
         <div className="bg-white text-slate-900 font-sans">
             {/* Navigation */}
             <nav className="fixed w-full z-50 top-0 transition-all duration-300 bg-white/80 backdrop-blur-md border-b border-white/30">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                    <Link to="/" className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
                         </div>
                         <span className="font-bold text-xl text-slate-900 tracking-tight">JobPilot</span>
-                    </div>
+                    </Link>
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
                         <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
                         <a href="#how-it-works" className="hover:text-indigo-600 transition-colors">How it Works</a>
                         <a href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</a>
                     </div>
                     <div className="flex items-center gap-4">
-                        <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</Link>
-                        <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30">
-                            <Link to="/register">Get Started Free</Link>
-                        </Button>
+                        {isAuthenticated ? (
+                            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30">
+                                <Link to="/dashboard">Go to Dashboard</Link>
+                            </Button>
+                        ) : (
+                            <>
+                                <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</Link>
+                                <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30">
+                                    <Link to="/register">Get Started Free</Link>
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
             </nav>
@@ -43,18 +53,29 @@ export default function LandingPage() {
                             description, increasing your interview chances by 3x.
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center gap-4">
-                            <Button asChild size="lg" className="h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full shadow-xl hover:shadow-2xl text-lg">
-                                <Link to="/register">
-                                    Start Your Free Trial
-                                    <ArrowRight className="ml-2 w-5 h-5" />
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="lg" className="h-14 px-8 bg-white text-slate-700 font-bold rounded-full border-slate-200 hover:bg-slate-50 text-lg">
-                                <a href="#demo">
-                                    <Play className="mr-2 w-5 h-5 text-slate-400 fill-current" />
-                                    Watch Demo
-                                </a>
-                            </Button>
+                            {isAuthenticated ? (
+                                <Button asChild size="lg" className="h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full shadow-xl hover:shadow-2xl text-lg">
+                                    <Link to="/dashboard">
+                                        Go to Dashboard
+                                        <ArrowRight className="ml-2 w-5 h-5" />
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button asChild size="lg" className="h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full shadow-xl hover:shadow-2xl text-lg">
+                                        <Link to="/register">
+                                            Start Your Free Trial
+                                            <ArrowRight className="ml-2 w-5 h-5" />
+                                        </Link>
+                                    </Button>
+                                    <Button asChild variant="outline" size="lg" className="h-14 px-8 bg-white text-slate-700 font-bold rounded-full border-slate-200 hover:bg-slate-50 text-lg">
+                                        <a href="#demo">
+                                            <Play className="mr-2 w-5 h-5 text-slate-400 fill-current" />
+                                            Watch Demo
+                                        </a>
+                                    </Button>
+                                </>
+                            )}
                         </div>
 
                     </div>
