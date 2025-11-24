@@ -300,7 +300,7 @@
 ### 新增功能
 
 #### 1. 完整状态流转
-- 扩展状态：Pending → Tailoring → Ready → Applied → ResumeScreened → PhoneScreen → Interviewing → Offer/Rejected
+- 扩展状态：Pending → Tailoring → Ready → Applied → PhoneScreen → Interviewing → Offer/Rejected
 - 状态手动更新 (下拉选择)
 - 状态变更时记录时间线事件
 
