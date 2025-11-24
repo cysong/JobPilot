@@ -34,10 +34,7 @@ export default function LandingPage() {
             <section className="pt-32 pb-20 overflow-hidden bg-[radial-gradient(circle_at_50%_50%,#eef2ff_0%,#ffffff_50%)]">
                 <div className="max-w-7xl mx-auto px-6 relative">
                     <div className="text-center max-w-3xl mx-auto mb-16">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider mb-6 border border-indigo-100">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                            New: AI Cover Letter Generator
-                        </div>
+
                         <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-6">
                             Land Your Dream Job with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">AI Precision</span>
                         </h1>
@@ -59,7 +56,7 @@ export default function LandingPage() {
                                 </a>
                             </Button>
                         </div>
-                        <p className="mt-6 text-sm text-slate-500">No credit card required · 14-day free trial · Cancel anytime</p>
+
                     </div>
 
                     {/* Hero Image/Dashboard Mockup */}
