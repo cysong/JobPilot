@@ -9,6 +9,20 @@
 
 ## Work Log
 
+### 2025-11-24 - Application Workflow Backend Implemented
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- Added application workflow scaffolding (Celery + workflow/task/outbox/ai_call models) and application API routes for create/get/retry (backend/app/modules/applications/*, backend/app/api/v1/router.py).
+- Implemented cover-letter generation task via DeepSeek (OpenRouter) with workflow/task status updates, AI usage logging, and outbox events; added Celery app config (backend/app/core/celery_app.py).
+- Updated application schema: status default Pending, source resume + resume/cover documents, soft delete fields, unique (user_id, job_id), last_error, removed workflow_id FK; aligned Alembic migration and architecture doc.
+- Added OpenRouter configuration fields; documented backend plan in docs/application-plan.md.
+
+**Pending:**
+- Run Alembic migrations to apply updated application/workflow tables.
+- Start Celery worker alongside API after setting AI credentials (OPENROUTER_API_KEY or alternatives).
+
 ### 2025-11-24 - Resume Management Frontend Completed
 
 **Completed Tasks:**
