@@ -14,14 +14,14 @@
 - **实时通信**: Socket.IO Client
 - **Markdown编辑**: React-Markdown-Editor-Lite
 - **拖拽**: @hello-pangea/dnd
-- **PDF生成**: jsPDF / react-pdf
+- **PDF生成**: WeasyPrint (后端)
 
 ### 后端
 - **框架**: FastAPI 0.109+
 - **语言**: Python 3.11+
 - **ORM**: SQLAlchemy 2.0 (Async) + Alembic
 - **数据库**: PostgreSQL 15+
-- **缓存**: Redis 7+ (aioredis)
+- **缓存**: Redis 5+ (redis-py)
 - **任务队列**: Celery + Redis
 - **认证**: python-jose (JWT) + passlib
 - **实时通信**: FastAPI WebSocket / python-socketio
@@ -199,10 +199,8 @@ backend/
 │   │   │   ├── __init__.py
 │   │   │   ├── router.py             # Job API 路由
 │   │   │   ├── service.py            # Job 业务逻辑
-│   │   │   ├── models.py             # Job/JobAnalysis/JobMatch 模型
-│   │   │   ├── schemas.py            # Job 请求/响应模式
-│   │   │   ├── tasks.py              # Job 分析 Celery 任务
-│   │   │   └── utils.py              # Job 工具函数
+│   │   │   ├── models.py             # SeekJob 模型 (只读访问)
+│   │   │   └── schemas.py            # Job 请求/响应模式
 │   │   │
 │   │   ├── applications/             # 申请模块
 │   │   │   ├── __init__.py
@@ -217,9 +215,20 @@ backend/
 │   │   │   ├── __init__.py
 │   │   │   ├── router.py             # 简历 API 路由
 │   │   │   ├── service.py            # 简历业务逻辑
-│   │   │   ├── models.py             # Resume/Document/DocumentVersion 模型
+│   │   │   ├── models.py             # Resume/Document 模型
 │   │   │   ├── schemas.py            # 简历请求/响应模式
-│   │   │   └── utils.py              # Markdown解析、PDF生成
+│   │   │   └── export/               # 文档导出子模块
+│   │   │       ├── __init__.py
+│   │   │       ├── service.py        # DocumentExportService (通用导出)
+│   │   │       ├── generator.py      # PDFGenerator (WeasyPrint)
+│   │   │       ├── renderer.py       # HTMLRenderer (模板渲染)
+│   │   │       ├── templates/        # HTML 模板 (按文档类型分类)
+│   │   │       │   ├── resume/       # 简历模板 (modern/classic/minimal)
+│   │   │       │   └── cover_letter/ # 求职信模板
+│   │   │       ├── css/              # 样式文件 (按文档类型分类)
+│   │   │       │   ├── resume/       # 简历样式
+│   │   │       │   └── cover_letter/ # 求职信样式
+│   │   │       └── static/           # 静态资源 (字体等)
 │   │   │
 │   │   ├── users/                    # 用户模块
 │   │   │   ├── __init__.py
@@ -288,7 +297,7 @@ backend/
 │   ├── seed_data.py                  # 种子数据
 │   └── celery_worker.py              # Celery worker 启动
 │
-├── pyproject.toml                    # Poetry 依赖管理
+├── pyproject.toml                    # uv 依赖管理
 ├── alembic.ini                       # Alembic 配置
 ├── .env.example                      # 环境变量示例
 └── README.md
@@ -737,18 +746,7 @@ Application 关联 TimelineEvent[]
 
 ---
 
-## 数据库Schema (Prisma)
-
-```prisma
-// schema.prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
+## 数据库Schema
 
 // ============================================
 // 枚举类型
@@ -785,352 +783,274 @@ enum DocumentFormat {
   PlainText
 }
 
-// ============================================
-// 核心文档管理模型（链式版本模型）
-// ============================================
-
-model Document {
-  id              String         @id @default(cuid())
-  rootId          String         // 文档家族根ID（第一版自引用）
-  parentId        String?        // 内容来源（模板或上一版本）
-  format          DocumentFormat @default(Markdown) // 文档格式
-  content         String         @db.Text
-  contentHash     String         // 内容哈希（幂等判断和缓存）
-  changeComments  String?        // 当前版本修改说明
-  metadata        Json?          // JSON扩展字段（业务自定义）
-  createdAt       DateTime       @default(now())
-  createdBy       String
-
-  // 关联关系
-  creator         User         @relation("DocumentCreator", fields: [createdBy], references: [id])
-  parent          Document?    @relation("DocumentChain", fields: [parentId], references: [id], onDelete: SetNull)
-  children        Document[]   @relation("DocumentChain")
-
-  // 业务层关联
-  resume                       Resume?
-  tailoredResumeApplications   Application[] @relation("TailoredResumeDocument")
-  coverLetterApplications      Application[] @relation("CoverLetterDocument")
-
-  @@index([rootId, createdAt(sort: Desc)])
-  @@index([parentId])
-  @@index([createdBy])
-  @@index([contentHash])
-  @@map("documents")
-}
-
-// ============================================
-// 用户与认证
-// ============================================
-
-model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
-  passwordHash      String
-  role              Role     @default(USER)
-  preferences       Json?    // 定制需求预设 {resumeCustomization, coverLetterStyle}
-  linkedinConnected Boolean  @default(false)
-
-  // 配额管理字段
-  monthlyJobLimit   Int      @default(0) // 每月Job分析配额
-  monthlyTokenLimit Int      @default(0) // 每月Token配额
-  monthlyTokenLeft  Int      @default(0) // 剩余Token数
-  quotaResetAt      DateTime? // 配额重置时间
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // 关联关系
-  resumes              Resume[]
-  applications         Application[]
-  skills               UserSkill[]
-  jobMatches           JobMatch[]
-  aiUsage              AiUsage[]
-  interviewPrep        InterviewPrep[]
-
-  // 文档创建关系
-  createdDocuments     Document[] @relation("DocumentCreator")
-
-  @@map("users")
-}
-
-// ============================================
-// 简历模板管理
-// ============================================
-
-model Resume {
-  id         String    @id @default(cuid())
-  userId     String
-  documentId String    @unique // 关联到Document表
-  title      String    // 简历名称（用户内唯一）
-  isDraft    Boolean   @default(true) // 草稿/正式版本
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  isDeleted  Boolean   @default(false) // 软删除标记
-  deletedAt  DateTime? // 软删除时间
-
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  // 反向关联：哪些申请使用了此简历模板
-  applications Application[]
-
-  @@unique([userId, title])
-  @@index([userId, isDraft, isDeleted])
-  @@index([userId, isDeleted])
-  @@map("resumes")
-}
-
-// ============================================
-// Job职位管理（只读表，由外部系统维护）
-// 注意：seek_jobs表由外部爬虫系统维护，JobPilot只读访问
-// ============================================
-
-model Job {
-  id                         Int       @id @default(autoincrement())
-  sourceId                   String    @unique @map("source_id")
-  title                      String    @db.VarChar(500)
-  abstract                   String?   @db.Text
-  content                    String?   @db.Text
-  status                     String?   @db.VarChar(50)
-  isExpired                  Boolean?  @default(false) @map("is_expired")
-  isLinkOut                  Boolean?  @default(false) @map("is_link_out")
-  isVerified                 Boolean?  @default(false) @map("is_verified")
-  phoneNumber                String?   @db.VarChar(50) @map("phone_number")
-  shareLink                  String?   @db.Text @map("share_link")
-  listedAt                   DateTime? @map("listed_at") @db.Timestamptz(6)
-  expiresAt                  DateTime? @map("expires_at") @db.Timestamptz(6)
-
-  // 薪资信息
-  salaryLabel                String?   @db.VarChar(200) @map("salary_label")
-
-  // 工作类型
-  workTypesLabel             String?   @db.VarChar(100) @map("work_types_label")
-  workTypeIds                String?   @db.VarChar(50) @map("work_type_ids")
-
-  // 地点信息
-  locationLabel              String?   @db.VarChar(200) @map("location_label")
-  locationArea               String?   @db.VarChar(100) @map("location_area")
-  locationCity               String?   @db.VarChar(100) @map("location_city")
-  locationIds                String?   @db.Text @map("location_ids")
-  countryCode                String?   @db.VarChar(10) @map("country_code")
-  country                    String?   @db.VarChar(50)
-  suburb                     String?   @db.VarChar(100)
-  region                     String?   @db.VarChar(100)
-  state                      String?   @db.VarChar(100)
-  postcode                   String?   @db.VarChar(20)
-
-  // 广告主信息
-  advertiserId               String?   @db.VarChar(50) @map("advertiser_id")
-  advertiserName             String?   @db.VarChar(300) @map("advertiser_name")
-  advertiserIsVerified       Boolean?  @default(false) @map("advertiser_is_verified")
-  advertiserRegistrationDate DateTime? @map("advertiser_registration_date") @db.Timestamptz(6)
-  isPrivateAdvertiser        Boolean?  @default(false) @map("is_private_advertiser")
-
-  // 分类信息
-  classificationId           String?   @db.VarChar(20) @map("classification_id")
-  classification             String?   @db.VarChar(200)
-  subClassificationId        String?   @db.VarChar(20) @map("sub_classification_id")
-  subClassification          String?   @db.VarChar(200) @map("sub_classification")
-  classificationsLabel       String?   @db.VarChar(500) @map("classifications_label")
-
-  // 品牌信息
-  productBullets             String?   @db.Text @map("product_bullets")
-  brandingId                 String?   @db.VarChar(100) @map("branding_id")
-  brandingCoverUrl           String?   @db.Text @map("branding_cover_url")
-  brandingThumbnailUrl       String?   @db.Text @map("branding_thumbnail_url")
-  brandingLogoUrl            String?   @db.Text @map("branding_logo_url")
-  displayTags                String?   @db.Text @map("display_tags")
-
-  // 公司信息
-  companyProfileId           String?   @db.VarChar(50) @map("company_profile_id")
-  companyName                String?   @db.VarChar(300) @map("company_name")
-  companySlug                String?   @db.VarChar(200) @map("company_slug")
-  companyLogo                String?   @db.Text @map("company_logo")
-  companyDescription         String?   @db.Text @map("company_description")
-  companyIndustry            String?   @db.VarChar(100) @map("company_industry")
-  companySize                String?   @db.VarChar(100) @map("company_size")
-  companyWebsite             String?   @db.Text @map("company_website")
-  shouldDisplayReviews       Boolean?  @default(false) @map("should_display_reviews")
-
-  // 标准化字段
-  normalisedRoleTitle        String?   @db.VarChar(300) @map("normalised_role_title")
-  normalisedOrganisationName String?   @db.VarChar(300) @map("normalised_organisation_name")
-  broaderLocationName        String?   @db.VarChar(100) @map("broader_location_name")
-
-  // 其他元数据
-  sourceZone                 String?   @db.VarChar(20) @map("source_zone")
-  adProductType              String?   @db.VarChar(50) @map("ad_product_type")
-  hasRoleRequirements        Boolean?  @default(false) @map("has_role_requirements")
-  contactPhone               String?   @db.VarChar(50) @map("contact_phone")
-  contactEmail               String?   @db.VarChar(100) @map("contact_email")
-  restrictedApplicationLabel String?   @db.VarChar(200) @map("restricted_application_label")
-
-  // 时间戳
-  createdAt                  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                  DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // 关联关系（JobPilot系统新增）
-  analysis                   JobAnalysis?
-  applications               Application[]
-  matches                    JobMatch[]
-
-  @@index([sourceId], map: "idx_seek_jobs_source_id")
-  @@index([title], map: "idx_seek_jobs_title")
-  @@index([listedAt], map: "idx_seek_jobs_listed_at")
-  @@index([isExpired], map: "idx_seek_jobs_is_expired")
-  @@index([status], map: "idx_seek_jobs_status")
-  @@index([locationCity], map: "idx_seek_jobs_location_city")
-  @@index([advertiserName], map: "idx_seek_jobs_advertiser_name")
-  @@index([classification], map: "idx_seek_jobs_classification")
-  @@index([subClassification], map: "idx_seek_jobs_sub_classification")
-  @@map("seek_jobs")
-}
-
-model JobAnalysis {
-  id                  String    @id @default(cuid())
-  jobId               Int       @unique @map("job_id") // 关联到Job.id (Int类型)
-  requiredSkills      String[]  // 必备技能
-  optionalSkills      String[]  // 可选技能
-  softSkills          String[]  // 软技能
-  yearsExperience     Int?      // 工作年限要求
-  deadline            DateTime? // 申请截止日期（用于计算紧急度）
-  markdownContent     String?   @db.Text // 分析结果的Markdown格式内容
-  translatedContent   String?   @db.Text // 翻译后的内容（如需要）
-  originalLanguage    String?   @db.VarChar(10) // 原始语言代码（如zh, en）
-  analysisResult      String?   @db.VarChar(50) // success/failed/pending
-  errorMessage        String?   @db.Text
-  analyzedAt          DateTime?
-
-  job                 Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@map("job_analysis")
-}
-
-model JobMatch {
-  id                  String   @id @default(cuid())
-  userId              String
-  jobId               Int      @map("job_id") // 关联到Job.id (Int类型)
-  matchScore          Decimal  @db.Decimal(5, 2) // 0-100 匹配度
-  urgencyScore        Decimal? @db.Decimal(5, 2) // 0-100 紧急度
-  bestMatchedResumeId String?  @map("best_matched_resume_id") // 系统推荐的最佳简历ID (Application创建时从此读取)
-  matchDetails        Json?    // 匹配详情（技能匹配、经验匹配等具体分析）
-  updatedAt           DateTime @default(now()) @map("updated_at")
-
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job                 Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  bestMatchedResume   Resume?  @relation(fields: [bestMatchedResumeId], references: [id])
-
-  @@unique([userId, jobId])
-  @@index([userId, matchScore(sort: Desc)])
-  @@index([userId, urgencyScore(sort: Desc)])
-  @@map("job_matches")
-}
-
-// ============================================
-// 申请管理
-// ============================================
-
-model Application {
-  id                      String            @id @default(cuid())
-  userId                  String            @map("user_id")
-  jobId                   Int               @map("job_id") // 关联到Job.id (Int类型)
-  sourceResumeId          String            @map("source_resume_id") // 用户选择的简历模板 (作为定制来源)
-  tailoringLevel          String?           @map("tailoring_level") // 定制深度: "Deep", "Light"
-  status                  ApplicationStatus @default(Pending)
-
-  // 定制简历和求职信（直接存储documentId）
-  resumeDocumentId        String?           @map("resume_document_id") // 定制简历的Document ID
-  coverLetterDocumentId   String?           @map("cover_letter_document_id") // 求职信的Document ID
-
-  // 质量检查标记
-  resumeVerified          Boolean           @default(false) @map("resume_verified") // 简历已验证
-  coverLetterVerified     Boolean           @default(false) @map("cover_letter_verified") // 求职信已验证
-
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
-  isDeleted               Boolean           @default(false) @map("is_deleted") // 软删除标记
-  deletedAt               DateTime?         @map("deleted_at") // 软删除时间
-
-  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job                     Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  sourceResume            Resume            @relation(fields: [sourceResumeId], references: [id])
-
-  // 关联到定制文档
-  resumeDocument          Document?         @relation("TailoredResumeDocument", fields: [resumeDocumentId], references: [id], onDelete: SetNull)
-  coverLetterDocument     Document?         @relation("CoverLetterDocument", fields: [coverLetterDocumentId], references: [id], onDelete: SetNull)
-
-  // 时间线
-  timeline                TimelineEvent[]
-
-  @@unique([userId, jobId])
-  @@index([userId, updatedAt(sort: Desc)])
-  @@index([userId, status, isDeleted])
-  @@index([userId, isDeleted])
-  @@index([status])
-  @@index([resumeDocumentId])
-  @@index([coverLetterDocumentId])
-  @@map("applications")
-}
-
-model TimelineEvent {
-  id            String      @id @default(cuid())
-  applicationId String
-  event         String      // created/status_changed/note_added/material_generated/quality_check
-  note          String?     // 用户备注
-  metadata      Json?       // 额外元数据（如状态变更前后值）
-  timestamp     DateTime    @default(now())
-
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-
-  @@index([applicationId, timestamp(sort: Desc)])
-  @@map("timeline_events")
-}
-
-// ============================================
-// 技能管理
-// ============================================
-
-model UserSkill {
-  id              String           @id @default(cuid())
-  userId          String
-  skillName       String
-  proficiency     ProficiencyLevel
-  skillType       String           // technical/soft/industry
-  extractedFromId String?          // 来源简历ID（Resume.id）
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, skillName])
-  @@index([userId, skillType])
-  @@map("user_skills")
-}
-
-// ============================================
-// AI使用追踪（配额管理）
-// ============================================
-
-model AiUsage {
-  id               String   @id @default(cuid())
-  userId           String
-  model            String   // claude-3-5-sonnet-20241022
-  inputTokens      Int
-  outputTokens     Int
-  cacheReadTokens  Int      @default(0)
-  cacheWriteTokens Int      @default(0)
-  estimatedCost    Decimal  @db.Decimal(10, 6)
-  operation        String   // job_analysis/resume_tailor/cover_letter/interview_prep
-  objectId         String?  // 无FK，可存储 applicationId/resumeId/jobId
-  timestamp        DateTime @default(now())
-
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, timestamp])
-  @@index([userId, operation])
-  @@map("ai_usage")
-}
+### users
+```sql
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role role NOT NULL DEFAULT 'USER',
+  preferences JSONB,
+  linkedin_connected BOOLEAN NOT NULL DEFAULT FALSE,
+  monthly_job_limit INTEGER NOT NULL DEFAULT 0,
+  monthly_token_limit INTEGER NOT NULL DEFAULT 0,
+  monthly_token_left INTEGER NOT NULL DEFAULT 0,
+  quota_reset_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
+
+### documents (��ʽ�汾ģ��)
+```sql
+CREATE TABLE documents (
+  id TEXT PRIMARY KEY,
+  root_id TEXT NOT NULL,
+  parent_id TEXT,
+  format document_format NOT NULL DEFAULT 'Markdown',
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  change_comments TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by TEXT NOT NULL,
+  CONSTRAINT fk_documents_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_documents_parent FOREIGN KEY (parent_id) REFERENCES documents(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_documents_root_created_at_desc ON documents (root_id, created_at DESC);
+CREATE INDEX idx_documents_parent_id ON documents (parent_id);
+CREATE INDEX idx_documents_created_by ON documents (created_by);
+CREATE INDEX idx_documents_content_hash ON documents (content_hash);
+```
+
+### resumes
+```sql
+CREATE TABLE resumes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  is_draft BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at TIMESTAMPTZ,
+  CONSTRAINT fk_resumes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_resumes_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT uq_resumes_user_title UNIQUE (user_id, title)
+);
+
+CREATE INDEX idx_resumes_user_draft_deleted ON resumes (user_id, is_draft, is_deleted);
+CREATE INDEX idx_resumes_user_deleted ON resumes (user_id, is_deleted);
+```
+
+### seek_jobs (ֻ����Դ��)
+```sql
+CREATE TABLE seek_jobs (
+  id BIGSERIAL PRIMARY KEY,
+  source_id TEXT NOT NULL UNIQUE,
+  title VARCHAR(500) NOT NULL,
+  abstract TEXT,
+  content TEXT,
+  status VARCHAR(50),
+  is_expired BOOLEAN DEFAULT FALSE,
+  is_link_out BOOLEAN DEFAULT FALSE,
+  is_verified BOOLEAN DEFAULT FALSE,
+  phone_number VARCHAR(50),
+  share_link TEXT,
+  listed_at TIMESTAMPTZ(6),
+  expires_at TIMESTAMPTZ(6),
+  salary_label VARCHAR(200),
+  work_types_label VARCHAR(100),
+  work_type_ids VARCHAR(50),
+  location_label VARCHAR(200),
+  location_area VARCHAR(100),
+  location_city VARCHAR(100),
+  location_ids TEXT,
+  country_code VARCHAR(10),
+  country VARCHAR(50),
+  suburb VARCHAR(100),
+  region VARCHAR(100),
+  state VARCHAR(100),
+  postcode VARCHAR(20),
+  advertiser_id VARCHAR(50),
+  advertiser_name VARCHAR(300),
+  advertiser_is_verified BOOLEAN DEFAULT FALSE,
+  advertiser_registration_date TIMESTAMPTZ(6),
+  is_private_advertiser BOOLEAN DEFAULT FALSE,
+  classification_id VARCHAR(20),
+  classification VARCHAR(200),
+  sub_classification_id VARCHAR(20),
+  sub_classification VARCHAR(200),
+  classifications_label VARCHAR(500),
+  product_bullets TEXT,
+  branding_id VARCHAR(100),
+  branding_cover_url TEXT,
+  branding_thumbnail_url TEXT,
+  branding_logo_url TEXT,
+  display_tags TEXT,
+  company_profile_id VARCHAR(50),
+  company_name VARCHAR(300),
+  company_slug VARCHAR(200),
+  company_logo TEXT,
+  company_description TEXT,
+  company_industry VARCHAR(100),
+  company_size VARCHAR(100),
+  company_website TEXT,
+  should_display_reviews BOOLEAN DEFAULT FALSE,
+  normalised_role_title VARCHAR(300),
+  normalised_organisation_name VARCHAR(300),
+  broader_location_name VARCHAR(100),
+  source_zone VARCHAR(20),
+  ad_product_type VARCHAR(50),
+  has_role_requirements BOOLEAN DEFAULT FALSE,
+  contact_phone VARCHAR(50),
+  contact_email VARCHAR(100),
+  restricted_application_label VARCHAR(200),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_seek_jobs_source_id ON seek_jobs (source_id);
+CREATE INDEX idx_seek_jobs_title ON seek_jobs (title);
+CREATE INDEX idx_seek_jobs_listed_at ON seek_jobs (listed_at);
+CREATE INDEX idx_seek_jobs_is_expired ON seek_jobs (is_expired);
+CREATE INDEX idx_seek_jobs_status ON seek_jobs (status);
+CREATE INDEX idx_seek_jobs_location_city ON seek_jobs (location_city);
+CREATE INDEX idx_seek_jobs_advertiser_name ON seek_jobs (advertiser_name);
+CREATE INDEX idx_seek_jobs_classification ON seek_jobs (classification);
+CREATE INDEX idx_seek_jobs_sub_classification ON seek_jobs (sub_classification);
+```
+
+### job_analysis
+```sql
+CREATE TABLE job_analysis (
+  id TEXT PRIMARY KEY,
+  job_id BIGINT NOT NULL UNIQUE,
+  required_skills TEXT[] NOT NULL DEFAULT '{}',
+  optional_skills TEXT[] NOT NULL DEFAULT '{}',
+  soft_skills TEXT[] NOT NULL DEFAULT '{}',
+  years_experience INTEGER,
+  deadline TIMESTAMPTZ,
+  markdown_content TEXT,
+  translated_content TEXT,
+  original_language VARCHAR(10),
+  analysis_result VARCHAR(50),
+  error_message TEXT,
+  analyzed_at TIMESTAMPTZ,
+  CONSTRAINT fk_job_analysis_job FOREIGN KEY (job_id) REFERENCES seek_jobs(id) ON DELETE CASCADE
+);
+```
+
+### job_matches
+```sql
+CREATE TABLE job_matches (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  job_id BIGINT NOT NULL,
+  match_score NUMERIC(5,2) NOT NULL,
+  urgency_score NUMERIC(5,2),
+  best_matched_resume_id TEXT,
+  match_details JSONB,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_job_matches_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_job_matches_job FOREIGN KEY (job_id) REFERENCES seek_jobs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_job_matches_best_resume FOREIGN KEY (best_matched_resume_id) REFERENCES resumes(id),
+  CONSTRAINT uq_job_matches_user_job UNIQUE (user_id, job_id)
+);
+
+CREATE INDEX idx_job_matches_user_match_score_desc ON job_matches (user_id, match_score DESC);
+CREATE INDEX idx_job_matches_user_urgency_score_desc ON job_matches (user_id, urgency_score DESC);
+```
+
+### applications
+```sql
+CREATE TABLE applications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  job_id BIGINT NOT NULL,
+  source_resume_id TEXT NOT NULL,
+  tailoring_level TEXT,
+  status application_status NOT NULL DEFAULT 'Pending',
+  resume_document_id TEXT,
+  cover_letter_document_id TEXT,
+  resume_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  cover_letter_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at TIMESTAMPTZ,
+  CONSTRAINT fk_applications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_applications_job FOREIGN KEY (job_id) REFERENCES seek_jobs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_applications_source_resume FOREIGN KEY (source_resume_id) REFERENCES resumes(id),
+  CONSTRAINT fk_applications_resume_doc FOREIGN KEY (resume_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+  CONSTRAINT fk_applications_cover_letter_doc FOREIGN KEY (cover_letter_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+  CONSTRAINT uq_applications_user_job UNIQUE (user_id, job_id)
+);
+
+CREATE INDEX idx_applications_user_updated_desc ON applications (user_id, updated_at DESC);
+CREATE INDEX idx_applications_user_status_deleted ON applications (user_id, status, is_deleted);
+CREATE INDEX idx_applications_user_deleted ON applications (user_id, is_deleted);
+CREATE INDEX idx_applications_status ON applications (status);
+CREATE INDEX idx_applications_resume_document_id ON applications (resume_document_id);
+CREATE INDEX idx_applications_cover_letter_document_id ON applications (cover_letter_document_id);
+```
+
+### timeline_events
+```sql
+CREATE TABLE timeline_events (
+  id TEXT PRIMARY KEY,
+  application_id TEXT NOT NULL,
+  event TEXT NOT NULL,
+  note TEXT,
+  metadata JSONB,
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_timeline_events_application FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_timeline_events_application_timestamp_desc ON timeline_events (application_id, timestamp DESC);
+```
+
+### user_skills
+```sql
+CREATE TABLE user_skills (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  skill_name TEXT NOT NULL,
+  proficiency proficiency_level NOT NULL,
+  skill_type TEXT NOT NULL,
+  extracted_from_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_user_skills_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT uq_user_skills_user_skill UNIQUE (user_id, skill_name)
+);
+
+CREATE INDEX idx_user_skills_user_skill_type ON user_skills (user_id, skill_type);
+```
+
+### ai_usage
+```sql
+CREATE TABLE ai_usage (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  estimated_cost NUMERIC(10,6) NOT NULL,
+  operation TEXT NOT NULL,
+  object_id TEXT,
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_ai_usage_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_ai_usage_user_timestamp ON ai_usage (user_id, timestamp);
+CREATE INDEX idx_ai_usage_user_operation ON ai_usage (user_id, operation);
+```
+
 
 ---
 
