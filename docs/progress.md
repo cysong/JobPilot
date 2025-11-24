@@ -2,12 +2,112 @@
 
 ## Current Status
 
-**Version:** v0.2.0 (Job Browsing Module)
+**Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
 ---
 
 ## Work Log
+
+### 2025-11-24 - Resume Management Frontend Completed
+
+**Completed Tasks:**
+
+**Frontend Implementation:**
+- ✅ Created TypeScript types (`src/types/resume.ts`) and API client (`src/api/resumes.ts`)
+- ✅ Implemented React Query hooks (`src/features/resumes/hooks/useResumes.ts`)
+- ✅ Built Resume Management UI:
+  - `ResumeListingPage`: Grid view of resumes with create/delete actions
+  - `ResumeEditPage`: Split-pane Markdown editor with real-time preview
+  - `ResumeCard`: Display resume status (Draft/Formal) and metadata
+- ✅ Integrated `react-markdown` for resume preview
+- ✅ Implemented PDF export trigger (downloads blob from backend)
+- ✅ Configured routes: `/resumes`, `/resumes/new`, `/resumes/:id`
+
+**Refactoring & Optimization:**
+- ✅ **Directory Structure**: Standardized `src/features/resumes` (removed `pages` subdirectory)
+- ✅ **Configuration**: Fixed `shadcn/ui` alias issue (moved files from `@` to `src`)
+- ✅ **Landing Page**: Updated content (removed "AI Cover Letter" badge and trial text)
+
+**Key Features Implemented:**
+- Full CRUD for resumes (Create, Read, Update, Delete)
+- Draft vs. Formal resume workflow
+- Markdown-based resume editing
+- Real-time preview
+- PDF Export integration
+
+---
+
+### 2025-11-24 - Project Layout & Access Control Completed
+
+**Completed Tasks:**
+
+**Frontend Implementation:**
+- ✅ Implemented **Public Layout** (Landing Page) with responsive design
+- ✅ Implemented **Main Layout** (Authenticated) with Top Navigation and User Menu
+- ✅ Built `Navigation` component with responsive mobile drawer (`Sheet`)
+- ✅ Built `UserNav` component with Avatar dropdown and Logout functionality
+- ✅ Created `PlaceholderPage` for unimplemented features (Dashboard, Applications, Resumes)
+- ✅ Configured `App.tsx` with Public and Protected routes
+- ✅ Adapted `JobListingPage` to the new layout structure
+
+**Refactoring & Optimization:**
+- ✅ **Directory Structure**: Merged `src/layouts` into `src/components/layout` for a flatter structure
+- ✅ **Utility Functions**: Standardized `cn` utility in `src/utils/cn.ts`
+- ✅ **Configuration**: Added `components.json` for shadcn/ui and configured path aliases (`@/utils/cn`)
+- ✅ **Documentation**: Updated `docs/frontend_development_guide.md` with new structure and standards
+
+**Key Features Implemented:**
+- Unified navigation experience for authenticated users
+- Modern, responsive Landing Page for public visitors
+- Secure access control (redirects to login if unauthenticated)
+- Mobile-friendly navigation menu
+
+---
+
+### 2025-11-24 - Document Export System Implemented
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- ✅ Refactored PDF export system to support multiple document types (方案 3: 混合方案)
+- ✅ Created **DocumentExportService** - Universal export service ([app/modules/resumes/export/service.py](app/modules/resumes/export/service.py))
+  - `export_to_pdf()`: Generic export method for all document types
+  - `get_available_document_types()`: Auto-discover document types
+  - `get_available_templates(document_type)`: Get templates per type
+- ✅ Refactored **PDFGenerator** to support `document_type` parameter ([app/modules/resumes/export/generator.py](app/modules/resumes/export/generator.py))
+  - Template path: `templates/{document_type}/{template_name}.html`
+  - CSS path: `css/{document_type}/base.css` + `css/{document_type}/{template}.css`
+  - Added `get_available_document_types()` method
+  - Updated `get_available_templates(document_type)` method
+  - Updated `validate_template(document_type, template_name)` method
+- ✅ Reorganized template directory structure:
+  - `templates/resume/` - Resume templates (modern/classic/minimal)
+  - `templates/cover_letter/` - Cover letter templates (to be created)
+- ✅ Reorganized CSS directory structure:
+  - `css/resume/` - Resume styles (base.css + template-specific)
+  - `css/cover_letter/` - Cover letter styles (to be created)
+- ✅ Updated **ResumeService** to use DocumentExportService ([app/modules/resumes/service.py](app/modules/resumes/service.py:394-453))
+  - Calls `DocumentExportService.export_to_pdf(document_type="resume")`
+- ✅ Updated Resume API endpoints ([app/modules/resumes/router.py](app/modules/resumes/router.py))
+  - Updated `/resumes/templates` to call `DocumentExportService.get_available_templates("resume")`
+- ✅ Updated configuration ([app/core/config.py](app/core/config.py:55))
+  - Renamed `RESUME_EXPORT_DEFAULT_TEMPLATE` → `EXPORT_DEFAULT_TEMPLATE`
+  - Now applies to all document types
+
+**Documentation:**
+- ✅ Updated [docs/resume-export.md](docs/resume-export.md) to reflect new architecture
+
+
+**Key Features Implemented:**
+- Multi-document type support (resume, cover_letter, etc.)
+- Template and CSS isolation by document type
+- Auto-discovery of document types and templates
+- Easy extension: just add new `templates/{type}/` and `css/{type}/` directories
+- Backward compatible: existing resume export API unchanged
+
+
+---
 
 ### 2025-11-24 - Resume Management Module Backend Completed
 
