@@ -971,21 +971,24 @@ CREATE TABLE applications (
   user_id TEXT NOT NULL,
   job_id BIGINT NOT NULL,
   source_resume_id TEXT NOT NULL,
-  tailoring_level TEXT,
+  tailoring_level TEXT NOT NULL DEFAULT 'light',
   status application_status NOT NULL DEFAULT 'Pending',
   resume_document_id TEXT,
   cover_letter_document_id TEXT,
   resume_verified BOOLEAN NOT NULL DEFAULT FALSE,
   cover_letter_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  workflow_id TEXT,
+  last_error TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
   CONSTRAINT fk_applications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_applications_job FOREIGN KEY (job_id) REFERENCES seek_jobs(id) ON DELETE CASCADE,
-  CONSTRAINT fk_applications_source_resume FOREIGN KEY (source_resume_id) REFERENCES resumes(id),
+  CONSTRAINT fk_applications_source_resume FOREIGN KEY (source_resume_id) REFERENCES resumes(id) ON DELETE SET NULL,
   CONSTRAINT fk_applications_resume_doc FOREIGN KEY (resume_document_id) REFERENCES documents(id) ON DELETE SET NULL,
   CONSTRAINT fk_applications_cover_letter_doc FOREIGN KEY (cover_letter_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+  CONSTRAINT fk_applications_workflow FOREIGN KEY (workflow_id) REFERENCES workflow_executions(id) ON DELETE SET NULL,
   CONSTRAINT uq_applications_user_job UNIQUE (user_id, job_id)
 );
 
@@ -995,6 +998,7 @@ CREATE INDEX idx_applications_user_deleted ON applications (user_id, is_deleted)
 CREATE INDEX idx_applications_status ON applications (status);
 CREATE INDEX idx_applications_resume_document_id ON applications (resume_document_id);
 CREATE INDEX idx_applications_cover_letter_document_id ON applications (cover_letter_document_id);
+CREATE INDEX idx_applications_workflow_id ON applications (workflow_id);
 ```
 
 ### timeline_events
