@@ -4,7 +4,8 @@ import type {
     ResumeListItem,
     CreateResumeRequest,
     UpdateResumeRequest,
-    ResumeListResponse
+    ResumeListResponse,
+    ResumeExportRequest
 } from '@/types/resume'
 
 export const resumeApi = {
@@ -40,8 +41,12 @@ export const resumeApi = {
     },
 
     // Returns the blob for the PDF
-    exportResume: async (id: string) => {
-        const response = await client.get(`/resumes/${id}/export`, {
+    exportResume: async (id: string, options?: ResumeExportRequest) => {
+        const response = await client.post(`/resumes/${id}/export`, {
+            template: options?.template || 'modern',
+            font_size: options?.font_size || 12,
+            include_metadata: options?.include_metadata ?? true
+        }, {
             responseType: 'blob'
         })
         return response.data

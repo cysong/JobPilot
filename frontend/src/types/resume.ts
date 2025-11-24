@@ -7,6 +7,13 @@ export interface ResumeListItem {
     document_id?: string
 }
 
+export interface Document {
+    id: string
+    content: string
+    format: string
+    updated_at: string
+}
+
 export interface Resume {
     id: string
     title: string
@@ -15,7 +22,7 @@ export interface Resume {
     document_id: string
     created_at: string
     updated_at: string
-    content: string // From joined Document
+    document: Document
 }
 
 export interface CreateResumeRequest {
@@ -35,4 +42,10 @@ export interface ResumeListResponse {
     page: number
     size: number
     pages: number
+}
+
+export interface ResumeExportRequest {
+    template?: 'modern' | 'classic' | 'minimal'
+    font_size?: number
+    include_metadata?: boolean
 }

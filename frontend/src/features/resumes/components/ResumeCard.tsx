@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FileText, Trash2, Download, Edit } from 'lucide-react'
+import { FileText, Trash2, Download } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ResumeListItem } from '@/types/resume'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,15 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                 </Button>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                            }}
+                        >
                             <Trash2 className="w-4 h-4" />
                         </Button>
                     </AlertDialogTrigger>
@@ -64,7 +72,14 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onDelete(resume.id)} className="bg-red-600 hover:bg-red-700">
+                            <AlertDialogAction
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onDelete(resume.id)
+                                }}
+                                className="bg-red-600 hover:bg-red-700"
+                            >
                                 Delete
                             </AlertDialogAction>
                         </AlertDialogFooter>
@@ -82,14 +97,13 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                 Updated {formatDistanceToNow(new Date(resume.updated_at), { addSuffix: true })}
             </p>
 
-            <div className="mt-4 flex gap-2">
-                <Badge variant="secondary" className="font-normal">PDF</Badge>
-                {resume.is_draft && (
+            {resume.is_draft && (
+                <div className="mt-4">
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
                         Draft
                     </Badge>
-                )}
-            </div>
+                </div>
+            )}
         </Link>
     )
 }
