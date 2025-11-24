@@ -42,10 +42,10 @@ export default function JobListingPage() {
     }, [filters.page])
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full -mx-6 -mt-8">
             {/* Header / Search Bar */}
             <div className="bg-white border-b border-slate-200 sticky top-[65px] z-30">
-                <div className="max-w-7xl mx-auto px-4 py-4">
+                <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center gap-4">
                         <div className="flex-1">
                             <JobSearch />
@@ -71,7 +71,7 @@ export default function JobListingPage() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-8 w-full">
+            <div className="max-w-7xl mx-auto px-6 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     {/* Desktop Filters Sidebar */}
                     <div className="hidden lg:block lg:col-span-1">
