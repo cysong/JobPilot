@@ -71,7 +71,7 @@ export default function ResumeEditPage() {
             // Optional: trigger backend save if needed
         },
         storageKey: getStorageKey(),
-        enabled: !!(values.title || values.content)
+        enabled: form.formState.isDirty
     })
 
     // Load data when resume is fetched or check for local draft
@@ -257,7 +257,7 @@ export default function ResumeEditPage() {
                         </button>
                     </div>
 
-                    {!isNew && !resume?.is_draft && (
+                    {!isNew && (
                         <Button variant="outline" onClick={handleDownload}>
                             <Download className="w-4 h-4 mr-2" />
                             Export PDF
@@ -279,27 +279,42 @@ export default function ResumeEditPage() {
             </div>
 
             {/* Editor/Preview Area */}
-            <div className="flex-1 overflow-hidden bg-slate-50">
+            <div className="flex-1 overflow-hidden bg-white">
                 {activeTab === 'edit' ? (
                     <div className="h-full flex">
-                        <div className="w-1/2 h-full border-r border-slate-200 bg-white p-6">
-                            <FormField
-                                control={form.control}
-                                name="content"
-                                render={({ field }) => (
-                                    <ResumeEditor content={field.value} onChange={field.onChange} />
-                                )}
-                            />
+                        {/* Editor Column */}
+                        <div className="w-1/2 h-full bg-white border-r border-slate-200 flex flex-col">
+                            <div className="border-b border-slate-100 px-6 py-3 flex justify-between items-center bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Markdown Editor</span>
+                            </div>
+                            <div className="flex-1 relative">
+                                <FormField
+                                    control={form.control}
+                                    name="content"
+                                    render={({ field }) => (
+                                        <ResumeEditor content={field.value} onChange={field.onChange} />
+                                    )}
+                                />
+                            </div>
                         </div>
-                        <div className="w-1/2 h-full overflow-auto bg-slate-50 p-8 flex justify-center">
-                            <div className="w-full max-w-4xl bg-white min-h-[800px] p-12">
-                                <ResumePreview content={form.watch('content')} />
+
+                        {/* Preview Column */}
+                        <div className="w-1/2 h-full bg-white flex flex-col border-l border-slate-50 overflow-hidden">
+                            <div className="border-b border-slate-100 px-6 py-3 flex justify-between items-center bg-white z-10">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Preview</span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto bg-slate-50/30">
+                                <div className="min-h-full p-8 flex flex-col items-center shrink-0">
+                                    <div className="bg-white shadow-sm border border-slate-200 min-h-[297mm] w-[210mm] rounded-sm shrink-0">
+                                        <ResumePreview content={form.watch('content')} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full overflow-auto p-8 flex justify-center">
-                        <div className="w-full max-w-4xl bg-white shadow-lg min-h-[1000px]">
+                    <div className="h-full overflow-auto bg-slate-50/30 p-8 flex flex-col items-center">
+                        <div className="bg-white shadow-sm border border-slate-200 min-h-[297mm] w-[210mm] rounded-sm shrink-0">
                             <ResumePreview content={form.watch('content')} />
                         </div>
                     </div>

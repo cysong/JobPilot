@@ -23,7 +23,7 @@ const sanitizeSchema = {
 
 export function ResumePreview({ content }: ResumePreviewProps) {
     return (
-        <div className="prose prose-slate max-w-none bg-white min-h-full">
+        <div className="prose prose-slate max-w-none bg-white min-h-full p-8">
             <Markdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
