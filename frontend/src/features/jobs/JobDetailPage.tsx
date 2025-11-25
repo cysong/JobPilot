@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -8,9 +9,11 @@ import {
   ArrowLeft,
   Share2,
   ExternalLink,
+  Plus,
 } from "lucide-react";
 
 import { useJobDetail } from "@/features/jobs/hooks/useJobs";
+import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const [searchParams] = useSearchParams();
+  const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
   const {
     data: job,
     isLoading,
@@ -96,10 +100,19 @@ export default function JobDetailPage() {
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsApplicationDialogOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add to Applications
+              </Button>
               {job.share_link && (
                 <Button
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700"
+                  variant="outline"
+                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                   asChild
                 >
                   <a
@@ -113,6 +126,13 @@ export default function JobDetailPage() {
                 </Button>
               )}
             </div>
+
+            <ApplicationDialog
+              open={isApplicationDialogOpen}
+              onOpenChange={setIsApplicationDialogOpen}
+              jobId={job.id}
+              jobTitle={job.title}
+            />
           </div>
         </div>
       </div>
@@ -170,8 +190,8 @@ export default function JobDetailPage() {
                   Posted{" "}
                   {job.listed_at
                     ? formatDistanceToNow(new Date(job.listed_at), {
-                        addSuffix: true,
-                      })
+                      addSuffix: true,
+                    })
                     : "recently"}
                 </span>
               </div>

@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.shared.enums import ApplicationStatus
+from app.modules.jobs.schemas import JobBase
 
 
 class ApplicationCreateRequest(BaseModel):
@@ -28,6 +29,7 @@ class ApplicationResponse(BaseModel):
     last_error: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    job: Optional[JobBase] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,3 +37,13 @@ class ApplicationResponse(BaseModel):
 class ApplicationDetail(ApplicationResponse):
     """Detailed response (currently same as base, reserved for extension)."""
     pass
+
+
+class ApplicationListResponse(BaseModel):
+    """Paginated list response for applications."""
+
+    items: list[ApplicationDetail]
+    total: int
+    page: int
+    size: int
+    pages: int

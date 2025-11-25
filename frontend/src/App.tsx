@@ -8,6 +8,7 @@ import LandingPage from '@/features/landing/LandingPage'
 import PlaceholderPage from '@/features/common/PlaceholderPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
 import JobDetailPage from '@/features/jobs/JobDetailPage'
+import ApplicationListingPage from '@/features/applications/ApplicationListingPage'
 import ResumeListingPage from '@/features/resumes/ResumeListingPage'
 import ResumeEditPage from '@/features/resumes/ResumeEditPage'
 import { Toaster } from '@/components/ui/toaster'
@@ -41,7 +42,7 @@ function App() {
             <Route path="/dashboard" element={<PlaceholderPage />} />
             <Route path="/jobs" element={<JobListingPage />} />
             <Route path="/jobs/:jobId" element={<JobDetailPage />} />
-            <Route path="/applications" element={<PlaceholderPage />} />
+            <Route path="/applications" element={<ApplicationListingPage />} />
             <Route path="/resumes" element={<ResumeListingPage />} />
             <Route path="/resumes/new" element={<ResumeEditPage />} />
             <Route path="/resumes/:id" element={<ResumeEditPage />} />

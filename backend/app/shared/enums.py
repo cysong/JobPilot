@@ -19,6 +19,7 @@ class ApplicationStatus(str, Enum):
     INTERVIEWING = "Interviewing"    # Interview stage
     OFFER = "Offer"                  # Offer received
     REJECTED = "Rejected"            # Application rejected
+    FAILED = "Failed"                # Application failed
 
 
 class WorkflowStatus(str, Enum):

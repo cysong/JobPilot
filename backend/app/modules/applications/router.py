@@ -10,10 +10,22 @@ from app.modules.auth.models import User
 from app.modules.applications.schemas import (
     ApplicationCreateRequest,
     ApplicationDetail,
+    ApplicationListResponse,
 )
 from app.modules.applications.service import ApplicationService
 
 router = APIRouter(prefix="/applications", tags=["applications"])
+
+
+@router.get("/", response_model=ApplicationListResponse)
+async def list_applications(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    page: int = 1,
+    size: int = 20,
+):
+    """List applications for the current user with pagination."""
+    return await ApplicationService.list_applications(db, current_user, page, size)
 
 
 @router.post("/", response_model=ApplicationDetail, status_code=status.HTTP_201_CREATED)
@@ -36,7 +48,8 @@ async def get_application(
     """Get application detail for current user."""
     application = await ApplicationService.get_application_by_id(db, application_id, current_user)
     if not application:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
     return application
 
 

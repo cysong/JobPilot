@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException, status
 from openai import OpenAI
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,6 +32,7 @@ from app.shared.enums import (
     TaskStatus,
     AICallStatus,
 )
+from sqlalchemy.orm import selectinload
 
 
 class ApplicationService:
@@ -145,6 +146,40 @@ class ApplicationService:
         return application
 
     @staticmethod
+    async def list_applications(
+        db: AsyncSession,
+        user: User,
+        page: int = 1,
+        size: int = 20,
+    ):
+        """List applications for the current user with pagination."""
+        page = max(page, 1)
+        size = min(max(size, 1), 100)
+
+        base_query = select(Application).where(Application.user_id == user.id)
+        query = (
+            base_query
+            .options(selectinload(Application.job))
+            .order_by(Application.created_at.desc())
+            .limit(size)
+            .offset((page - 1) * size)
+        )
+        result = await db.execute(query)
+        items = result.scalars().all()
+
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total = (await db.execute(count_query)).scalar_one()
+
+        pages = (total + size - 1) // size if size else 0
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": pages,
+        }
+
+    @staticmethod
     async def get_application_by_id(
         db: AsyncSession,
         application_id: str,
@@ -163,6 +198,7 @@ class ApplicationService:
                 selectinload(Application.source_resume).selectinload(
                     Resume.document),
                 selectinload(Application.resume_document),
+                selectinload(Application.job),
             )
         )
         result = await db.execute(query)
@@ -211,7 +247,7 @@ class ApplicationService:
             input_data={
                 "application_id": application.id,
                 "job_id": application.job_id,
-                "resume_id": application.resume_id,
+                "resume_document_id": application.resume_document_id,
                 "force": True,
             },
         )
