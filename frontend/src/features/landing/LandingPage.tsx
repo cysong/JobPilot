@@ -87,7 +87,7 @@ export default function LandingPage() {
                             <img src="https://placehold.co/1200x800/f8fafc/cbd5e1?text=JobPilot+Dashboard+Preview" alt="Dashboard Preview" className="w-full h-auto opacity-90" />
 
                             {/* Overlay Elements */}
-                            <div className="absolute top-1/4 left-10 bg-white p-4 rounded-lg shadow-lg border border-slate-100 animate-bounce duration-[3000ms]">
+                            <div className="absolute top-1/4 left-10 bg-white p-4 rounded-lg shadow-lg border border-slate-100 animate-bounce [animation-duration:3000ms]">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
                                         <Check className="w-6 h-6" />
