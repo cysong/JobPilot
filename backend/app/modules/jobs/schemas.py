@@ -6,6 +6,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.shared.pagination import PaginatedResponse
+
 
 class JobBase(BaseModel):
     """Base Job schema with essential fields for list display"""
@@ -117,13 +119,8 @@ class JobDetail(JobBase):
     updated_at: Optional[datetime] = None
 
 
-class JobListResponse(BaseModel):
+class JobListResponse(PaginatedResponse[JobBase]):
     """Paginated job list response"""
-    items: list[JobBase]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int
 
 
 class JobFiltersRequest(BaseModel):
@@ -139,10 +136,6 @@ class JobFiltersRequest(BaseModel):
     # Date range
     listed_after: Optional[datetime] = Field(None, description="Filter jobs listed after this date")
     listed_before: Optional[datetime] = Field(None, description="Filter jobs listed before this date")
-
-    # Pagination
-    page: int = Field(1, ge=1, description="Page number (starts from 1)")
-    page_size: int = Field(20, ge=1, le=100, description="Page size (max 100)")
 
     # Sorting
     sort_by: str = Field("listed_at", description="Sort field")

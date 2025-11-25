@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.jobs.models import SeekJob
 from app.modules.jobs.schemas import JobFiltersRequest, JobFiltersOptions
+from app.shared.pagination import PaginationParams
 
 
 class JobService:
@@ -17,7 +18,8 @@ class JobService:
     @staticmethod
     async def get_jobs(
         db: AsyncSession,
-        filters: JobFiltersRequest
+        filters: JobFiltersRequest,
+        pagination: PaginationParams,
     ) -> tuple[list[SeekJob], int]:
         """
         Get paginated job list with filtering.
@@ -25,6 +27,7 @@ class JobService:
         Args:
             db: Database session
             filters: Filter parameters
+            pagination: Pagination parameters
 
         Returns:
             Tuple of (job_list, total_count)
@@ -93,8 +96,7 @@ class JobService:
             query = query.order_by(sort_column.asc())
 
         # Apply pagination
-        offset = (filters.page - 1) * filters.page_size
-        query = query.offset(offset).limit(filters.page_size)
+        query = query.offset(pagination.get_offset()).limit(pagination.get_limit())
 
         # Execute query
         result = await db.execute(query)

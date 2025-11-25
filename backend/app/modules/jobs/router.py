@@ -1,7 +1,6 @@
 """
 Job API endpoints.
 """
-import math
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,6 +17,7 @@ from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobFiltersOptions
 )
+from app.shared.pagination import PaginationParams
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -32,8 +32,7 @@ async def list_jobs(
     companies: list[str] | None = Query(None, description="Filter by companies"),
     listed_after: str | None = Query(None, description="Listed after date (ISO format)"),
     listed_before: str | None = Query(None, description="Listed before date (ISO format)"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Page size"),
+    params: PaginationParams = Depends(),
     sort_by: str = Query("listed_at", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order: asc or desc")
 ):
@@ -45,7 +44,7 @@ async def list_jobs(
     - **work_types**: Filter by work types (e.g., "Full Time", "Part Time")
     - **companies**: Filter by company names
     - **listed_after/listed_before**: Date range filter
-    - **page/page_size**: Pagination parameters
+    - **page/page_size** (或 size): Pagination parameters
     - **sort_by/sort_order**: Sorting parameters
     """
     # Parse date strings if provided
@@ -73,27 +72,21 @@ async def list_jobs(
         companies=companies,
         listed_after=parsed_listed_after,
         listed_before=parsed_listed_before,
-        page=page,
-        page_size=page_size,
         sort_by=sort_by,
         sort_order=sort_order
     )
 
     # Get jobs
-    jobs, total = await service.JobService.get_jobs(db, filters)
-
-    # Calculate total pages
-    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    jobs, total = await service.JobService.get_jobs(db, filters, params)
 
     # Convert to JobBase schema
     job_items = [JobBase.model_validate(job) for job in jobs]
 
-    return JobListResponse(
+    return JobListResponse.create(
         items=job_items,
         total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages
+        page=params.page,
+        page_size=params.page_size,
     )
 
 
