@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from app.shared.enums import ApplicationStatus
 from app.modules.jobs.schemas import JobBase
+from app.shared.pagination import PaginatedResponse
 
 
 class ApplicationCreateRequest(BaseModel):
@@ -39,11 +40,5 @@ class ApplicationDetail(ApplicationResponse):
     pass
 
 
-class ApplicationListResponse(BaseModel):
+class ApplicationListResponse(PaginatedResponse[ApplicationDetail]):
     """Paginated list response for applications."""
-
-    items: list[ApplicationDetail]
-    total: int
-    page: int
-    size: int
-    pages: int

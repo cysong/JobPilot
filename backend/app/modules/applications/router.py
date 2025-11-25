@@ -13,6 +13,7 @@ from app.modules.applications.schemas import (
     ApplicationListResponse,
 )
 from app.modules.applications.service import ApplicationService
+from app.shared.pagination import PaginationParams
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -21,11 +22,10 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 async def list_applications(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    page: int = 1,
-    size: int = 20,
+    params: Annotated[PaginationParams, Depends()],
 ):
     """List applications for the current user with pagination."""
-    return await ApplicationService.list_applications(db, current_user, page, size)
+    return await ApplicationService.list_applications(db, current_user, params)
 
 
 @router.post("/", response_model=ApplicationDetail, status_code=status.HTTP_201_CREATED)

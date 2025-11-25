@@ -11,6 +11,8 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.shared.pagination import PaginationParams, PaginatedResponse
+
 from app.core.config import settings
 from app.modules.auth.models import User
 from app.modules.jobs.models import SeekJob
@@ -149,35 +151,31 @@ class ApplicationService:
     async def list_applications(
         db: AsyncSession,
         user: User,
-        page: int = 1,
-        size: int = 20,
-    ):
-        """List applications for the current user with pagination."""
-        page = max(page, 1)
-        size = min(max(size, 1), 100)
-
+        params: PaginationParams,
+    ) -> PaginatedResponse[Application]:
+        """List applications for the current user with pagination helpers."""
         base_query = select(Application).where(Application.user_id == user.id)
-        query = (
+        result = await db.execute(
             base_query
             .options(selectinload(Application.job))
             .order_by(Application.created_at.desc())
-            .limit(size)
-            .offset((page - 1) * size)
+            .limit(params.get_limit())
+            .offset(params.get_offset())
         )
-        result = await db.execute(query)
         items = result.scalars().all()
 
-        count_query = select(func.count()).select_from(base_query.subquery())
-        total = (await db.execute(count_query)).scalar_one()
+        total = (
+            await db.execute(
+                select(func.count()).select_from(base_query.subquery())
+            )
+        ).scalar_one()
 
-        pages = (total + size - 1) // size if size else 0
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "size": size,
-            "pages": pages,
-        }
+        return PaginatedResponse.create(
+            items=items,
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+        )
 
     @staticmethod
     async def get_application_by_id(

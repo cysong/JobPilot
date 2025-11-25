@@ -1,5 +1,5 @@
 """Pagination utilities"""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 from typing import Generic, TypeVar, List
 from math import ceil
 
@@ -8,8 +8,13 @@ T = TypeVar('T')
 
 class PaginationParams(BaseModel):
     """Pagination query parameters"""
-    page: int = 1
-    page_size: int = 20
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        validation_alias=AliasChoices("page_size", "size"),
+    )
 
     def get_offset(self) -> int:
         """Calculate offset for database query"""
