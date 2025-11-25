@@ -14,52 +14,71 @@ JobPilot 采用 **Celery Canvas + PostgreSQL 状态机 + Outbox Pattern** 的混
 ### 1.2 调用链路
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    Frontend (React)                             │
-│  • 用户交互                                                      │
-│  • WebSocket 接收实时通知                                        │
-└──────────────────────┬─────────────────────────────────────────┘
-                       │
-                       ▼
-┌────────────────────────────────────────────────────────────────┐
-│                  API Layer (FastAPI)                            │
-│  • 接收请求并验证                                                │
-│  • 检查用户配额                                                  │
-│  • 创建 workflow_executions 和 task_executions 记录             │
-│  • 写入 outbox_events                                           │
-└──────────────────────┬─────────────────────────────────────────┘
-                       │
-                       ▼
-┌────────────────────────────────────────────────────────────────┐
-│           Workflow Orchestration Layer                          │
-│  • WorkflowVersionLoader: 加载配置版本                          │
-│  • WorkflowParser: 解析 YAML 配置                              │
-│  • WorkflowExecutor: 构建 Celery Canvas DAG                    │
-└──────────────────────┬─────────────────────────────────────────┘
-                       │
-                       ▼
-┌────────────────────────────────────────────────────────────────┐
-│              Execution Layer (Celery Workers)                   │
-│  • 执行具体任务                                                  │
-│  • 更新 PostgreSQL 状态                                         │
-│  • 写入 outbox_events                                           │
-│  • 通过 Spec-kit Gateway 调用 AI                                │
-└────────┬──────────────────────────────┬────────────────────────┘
-         │                              │
-         ▼                              ▼
-┌──────────────────┐          ┌─────────────────────────┐
-│  Spec-kit Gateway│          │  Outbox Publisher       │
-│  • Prompt 渲染    │          │  • 扫描未发布事件        │
-│  • Model 路由     │          │  • 执行事件处理器        │
-│  • 异步写 AiCalls│          │  • 发送通知/邮件         │
-└────────┬─────────┘          └─────────────────────────┘
-         │
-         ▼
-┌──────────────────┐
-│  LLM Providers   │
-│  • DeepSeek      │
-│  • OpenAI        │
-└──────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       Frontend (React)                           │
+│  • 用户交互  • WebSocket 接收实时通知                             │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ HTTP/REST
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Layer (FastAPI)                           │
+│  • Router: 路由和参数验证                                         │
+│  • Middleware: 认证、限流、日志                                   │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Service Layer (业务逻辑)                        │
+│  • ApplicationService: 应用业务逻辑                               │
+│  • WorkflowService: 工作流编排                                    │
+│  • 事务控制 + Outbox 事件写入                                     │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                Repository Layer (数据访问)                        │
+│  • ApplicationRepo  • WorkflowRepo  • TaskRepo  • OutboxRepo    │
+│  • 封装查询逻辑  • 提供事务友好接口                                │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 Database (PostgreSQL)                            │
+│  • applications  • workflow_executions  • task_executions        │
+│  • outbox_events  • ai_calls  • documents                       │
+└─────────────────────────────────────────────────────────────────┘
+
+                    ┌──────── Outbox Consumer ────────┐
+                    │ (Celery Beat: 每 5 秒轮询)       │
+                    │  • 批量获取未发布事件             │
+                    │  • 并发处理 (Semaphore 限制)    │
+                    │  • 独立 session (避免竞态)       │
+                    └──────────┬──────────────────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │                             │
+                ▼                             ▼
+    ┌─────────────────────┐       ┌───────────────────────┐
+    │  Event Handler      │       │  Celery Worker        │
+    │  • 工作流初始化      │       │  • 执行任务           │
+    │  • 状态更新通知      │       │  • AI 调用            │
+    │  • 配额扣减         │       │  • 状态持久化         │
+    └─────────────────────┘       └──────────┬────────────┘
+                                              │
+                                              ▼
+                                   ┌────────────────────┐
+                                   │  Spec-kit Gateway  │
+                                   │  • Prompt 渲染     │
+                                   │  • Model 路由      │
+                                   │  • 使用量记录      │
+                                   └──────────┬─────────┘
+                                              │
+                                              ▼
+                                   ┌────────────────────┐
+                                   │   LLM Providers    │
+                                   │  • DeepSeek        │
+                                   │  • OpenAI          │
+                                   └────────────────────┘
 ```
 
 ## 2. 核心组件设计
@@ -231,6 +250,67 @@ workflows:
       - "1.0.0"
 ```
 
+#### 2.1.3 Repository 模式
+
+**职责分离**:
+
+采用 Repository 模式实现数据访问层与业务逻辑层的解耦:
+
+- **Router Layer**: 路由和参数验证
+- **Service Layer**: 业务逻辑、事务控制、事件编排
+- **Repository Layer**: 数据访问封装、查询构建
+- **Model Layer**: 数据模型定义
+
+**核心 Repository**:
+
+```
+ApplicationRepository    - 应用数据 CRUD 和查询
+WorkflowRepository      - 工作流状态管理
+TaskRepository          - 任务记录管理
+OutboxRepository        - 事件队列管理
+```
+
+**接口设计** (关键方法):
+
+```python
+class ApplicationRepository:
+    @staticmethod
+    async def create(db, application) -> Application
+    @staticmethod
+    async def get_by_user_and_job(db, user_id, job_id) -> Optional[Application]
+    @staticmethod
+    async def mark_ready(db, application, cover_letter_document_id)
+    @staticmethod
+    async def mark_failed(db, application, error)
+
+class WorkflowRepository:
+    @staticmethod
+    async def create(db, workflow_type, user_id, entity_id, input_data)
+    @staticmethod
+    async def mark_running(db, workflow, celery_task_id)
+    @staticmethod
+    async def mark_completed(db, workflow, output_data)
+    @staticmethod
+    async def reset_for_retry(db, workflow)
+
+class OutboxRepository:
+    @staticmethod
+    async def enqueue_event(db, event_type, aggregate_id, payload, meta)
+    @staticmethod
+    async def fetch_pending_batch(db, batch_size) -> List[OutboxEvent]
+    @staticmethod
+    async def mark_published(db, event)
+    @staticmethod
+    async def mark_retry(db, event, error_message)
+```
+
+**优势**:
+
+- ✅ 测试友好: Service 层可独立单元测试
+- ✅ 查询复用: 复杂查询统一封装
+- ✅ 事务安全: Repository 方法都是事务友好的
+- ✅ 易于维护: 数据访问逻辑集中管理
+
 ### 2.2 Outbox Pattern (事件可靠发布)
 
 #### 2.2.1 核心概念
@@ -266,260 +346,175 @@ CREATE INDEX idx_outbox_aggregate ON outbox_events(aggregate_type, aggregate_id,
 
 #### 2.2.3 事件发布流程
 
-**任务执行中的事件写入** (app/tasks/ai_agent.py):
+**核心原则**: 所有状态变更与 Outbox 事件在同一事务中提交,保证原子性。
+
+**事件写入** (使用 Repository 模式):
 
 ```python
-from app.core.outbox import OutboxEventPublisher
+# API Layer: 创建应用 + 写入事件
+async def create_application(db, user, payload):
+    async with db.begin():
+        # 1. 创建 Application
+        application = Application(...)
+        await ApplicationRepository.create(db, application)
 
-@celery_app.task(bind=True)
-def tailor_resume(self, workflow_id, task_id, application_id, resume_id, job_id):
-    # Start transaction
-    with db.begin():
-        # 1. Update task status
-        task = db.query(TaskExecution).get(task_id)
-        task.status = "running"
-        task.started_at = datetime.utcnow()
-
-        # 2. Write outbox event (in same transaction)
-        OutboxEventPublisher.publish(
-            db_session=db,
-            event_type="task_started",
-            aggregate_type="task",
-            aggregate_id=task_id,
-            payload={
-                "task_id": task_id,
-                "task_name": "tailor_resume",
-                "workflow_id": workflow_id,
-                "status": "running"
-            },
-            metadata={"user_id": task.workflow.user_id}
+        # 2. 写入 Outbox 事件 (同一事务)
+        await OutboxRepository.enqueue_event(
+            db,
+            event_type="application_created",
+            aggregate_id=application.id,
+            payload=ApplicationCreatedPayload(...).model_dump(),
+            meta={"user_id": user.id}
         )
-        # Atomic commit - both task status and outbox event are persisted
+        # 原子提交: 应用 + 事件都持久化或都失败
 
-    # Execute business logic (outside transaction)
-    try:
-        # Call AI via Spec-kit Gateway
-        result = ai_agent_service.tailor_resume(
-            resume_id=resume_id,
-            job_id=job_id,
-            prompt_version="v1.0.0"  # Decoupled from workflow config_version
+    return application
+
+# Celery Worker: 任务执行中写入事件
+async def generate_cover_letter_task(application_id, workflow_id):
+    async with db.begin():
+        # 更新状态 + 写入事件
+        await WorkflowRepository.mark_running(db, workflow)
+        await OutboxRepository.enqueue_event(
+            db, event_type="workflow_started", ...
         )
 
-        # Save results (another transaction)
-        with db.begin():
-            # Save resume version
-            resume_version = ResumeVersion(
-                resume_id=resume_id,
-                job_id=job_id,
-                content=result.tailored_content,
-                version_type="tailored"
-            )
-            db.add(resume_version)
+    # 执行业务逻辑 (事务外)
+    result = await ai_service.generate_cover_letter(...)
 
-            # Update task status
-            task.status = "success"
-            task.output_data = {"resume_version_id": str(resume_version.id)}
-            task.completed_at = datetime.utcnow()
-            task.execution_time_ms = (datetime.utcnow() - task.started_at).total_seconds() * 1000
-
-            # Write completion event
-            OutboxEventPublisher.publish(
-                db_session=db,
-                event_type="task_completed",
-                aggregate_type="task",
-                aggregate_id=task_id,
-                payload={
-                    "task_id": task_id,
-                    "status": "success",
-                    "output": task.output_data
-                }
-            )
-
-        return {"resume_version_id": str(resume_version.id)}
-
-    except Exception as e:
-        # Handle failure
-        with db.begin():
-            task.status = "failed"
-            task.error_message = str(e)
-
-            OutboxEventPublisher.publish(
-                db_session=db,
-                event_type="task_failed",
-                aggregate_type="task",
-                aggregate_id=task_id,
-                payload={
-                    "task_id": task_id,
-                    "error": str(e)
-                }
-            )
-        raise
+    async with db.begin():
+        # 保存结果 + 写入完成事件
+        await save_document(db, result)
+        await WorkflowRepository.mark_completed(db, workflow)
+        await OutboxRepository.enqueue_event(
+            db, event_type="workflow_completed", ...
+        )
 ```
 
-**Outbox Publisher Daemon** (app/core/outbox/publisher.py):
+**事件类型和 Payload**:
 
 ```python
-import time
-from datetime import datetime, timedelta
-from typing import Dict, Callable
+# event_types.py
+class ApplicationEventType(str, Enum):
+    APPLICATION_CREATED = "application_created"
+    APPLICATION_READY = "application_ready"
+    APPLICATION_FAILED = "application_failed"
 
-class OutboxPublisherDaemon:
-    """
-    Background daemon that processes outbox events
-    Run as a separate process or Celery Beat task
-    """
-
-    def __init__(self, db_session_factory, poll_interval: int = 5):
-        self.db_factory = db_session_factory
-        self.poll_interval = poll_interval
-        self.handlers: Dict[str, Callable] = {}
-
-        # Register event handlers
-        self._register_handlers()
-
-    def _register_handlers(self):
-        """Register event handlers for different event types"""
-        from .handlers import (
-            send_task_notification,
-            send_workflow_notification,
-            send_application_ready_email,
-            update_quota
-        )
-
-        self.handlers = {
-            "task_completed": send_task_notification,
-            "workflow_completed": send_workflow_notification,
-            "application_ready": send_application_ready_email,
-            "ai_call_completed": update_quota  # Deduct quota after success
-        }
-
-    def run(self):
-        """Main event loop"""
-        while True:
-            try:
-                self._process_batch(batch_size=100)
-            except Exception as e:
-                logger.error(f"Outbox publisher error: {e}")
-
-            time.sleep(self.poll_interval)
-
-    def _process_batch(self, batch_size: int):
-        """Process a batch of unpublished events"""
-        db = self.db_factory()
-
-        try:
-            # Fetch unpublished events
-            events = db.query(OutboxEvent).filter(
-                OutboxEvent.published == False,
-                OutboxEvent.retry_count < OutboxEvent.max_retries,
-                or_(
-                    OutboxEvent.next_retry_at == None,
-                    OutboxEvent.next_retry_at <= datetime.utcnow()
-                )
-            ).order_by(
-                OutboxEvent.created_at
-            ).limit(batch_size).with_for_update(skip_locked=True).all()
-
-            for event in events:
-                self._process_event(db, event)
-
-            db.commit()
-
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Batch processing error: {e}")
-        finally:
-            db.close()
-
-    def _process_event(self, db, event: OutboxEvent):
-        """Process a single event"""
-        handler = self.handlers.get(event.event_type)
-
-        if not handler:
-            logger.warning(f"No handler for event type: {event.event_type}")
-            event.published = True
-            event.published_at = datetime.utcnow()
-            return
-
-        try:
-            # Execute handler
-            handler(event)
-
-            # Mark as published
-            event.published = True
-            event.published_at = datetime.utcnow()
-
-        except Exception as e:
-            # Retry with exponential backoff
-            event.retry_count += 1
-            event.error_message = str(e)
-
-            if event.retry_count < event.max_retries:
-                # Exponential backoff: 60s, 120s, 240s
-                delay_seconds = 60 * (2 ** event.retry_count)
-                event.next_retry_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
-            else:
-                # Max retries exceeded
-                logger.error(f"Event {event.id} failed after {event.retry_count} retries: {e}")
-                event.published = True  # Stop retrying
-                event.published_at = datetime.utcnow()
+class ApplicationCreatedPayload(BaseModel):
+    application_id: str
+    user_id: int
+    job_id: int
+    resume_document_id: str
+    is_retry: bool = False
 ```
 
-**Event Handlers** (app/core/outbox/handlers.py):
+#### 2.2.4 并发消费优化
+
+**核心机制**:
+- 使用 `asyncio.Semaphore` 限制并发数为 5
+- 每个事件独立 session，避免竞争
+- 批量拉取 + 并发处理，提升 5 倍吞吐
+
+**配置**:
+- `OUTBOX_MAX_CONCURRENT`: 5 (最大并发事件处理数)
+- `OUTBOX_BATCH_SIZE`: 100 (单次拉取事件数)
+- `OUTBOX_CONSUMER_INTERVAL_SECONDS`: 5.0 (Celery 轮询间隔)
+
+**并发消费实现**:
 
 ```python
-def send_task_notification(event: OutboxEvent):
-    """Send WebSocket notification for task completion"""
-    from app.core.websocket import broadcast_to_user
-
-    user_id = event.metadata.get("user_id")
-    if not user_id:
+async def process_outbox_batch(db: AsyncSession, *, batch_size: int = 100):
+    """Fetch and process events with controlled concurrency."""
+    # 1. Batch fetch pending events (skip locked)
+    events = await OutboxRepository.fetch_pending_batch(db, batch_size)
+    if not events:
         return
 
-    broadcast_to_user(
-        user_id=user_id,
-        message={
-            "type": "task_update",
-            "task_id": event.aggregate_id,
-            "status": event.payload.get("status"),
-            "output": event.payload.get("output")
-        }
-    )
+    # 2. Concurrent processing with Semaphore
+    semaphore = asyncio.Semaphore(app_module_settings.OUTBOX_MAX_CONCURRENT)
 
-def send_application_ready_email(event: OutboxEvent):
-    """Send email notification when application is ready"""
-    from app.core.email import send_email
+    async def process_single(event: OutboxEvent):
+        async with semaphore:
+            async with async_session_factory() as event_db:  # Independent session
+                handler = HANDLERS[event.event_type]
+                await handler(event_db, event)
+                await OutboxRepository.mark_published(event_db, event)
+                await event_db.commit()
 
-    application_id = event.aggregate_id
-    user_email = event.metadata.get("user_email")
-
-    send_email(
-        to=user_email,
-        subject="Your application materials are ready",
-        template="application_ready",
-        context={
-            "application_id": application_id,
-            "application_url": f"https://jobpilot.com/applications/{application_id}"
-        }
-    )
-
-def update_quota(event: OutboxEvent):
-    """Deduct user quota after successful AI call"""
-    from app.modules.users.service import UserQuotaService
-
-    user_id = event.metadata.get("user_id")
-    tokens_used = event.payload.get("total_tokens", 0)
-
-    UserQuotaService.deduct_quota(
-        user_id=user_id,
-        tokens=tokens_used,
-        operation=event.payload.get("operation")
-    )
+    await asyncio.gather(*[process_single(e) for e in events], return_exceptions=True)
 ```
 
-### 2.3 Spec-kit Gateway (统一 AI 调用层)
+**事件处理器注册**:
 
-#### 2.3.1 定位
+```python
+HANDLERS = {
+    "application_created": handle_application_created,    # Init workflow
+    "application_ready": handle_application_ready,        # Send notifications
+    "workflow_failed": handle_workflow_failed,            # Error handling
+}
+```
+
+### 2.3 配置管理
+
+#### 2.3.1 模块级配置
+
+使用 Pydantic Settings 管理 applications 模块配置:
+
+```python
+class ApplicationModuleSettings(BaseSettings):
+    # Outbox 消费配置
+    OUTBOX_BATCH_SIZE: int = 100
+    OUTBOX_MAX_CONCURRENT: int = 5              # 最大并发事件处理数
+    OUTBOX_CONSUMER_INTERVAL_SECONDS: float = 5.0  # 轮询间隔
+
+    # 工作流配置
+    WORKFLOW_VERSION: str = "v1.0.0"
+    COVER_LETTER_PROMPT_ID: str = "cover_letter_v1"
+    COVER_LETTER_MODEL: str = "deepseek-chat"
+
+    class Config:
+        env_prefix = "APP_MODULE_"              # 环境变量前缀
+```
+
+#### 2.3.2 环境变量覆盖
+
+通过 `.env` 文件或环境变量覆盖默认配置:
+
+```bash
+# Outbox 并发控制
+APP_MODULE_OUTBOX_MAX_CONCURRENT=10
+APP_MODULE_OUTBOX_BATCH_SIZE=200
+
+# 工作流版本
+APP_MODULE_WORKFLOW_VERSION=v1.1.0
+
+# AI 模型选择
+APP_MODULE_COVER_LETTER_MODEL=gpt-4o
+```
+
+#### 2.3.3 配置使用
+
+```python
+from app.modules.applications.config import app_module_settings
+
+# 在 outbox consumer 中使用
+max_concurrent = app_module_settings.OUTBOX_MAX_CONCURRENT
+batch_size = app_module_settings.OUTBOX_BATCH_SIZE
+
+# 在 service 中使用
+model = app_module_settings.COVER_LETTER_MODEL
+```
+
+**优势**:
+
+- ✅ 集中管理: 所有配置在一个文件
+- ✅ 类型安全: Pydantic 自动验证
+- ✅ 环境隔离: 开发/生产环境不同配置
+- ✅ 易于调优: 运行时调整无需改代码
+
+### 2.4 Spec-kit Gateway (统一 AI 调用层)
+
+#### 2.4.1 定位
 
 Spec-kit Gateway 作为**内部模块/库** (非独立服务)，提供:
 
@@ -528,7 +523,7 @@ Spec-kit Gateway 作为**内部模块/库** (非独立服务)，提供:
 - AI 调用记录 (异步写入 `ai_calls` 表 via Outbox Pattern)
 - 重试和超时策略
 
-#### 2.3.2 Prompt 管理 (与 config_version 解耦)
+#### 2.4.2 Prompt 管理 (与 config_version 解耦)
 
 **目录结构**:
 
@@ -602,269 +597,73 @@ prompts:
 **Prompt Store** (app/core/spec_kit/prompt_store.py):
 
 ```python
-import yaml
-from pathlib import Path
-from jinja2 import Template, UndefinedError
-from typing import Dict, Optional
-
 class PromptStore:
-    """
-    Prompt template store with version management
-    Decoupled from workflow config_version
-    """
+    """Prompt template store with version management (decoupled from workflow config_version)"""
 
     def __init__(self, prompts_dir: str = "app/modules/ai_agent/prompts"):
         self.prompts_dir = Path(prompts_dir)
-        self.manifest = self._load_manifest()
+        self.manifest = self._load_manifest()  # Load prompts/manifest.yaml
 
-    def _load_manifest(self) -> Dict:
-        """Load prompt manifest"""
-        manifest_path = self.prompts_dir / "manifest.yaml"
-        with open(manifest_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
-
-    def render_prompt(
-        self,
-        prompt_id: str,
-        prompt_version: str,
-        variables: Dict
-    ) -> Dict:
-        """
-        Render prompt template with variables
-
-        Returns:
-            {
-                "prompt_id": str,
-                "prompt_version": str,
-                "rendered_text": str,
-                "model_default": str,
-                "output_format": str
-            }
-        """
-        # Find prompt definition
+    def render_prompt(self, prompt_id: str, prompt_version: str, variables: Dict) -> Dict:
+        """Render Jinja2 template with variables, returns rendered_text + metadata"""
         prompt_def = self._find_prompt(prompt_id, prompt_version)
-        if not prompt_def:
-            raise ValueError(f"Prompt not found: {prompt_id}@{prompt_version}")
+        self._validate_variables(prompt_def, variables)  # Check required vars
 
-        # Validate variables
-        self._validate_variables(prompt_def, variables)
-
-        # Load template file
         template_path = self.prompts_dir / prompt_def['path']
-        with open(template_path, 'r', encoding='utf-8') as f:
-            template_text = f.read()
-
-        # Render template
-        try:
-            template = Template(template_text)
-            rendered = template.render(**variables)
-        except UndefinedError as e:
-            raise ValueError(f"Template rendering failed: {e}")
+        rendered = Template(template_path.read_text()).render(**variables)
 
         return {
-            "prompt_id": prompt_id,
-            "prompt_version": prompt_version,
             "rendered_text": rendered,
             "model_default": prompt_def.get('model_default'),
             "output_format": prompt_def.get('output_format', 'text')
         }
-
-    def _find_prompt(self, prompt_id: str, version: str) -> Optional[Dict]:
-        """Find prompt definition by ID and version"""
-        for prompt in self.manifest['prompts']:
-            if prompt['id'] == prompt_id and prompt['version'] == version:
-                return prompt
-        return None
-
-    def _validate_variables(self, prompt_def: Dict, variables: Dict):
-        """Validate that all required variables are provided"""
-        required_vars = [
-            var['name'] for var in prompt_def.get('variables', [])
-            if var.get('required', False)
-        ]
-
-        missing_vars = set(required_vars) - set(variables.keys())
-        if missing_vars:
-            raise ValueError(f"Missing required variables: {missing_vars}")
-
-        # Check for unexpected variables
-        defined_vars = [var['name'] for var in prompt_def.get('variables', [])]
-        extra_vars = set(variables.keys()) - set(defined_vars)
-        if extra_vars:
-            raise ValueError(f"Unexpected variables: {extra_vars}")
 ```
 
-#### 2.3.3 Gateway 实现
+#### 2.4.3 Gateway 实现
 
-**app/core/spec_kit/gateway.py**:
+**核心流程**: Prompt 渲染 → LLM 调用 → Outbox 记录
 
 ```python
-from typing import Dict, Optional
-from .prompt_store import PromptStore
-from .client import LLMClient
-from app.core.outbox import OutboxEventPublisher
-
 class SpecKitGateway:
-    """
-    Unified AI calling gateway
-    - Prompt rendering
-    - Model routing
-    - Retry/timeout strategies
-    - Async logging to ai_calls via Outbox
-    """
-
-    def __init__(self):
-        self.prompt_store = PromptStore()
-        self.llm_client = LLMClient()
-
-    def call(
-        self,
-        prompt_id: str,
-        prompt_version: str,
-        variables: Dict,
-        model: Optional[str] = None,  # Override model
-        workflow_id: Optional[str] = None,
-        task_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        operation: Optional[str] = None,
-        db_session = None  # For Outbox event writing
-    ) -> Dict:
-        """
-        Execute AI call with prompt rendering and logging
-
-        Returns:
-            {
-                "result": str | dict,
-                "usage": {
-                    "input_tokens": int,
-                    "output_tokens": int,
-                    "cache_read_tokens": int,
-                    "cache_write_tokens": int
-                },
-                "model": str,
-                "latency_ms": int
-            }
-        """
-        import time
-        start_time = time.time()
-
-        # 1. Render prompt
-        rendered = self.prompt_store.render_prompt(
-            prompt_id=prompt_id,
-            prompt_version=prompt_version,
-            variables=variables
-        )
-
-        # 2. Determine model (override or default)
+    def call(self, prompt_id: str, prompt_version: str, variables: Dict,
+             model: Optional[str] = None, db_session = None, **context) -> Dict:
+        # 1. Render prompt template
+        rendered = self.prompt_store.render_prompt(prompt_id, prompt_version, variables)
         model_to_use = model or rendered['model_default']
 
-        # 3. Call LLM
+        # 2. Call LLM with retry/timeout
         try:
             response = self.llm_client.call(
                 model=model_to_use,
                 prompt=rendered['rendered_text'],
-                output_format=rendered['output_format'],
-                timeout=60,  # Default timeout
-                max_retries=2
+                timeout=60, max_retries=2
             )
-
-            latency_ms = int((time.time() - start_time) * 1000)
             status = "success"
-            error_message = None
-
         except Exception as e:
-            latency_ms = int((time.time() - start_time) * 1000)
-            status = self._classify_error(e)
-            error_message = str(e)
-
-            # Re-raise exception after logging
-            self._log_ai_call(
-                db_session=db_session,
-                workflow_id=workflow_id,
-                task_id=task_id,
-                user_id=user_id,
-                operation=operation,
-                prompt_id=prompt_id,
-                prompt_version=prompt_version,
-                model=model_to_use,
-                status=status,
-                latency_ms=latency_ms,
-                error_message=error_message
-            )
+            status = self._classify_error(e)  # 'ratelimit', 'timeout', 'error'
+            self._log_ai_call(db_session, status=status, error=str(e), **context)
             raise
 
-        # 4. Async log to ai_calls via Outbox
-        self._log_ai_call(
-            db_session=db_session,
-            workflow_id=workflow_id,
-            task_id=task_id,
-            user_id=user_id,
-            operation=operation,
-            prompt_id=prompt_id,
-            prompt_version=prompt_version,
-            model=model_to_use,
-            input_tokens=response['usage']['input_tokens'],
-            output_tokens=response['usage']['output_tokens'],
-            cache_read_tokens=response['usage'].get('cache_read_tokens', 0),
-            cache_write_tokens=response['usage'].get('cache_write_tokens', 0),
-            estimated_cost=response['usage'].get('cost', 0),
-            latency_ms=latency_ms,
-            status=status
-        )
-
-        return {
-            "result": response['result'],
-            "usage": response['usage'],
-            "model": model_to_use,
-            "latency_ms": latency_ms
-        }
-
-    def _log_ai_call(self, db_session, **kwargs):
-        """Write AI call record to Outbox (async write to ai_calls)"""
-        if not db_session:
-            return
-
-        OutboxEventPublisher.publish(
-            db_session=db_session,
-            event_type="ai_call_completed",
-            aggregate_type="ai_call",
-            aggregate_id=kwargs.get('task_id') or str(uuid.uuid4()),
-            payload={
-                "workflow_id": kwargs.get('workflow_id'),
-                "task_id": kwargs.get('task_id'),
-                "operation": kwargs.get('operation'),
-                "prompt_id": kwargs.get('prompt_id'),
-                "prompt_version": kwargs.get('prompt_version'),
-                "model": kwargs.get('model'),
-                "input_tokens": kwargs.get('input_tokens', 0),
-                "output_tokens": kwargs.get('output_tokens', 0),
-                "cache_read_tokens": kwargs.get('cache_read_tokens', 0),
-                "cache_write_tokens": kwargs.get('cache_write_tokens', 0),
-                "estimated_cost": kwargs.get('estimated_cost', 0),
-                "latency_ms": kwargs.get('latency_ms'),
-                "status": kwargs.get('status'),
-                "error_message": kwargs.get('error_message')
-            },
-            metadata={
-                "user_id": kwargs.get('user_id')
-            }
-        )
-
-    def _classify_error(self, error: Exception) -> str:
-        """Classify error type for logging"""
-        error_str = str(error).lower()
-
-        if 'rate limit' in error_str or 'ratelimit' in error_str:
-            return 'ratelimit'
-        elif 'timeout' in error_str:
-            return 'timeout'
-        elif 'unauthorized' in error_str or 'invalid_api_key' in error_str:
-            return 'auth_error'
-        else:
-            return 'error'
+        # 3. Async log via Outbox (written to ai_calls table by consumer)
+        self._log_ai_call(db_session, status="success", usage=response['usage'], **context)
+        return response
 ```
 
-#### 2.3.4 AI Calls 表设计
+**调用示例**:
+
+```python
+result = gateway.call(
+    prompt_id="language_detector",
+    prompt_version="v1.0.0",
+    variables={"text": markdown},
+    model="deepseek-chat",
+    db_session=db,
+    workflow_id=workflow_id,
+    task_id=task_id
+)
+```
+
+#### 2.4.4 AI Calls 表设计
 
 ```sql
 CREATE TABLE ai_calls (
@@ -897,52 +696,20 @@ CREATE INDEX idx_ai_calls_status ON ai_calls(status, created_at);
 CREATE INDEX idx_ai_calls_user ON ai_calls(user_id, created_at);
 ```
 
-**Outbox Handler for AI Calls** (app/core/outbox/handlers.py):
+**Outbox Handler 注册**:
 
 ```python
-def log_ai_call(event: OutboxEvent):
-    """Write AI call record to ai_calls table"""
-    from app.models import AiCall
-    from app.database import get_db
-
-    db = next(get_db())
-
-    try:
-        ai_call = AiCall(
-            user_id=event.metadata.get('user_id'),
-            workflow_execution_id=event.payload.get('workflow_id'),
-            task_id=event.payload.get('task_id'),
-            operation=event.payload.get('operation'),
-            prompt_id=event.payload.get('prompt_id'),
-            prompt_version=event.payload.get('prompt_version'),
-            model=event.payload.get('model'),
-            provider=event.payload.get('model', '').split('-')[0],  # Extract provider
-            input_tokens=event.payload.get('input_tokens', 0),
-            output_tokens=event.payload.get('output_tokens', 0),
-            cache_read_tokens=event.payload.get('cache_read_tokens', 0),
-            cache_write_tokens=event.payload.get('cache_write_tokens', 0),
-            estimated_cost=event.payload.get('estimated_cost', 0),
-            latency_ms=event.payload.get('latency_ms'),
-            status=event.payload.get('status'),
-            error_message=event.payload.get('error_message')
-        )
-
-        db.add(ai_call)
-        db.commit()
-
-    except Exception as e:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-# Register handler in OutboxPublisherDaemon
-# self.handlers["ai_call_completed"] = log_ai_call
+# Outbox consumer 通过 ai_call_completed 事件异步写入 ai_calls 表
+HANDLERS = {
+    "ai_call_completed": handle_ai_call_completed,  # Write to ai_calls table
+    "application_created": handle_application_created,
+    "application_ready": handle_application_ready,
+}
 ```
 
-### 2.4 任务优先级与配额系统
+### 2.5 任务优先级与配额系统
 
-#### 2.4.1 优先级队列
+#### 2.5.1 优先级队列
 
 **三级优先级**: `high`, `normal` (default), `low`
 
@@ -980,7 +747,7 @@ tasks:
     # ...
 ```
 
-#### 2.4.2 配额管理
+#### 2.5.2 配额管理
 
 **用户配额表** (users 表扩展):
 
@@ -1282,37 +1049,48 @@ def update_quota(event: OutboxEvent):
     └─ 工作流完成
 
 
-时间线 T0+26s: Outbox Publisher 处理事件
+时间线 T0+26s: Outbox Consumer 并发处理事件
 ─────────────────────────────────────────────────────────
-  OutboxPublisherDaemon (后台进程，每 5 秒轮询)
+  Celery Beat Task (每 5 秒触发: applications.run_outbox_consumer)
     │
-    ├─ 查询未发布事件
-    │  SELECT * FROM outbox_events
-    │  WHERE published = FALSE
-    │  ORDER BY created_at
-    │  LIMIT 100
-    │  FOR UPDATE SKIP LOCKED
+    ├─ 批量拉取待处理事件
+    │  events = OutboxRepository.fetch_pending_batch(db, batch_size=100)
+    │  # SELECT ... WHERE published=FALSE ORDER BY created_at
+    │  # LIMIT 100 FOR UPDATE SKIP LOCKED
     │
-    ├─ 处理事件:
+    ├─ 并发处理 (最多 5 个同时执行)
+    │  Semaphore(max=5) 控制并发
     │
-    │  ① workflow_completed 事件
-    │     → Handler: send_workflow_notification
-    │     → Action: WebSocket 推送给用户
-    │     → Mark published = TRUE
+    │  [并发槽位 1] workflow_completed 事件
+    │     → 独立 session: async_session_factory()
+    │     → Handler: handle_workflow_completed
+    │     → Action: 发送 WebSocket 通知
+    │     → Mark published=TRUE, COMMIT
     │
-    │  ② task_completed 事件 (多个)
-    │     → Handler: send_task_notification
-    │     → Action: WebSocket 更新任务状态
-    │     → Mark published = TRUE
+    │  [并发槽位 2] task_completed 事件 (task-001)
+    │     → 独立 session: async_session_factory()
+    │     → Handler: handle_task_completed
+    │     → Action: 发送 WebSocket 通知
+    │     → Mark published=TRUE, COMMIT
     │
-    │  ③ ai_call_completed 事件 (3个: detect_language, translate_job, extract_skills)
-    │     → Handler: log_ai_call
-    │     → Action: 写入 ai_calls 表
-    │     → Handler: update_quota
-    │     → Action: 扣减用户配额 (仅 success 状态)
-    │     → Mark published = TRUE
+    │  [并发槽位 3] task_completed 事件 (task-002)
+    │     → 独立 session: async_session_factory()
+    │     → Handler: handle_task_completed
+    │     → Mark published=TRUE, COMMIT
     │
-    └─ COMMIT
+    │  [并发槽位 4] application_created 事件
+    │     → 独立 session: async_session_factory()
+    │     → Handler: handle_application_created
+    │     → Action: 初始化 workflow (WorkflowService.init_workflow)
+    │     → Mark published=TRUE, COMMIT
+    │
+    │  [并发槽位 5] application_ready 事件
+    │     → 独立 session: async_session_factory()
+    │     → Handler: handle_application_ready
+    │     → Action: 发送邮件通知
+    │     → Mark published=TRUE, COMMIT
+    │
+    └─ await asyncio.gather() → 全部完成
 
 
 时间线 T0+27s: 前端收到通知
@@ -1383,9 +1161,138 @@ chord([
   节省: 35%
 ```
 
-## 4. 版本管理与切换
+## 4. 可观测性 (Observability)
 
-### 4.1 版本切换流程
+### 4.1 日志策略
+
+#### 4.1.1 结构化日志
+
+**日志级别**:
+- `INFO`: 关键业务事件 (workflow/task 状态变更)
+- `WARNING`: 可恢复错误 (重试成功)
+- `ERROR`: 不可恢复错误 (需要人工介入)
+
+**关键日志点**:
+
+```python
+# Workflow lifecycle
+logger.info("Workflow initialized", extra={
+    "workflow_id": workflow_id,
+    "workflow_type": "job_analysis",
+    "config_version": "1.1.0",
+    "user_id": user_id
+})
+
+# Task execution
+logger.info("Task started", extra={
+    "task_id": task_id,
+    "task_type": "extract_skills",
+    "workflow_id": workflow_id
+})
+
+# Outbox processing
+logger.info("Outbox batch processed", extra={
+    "batch_size": 100,
+    "processed": 95,
+    "failed": 5,
+    "duration_ms": 4200
+})
+
+# AI Gateway
+logger.info("AI call completed", extra={
+    "prompt_id": "language_detector",
+    "model": "deepseek-chat",
+    "latency_ms": 850,
+    "input_tokens": 1200,
+    "output_tokens": 50
+})
+```
+
+#### 4.1.2 关联 ID (Correlation ID)
+
+每个请求携带 `X-Request-ID`，贯穿整个调用链：
+
+```python
+# API Layer
+request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+logger = logger.bind(request_id=request_id)
+
+# Pass to workflow
+workflow_execution.metadata = {"request_id": request_id}
+
+# Celery tasks inherit request_id from workflow context
+```
+
+### 4.2 性能监控
+
+#### 4.2.1 关键指标
+
+**Workflow 级别**:
+- Workflow 执行时长分布 (p50, p95, p99)
+- Workflow 成功率 (按 type 分组)
+- Workflow 失败原因分布
+
+**Task 级别**:
+- Task 执行时长 (按 task_type 分组)
+- Task 重试率
+- Task 队列等待时长
+
+**AI 调用级别**:
+- AI call 延迟 (按 model 分组)
+- Token 消耗速率 (input/output)
+- AI call 错误率 (ratelimit, timeout, error)
+
+**Outbox 级别**:
+- Outbox 消费延迟 (事件创建到发布的时长)
+- Outbox 积压量 (未发布事件数)
+- Outbox 消费吞吐 (events/sec)
+
+#### 4.2.2 监控查询示例
+
+```sql
+-- Workflow 成功率 (最近 24 小时)
+SELECT workflow_type,
+       COUNT(*) as total,
+       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as success,
+       ROUND(100.0 * SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) / COUNT(*), 2) as success_rate
+FROM workflow_executions
+WHERE created_at > NOW() - INTERVAL '24 hours'
+GROUP BY workflow_type;
+
+-- AI call 成本统计 (按 operation)
+SELECT operation,
+       COUNT(*) as total_calls,
+       SUM(input_tokens) as total_input_tokens,
+       SUM(output_tokens) as total_output_tokens,
+       SUM(estimated_cost) as total_cost
+FROM ai_calls
+WHERE created_at > NOW() - INTERVAL '7 days'
+GROUP BY operation
+ORDER BY total_cost DESC;
+
+-- Outbox 积压监控
+SELECT COUNT(*) as pending_events,
+       MIN(created_at) as oldest_event_time,
+       EXTRACT(EPOCH FROM (NOW() - MIN(created_at))) as max_delay_seconds
+FROM outbox_events
+WHERE published = FALSE;
+```
+
+### 4.3 告警规则
+
+**高优先级告警**:
+- Outbox 积压 > 1000 events 或最老事件 > 5 分钟
+- Workflow 失败率 > 10% (过去 1 小时)
+- AI call 错误率 > 20% (过去 10 分钟)
+
+**中优先级告警**:
+- Workflow p95 延迟 > 阈值 (job_analysis: 60s, resume_tailor: 30s)
+- Task 重试率 > 15%
+- User quota 接近耗尽 (剩余 < 10%)
+
+## 5. 版本管理与切换
+
+### 5.1 版本切换流程
 
 **步骤 1: 修改 registry.yaml**
 
@@ -1429,7 +1336,7 @@ GROUP BY config_version;
 -- 1.0.0          | 5      <- 旧版本 (可能还在执行中)
 ```
 
-### 4.2 Prompt 版本切换 (独立于 config_version)
+### 5.2 Prompt 版本切换 (独立于 config_version)
 
 **场景**: 在同一个 workflow config_version 下 A/B 测试不同 prompt 版本
 
@@ -1492,7 +1399,7 @@ GROUP BY prompt_version;
 -- → v2.0.0 性能更优,可以全量切换
 ```
 
-### 4.3 版本回滚
+### 5.3 版本回滚
 
 **场景**: 发现新版本有问题,需要快速回滚
 
