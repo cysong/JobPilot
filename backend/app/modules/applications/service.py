@@ -1,15 +1,12 @@
 """Service layer for application creation and workflow execution."""
 from __future__ import annotations
 import time
-from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, status
 from openai import OpenAI
-from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.shared.pagination import PaginationParams, PaginatedResponse
 
@@ -21,26 +18,30 @@ from app.modules.resumes.models import Resume, Document, DocumentFormat
 from app.modules.resumes.service import ResumeService
 from app.modules.applications.models import (
     Application,
-    WorkflowExecution,
-    TaskExecution,
-    OutboxEvent,
     AICall,
+    TaskExecution,
+    WorkflowExecution,
 )
 from app.modules.applications.schemas import ApplicationCreateRequest
-from app.modules.applications.tasks import generate_cover_letter_task
 from app.shared.enums import (
     ApplicationStatus,
-    WorkflowStatus,
-    TaskStatus,
     AICallStatus,
 )
-from sqlalchemy.orm import selectinload
+from app.modules.applications.event_types import (
+    ApplicationEventType,
+    ApplicationCreatedPayload,
+    ApplicationReadyPayload,
+    ApplicationFailedPayload,
+)
+from app.modules.applications.repositories.application_repo import ApplicationRepository
+from app.modules.applications.repositories.workflow_repo import WorkflowRepository
+from app.modules.applications.repositories.task_repo import TaskRepository
+from app.modules.applications.repositories.outbox_repo import OutboxRepository
 
 
 class ApplicationService:
     """Business logic for job applications and workflow orchestration."""
 
-    WORKFLOW_TYPE = "application_generation"
     WORKFLOW_VERSION = "v1.0.0"
     COVER_LETTER_PROMPT_ID = "cover_letter_v1"
     COVER_LETTER_MODEL = "deepseek-chat"
@@ -65,86 +66,43 @@ class ApplicationService:
                 status_code=status.HTTP_404_NOT_FOUND, detail="Resume template not found")
 
         # Duplicate guard: return existing active application
-        existing_query = (
-            select(Application)
-            .where(
-                and_(
-                    Application.user_id == user.id,
-                    Application.job_id == payload.job_id,
-                )
-            )
-        )
-        existing_result = await db.execute(existing_query)
-        existing = existing_result.scalar_one_or_none()
+        existing = await ApplicationRepository.get_by_user_and_job(db, user.id, payload.job_id)
         if existing:
             return existing
 
         # Copy resume as working resume for tailoring
         working_document = await ApplicationService._copy_resume_for_application(db, resume_template, user.id)
 
-        # Create application
+        # Create application via repository
         application = Application(
             user_id=user.id,
             job_id=payload.job_id,
             source_resume_id=payload.resume_template_id,
             resume_document_id=working_document.id,
             status=ApplicationStatus.PENDING,
-            tailoring_level=payload.tailoring_level or "light"
+            tailoring_level=payload.tailoring_level or "light",
         )
-        db.add(application)
-        await db.flush()
+        await ApplicationRepository.create(db, application=application)
 
-        # Create workflow execution record
-        workflow = WorkflowExecution(
-            workflow_type=ApplicationService.WORKFLOW_TYPE,
-            config_version=ApplicationService.WORKFLOW_VERSION,
-            user_id=user.id,
-            entity_id=application.id,
-            status=WorkflowStatus.PENDING,
-            input_data={
-                "job_id": payload.job_id,
-                "resume_document_id": working_document.id,
-                "tailoring_level": payload.tailoring_level,
-            },
+        # Emit application_created event (transactional with application insert)
+        await OutboxRepository.enqueue_event(
+            db,
+            event_type=ApplicationEventType.APPLICATION_CREATED.value,
+            aggregate_type="application",
+            aggregate_id=application.id,
+            payload=ApplicationCreatedPayload(
+                application_id=application.id,
+                user_id=user.id,
+                job_id=payload.job_id,
+                resume_document_id=working_document.id,
+                tailoring_level=payload.tailoring_level,
+                is_retry=False,
+            ).model_dump(),
+            meta={"user_id": user.id},
         )
-        db.add(workflow)
-        await db.flush()
-
-        # Create initial task record (pending)
-        task = TaskExecution(
-            workflow_id=workflow.id,
-            task_name="generate_cover_letter",
-            task_type="ai_agent",
-            priority="normal",
-            status=TaskStatus.PENDING,
-            input_data={
-                "application_id": application.id,
-                "job_id": payload.job_id,
-                "resume_document_id": working_document.id,
-            },
-        )
-        db.add(task)
 
         await db.commit()
         await db.refresh(application)
-        await db.refresh(workflow)
-        await db.refresh(task)
-
-        # Enqueue Celery task (fire-and-forget)
-        try:
-            generate_cover_letter_task.delay(
-                application_id=application.id,
-                workflow_id=workflow.id,
-                task_id=task.id,
-            )
-        except Exception as exc:  # noqa: BLE001
-            application.mark_failed(str(exc))
-            workflow.status = WorkflowStatus.FAILED
-            workflow.error_message = str(exc)
-            task.status = TaskStatus.FAILED
-            task.error_message = str(exc)
-            await db.commit()
-
         return application
 
     @staticmethod
@@ -154,21 +112,7 @@ class ApplicationService:
         params: PaginationParams,
     ) -> PaginatedResponse[Application]:
         """List applications for the current user with pagination helpers."""
-        base_query = select(Application).where(Application.user_id == user.id)
-        result = await db.execute(
-            base_query
-            .options(selectinload(Application.job))
-            .order_by(Application.created_at.desc())
-            .limit(params.get_limit())
-            .offset(params.get_offset())
-        )
-        items = result.scalars().all()
-
-        total = (
-            await db.execute(
-                select(func.count()).select_from(base_query.subquery())
-            )
-        ).scalar_one()
+        items, total = await ApplicationRepository.list_for_user(db, user.id, params)
 
         return PaginatedResponse.create(
             items=items,
@@ -184,23 +128,7 @@ class ApplicationService:
         user: User,
     ) -> Optional[Application]:
         """Fetch application by id for current user."""
-        query = (
-            select(Application)
-            .where(
-                and_(
-                    Application.id == application_id,
-                    Application.user_id == user.id,
-                )
-            )
-            .options(
-                selectinload(Application.source_resume).selectinload(
-                    Resume.document),
-                selectinload(Application.resume_document),
-                selectinload(Application.job),
-            )
-        )
-        result = await db.execute(query)
-        return result.scalar_one_or_none()
+        return await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
 
     @staticmethod
     async def retry_cover_letter(
@@ -220,60 +148,27 @@ class ApplicationService:
                 detail="Only failed applications can be retried",
             )
 
-        # Create new workflow + task
-        workflow = WorkflowExecution(
-            workflow_type=ApplicationService.WORKFLOW_TYPE,
-            config_version=ApplicationService.WORKFLOW_VERSION,
-            user_id=user.id,
-            entity_id=application.id,
-            status=WorkflowStatus.PENDING,
-            input_data={
-                "job_id": application.job_id,
-                "source_resume_id": application.source_resume_id,
-                "tailoring_level": application.tailoring_level,
-            },
-        )
-        db.add(workflow)
-        await db.flush()
+        # Reset status and emit a fresh application_created event for reprocessing
+        await ApplicationRepository.mark_pending(db, application)
 
-        task = TaskExecution(
-            workflow_id=workflow.id,
-            task_name="generate_cover_letter",
-            task_type="ai_agent",
-            priority="high",
-            status=TaskStatus.PENDING,
-            input_data={
-                "application_id": application.id,
-                "job_id": application.job_id,
-                "resume_document_id": application.resume_document_id,
-                "force": True,
-            },
+        await OutboxRepository.enqueue_event(
+            db,
+            event_type=ApplicationEventType.APPLICATION_CREATED.value,
+            aggregate_type="application",
+            aggregate_id=application.id,
+            payload=ApplicationCreatedPayload(
+                application_id=application.id,
+                user_id=user.id,
+                job_id=application.job_id,
+                resume_document_id=application.resume_document_id,
+                tailoring_level=application.tailoring_level,
+                is_retry=True,
+            ).model_dump(),
+            meta={"user_id": application.user_id},
         )
-        db.add(task)
 
-        application.status = ApplicationStatus.TAILORING
-        application.last_error = None
         await db.commit()
         await db.refresh(application)
-        await db.refresh(task)
-
-        try:
-            generate_cover_letter_task.delay(
-                application_id=application.id,
-                workflow_id=workflow.id,
-                task_id=task.id,
-            )
-        except Exception as exc:  # noqa: BLE001
-            await ApplicationService._handle_failure(
-                db=db,
-                application=application,
-                workflow=workflow,
-                task=task,
-                error=str(exc),
-            )
-            # Reload failed application state for response
-            await db.refresh(application)
-
         return application
 
     @staticmethod
@@ -287,21 +182,25 @@ class ApplicationService:
         """Execute cover letter generation task, updating workflow/task/application records."""
         start_time = time.perf_counter()
 
-        application = await ApplicationService._load_application_for_processing(db, application_id)
-        workflow = await db.get(WorkflowExecution, workflow_id)
-        task = await db.get(TaskExecution, task_id)
+        application = await ApplicationRepository.get_with_dependencies(db, application_id)
+        workflow = await WorkflowRepository.get_by_id(db, workflow_id)
+        task = await TaskRepository.get_by_id(db, task_id)
 
         if not application or not workflow or not task:
             return
 
-        workflow.status = WorkflowStatus.RUNNING
-        workflow.celery_task_id = celery_task_id
-        task.status = TaskStatus.RUNNING
-        task.started_at = datetime.utcnow()
-        task.celery_task_id = celery_task_id
-        task.worker_id = celery_task_id
-        application.status = ApplicationStatus.TAILORING
-
+        await WorkflowRepository.mark_running(
+            db,
+            workflow,
+            celery_task_id=celery_task_id,
+        )
+        await TaskRepository.mark_running(
+            db,
+            task,
+            celery_task_id=celery_task_id,
+            worker_id=celery_task_id,
+        )
+        await ApplicationRepository.mark_tailoring(db, application)
         await db.commit()
 
         try:
@@ -326,21 +225,23 @@ class ApplicationService:
             )
             db.add(cover_document)
 
-            # Update execution records
-            now = datetime.utcnow()
-            workflow.status = WorkflowStatus.COMPLETED
-            workflow.output_data = {"cover_letter_document_id": cover_doc_id}
-            workflow.completed_at = now
-
-            task.status = TaskStatus.SUCCESS
-            task.output_data = {"cover_letter_document_id": cover_doc_id}
-            task.completed_at = now
-            task.execution_time_ms = int(
-                (time.perf_counter() - start_time) * 1000)
-
-            application.status = ApplicationStatus.READY
-            application.cover_letter_document_id = cover_doc_id
-            application.last_error = None
+            execution_time_ms = int((time.perf_counter() - start_time) * 1000)
+            await WorkflowRepository.mark_completed(
+                db,
+                workflow,
+                output_data={"cover_letter_document_id": cover_doc_id},
+            )
+            await TaskRepository.mark_success(
+                db,
+                task,
+                output_data={"cover_letter_document_id": cover_doc_id},
+                execution_time_ms=execution_time_ms,
+            )
+            await ApplicationRepository.mark_ready(
+                db,
+                application,
+                cover_letter_document_id=cover_doc_id,
+            )
 
             # Record AI call
             ai_call = AICall(
@@ -359,21 +260,18 @@ class ApplicationService:
             )
             db.add(ai_call)
 
-            # Outbox event
-            outbox = OutboxEvent(
-                event_type="application_ready",
+            await OutboxRepository.enqueue_event(
+                db,
+                event_type=ApplicationEventType.APPLICATION_READY.value,
                 aggregate_type="application",
                 aggregate_id=application.id,
-                payload={
-                    "application_id": application.id,
-                    "cover_letter_document_id": cover_doc_id,
-                    "status": application.status.value,
-                },
+                payload=ApplicationReadyPayload(
+                    application_id=application.id,
+                    cover_letter_document_id=cover_doc_id,
+                    status=application.status.value,
+                ).model_dump(),
                 meta={"user_id": application.user_id},
-                published=False,
             )
-            db.add(outbox)
-
             await db.commit()
         except Exception as exc:  # noqa: BLE001
             await ApplicationService._handle_failure(
@@ -393,29 +291,21 @@ class ApplicationService:
         error: str,
     ):
         """Mark workflow/task/application as failed and write outbox event."""
-        now = datetime.utcnow()
-        workflow.status = WorkflowStatus.FAILED
-        workflow.error_message = error
-        workflow.completed_at = now
+        await WorkflowRepository.mark_failed(db, workflow, error_message=error)
+        await TaskRepository.mark_failed(db, task, error_message=error)
+        await ApplicationRepository.mark_failed(db, application, error)
 
-        task.status = TaskStatus.FAILED
-        task.error_message = error
-        task.completed_at = now
-
-        application.mark_failed(error)
-
-        outbox = OutboxEvent(
-            event_type="application_failed",
+        await OutboxRepository.enqueue_event(
+            db,
+            event_type=ApplicationEventType.APPLICATION_FAILED.value,
             aggregate_type="application",
             aggregate_id=application.id,
-            payload={
-                "application_id": application.id,
-                "error": error,
-            },
+            payload=ApplicationFailedPayload(
+                application_id=application.id,
+                error=error,
+            ).model_dump(),
             meta={"user_id": application.user_id},
-            published=False,
         )
-        db.add(outbox)
         await db.commit()
 
     @staticmethod
@@ -446,16 +336,7 @@ class ApplicationService:
     @staticmethod
     async def _load_application_for_processing(db: AsyncSession, application_id: str) -> Optional[Application]:
         """Load application with dependencies needed for processing."""
-        query = (
-            select(Application)
-            .where(Application.id == application_id)
-            .options(
-                selectinload(Application.job),
-                selectinload(Application.resume_document),
-            )
-        )
-        result = await db.execute(query)
-        return result.scalar_one_or_none()
+        return await ApplicationRepository.get_with_dependencies(db, application_id)
 
     @staticmethod
     async def _generate_cover_letter(

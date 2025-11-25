@@ -1,10 +1,28 @@
-"""Celery tasks for application workflows."""
+"""Celery tasks for application workflows and outbox consumption."""
 from __future__ import annotations
 
 import asyncio
 
 from app.core.celery_app import celery_app
 from app.core.database import async_session_factory
+
+
+@celery_app.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    """Register periodic tasks for outbox consumption."""
+    sender.add_periodic_task(5.0, run_outbox_consumer.s(), name="applications.outbox-consumer-5s")
+
+
+@celery_app.task(name="applications.run_outbox_consumer")
+def run_outbox_consumer():
+    """Periodic task to drain application outbox events."""
+    from app.modules.applications.outbox_consumer import process_outbox_batch
+
+    async def _run():
+        async with async_session_factory() as db:
+            await process_outbox_batch(db, batch_size=100)
+
+    asyncio.run(_run())
 
 
 @celery_app.task(name="applications.generate_cover_letter", bind=True)
