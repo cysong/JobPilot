@@ -133,6 +133,24 @@ def generate_cover_letter_task(self, application_id: str, workflow_id: str, task
     )
 
 
+async def _run_cover_letter_task(
+    application_id: str,
+    workflow_id: str,
+    task_id: str,
+    celery_task_id: str | None,
+):
+    """Async bootstrap to create DB session and invoke the decorated handler."""
+    async with async_session_factory() as db:
+
+        await _execute_cover_letter_task(
+            db=db,
+            application_id=application_id,
+            workflow_id=workflow_id,
+            task_id=task_id,
+            celery_task_id=celery_task_id,
+        )
+
+
 @task_status_guard(first=True, last=True)
 async def _execute_cover_letter_task(
     *,
@@ -154,21 +172,3 @@ async def _execute_cover_letter_task(
         task_id=task_id,
         celery_task_id=celery_task_id,
     )
-
-
-async def _run_cover_letter_task(
-    application_id: str,
-    workflow_id: str,
-    task_id: str,
-    celery_task_id: str | None,
-):
-    """Async bootstrap to create DB session and invoke the decorated handler."""
-    async with async_session_factory() as db:
-
-        await _execute_cover_letter_task(
-            db=db,
-            application_id=application_id,
-            workflow_id=workflow_id,
-            task_id=task_id,
-            celery_task_id=celery_task_id,
-        )

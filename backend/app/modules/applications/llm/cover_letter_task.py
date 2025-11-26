@@ -1,6 +1,7 @@
 """Cover letter generation task logic using AgentGateway + YAML agents."""
 from __future__ import annotations
 
+import time
 from typing import Optional, Tuple
 from uuid import uuid4
 
@@ -34,8 +35,7 @@ async def run_cover_letter_task(
     db: AsyncSession,
     application: Application,
     workflow_id: str,
-    task_id: str,
-    celery_task_id: Optional[str] = None,
+    task_id: str
 ):
     """Execute cover letter generation task via AgentGateway."""
     ctx: GatewayContext = {
