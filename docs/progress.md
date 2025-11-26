@@ -9,6 +9,18 @@
 
 ## Work Log
 
+
+### 2025-11-26 - LLM Gateway 与 Cover Letter Agent 编排
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- 引入 LLM Gateway 基础设施：新增 `backend/app/core/llm/`（config/loader/gateway/types）与 YAML Agent 配置（`backend/agents/config/*.yaml`），统一 Agent 定义与成本计算。
+- 定义结构化输出模型与注册表 `backend/agents/schemas.py`，支持 AnalyzedJob/AnalyzedResume/CoverLetterDraft/ReviewResult。
+- 重构封面信任务：`backend/app/modules/applications/llm/cover_letter_task.py` 使用 AgentGateway 调用 `job_analyzer`、`resume_analyzer`、`cover_letter_writer`、`reviewer`，支持最多 2 次迭代与评分阈值 8.0，保持文档生成、Workflow/Task 状态更新、AI 调用记录与 Outbox 事件。
+- Celery 入口 `applications.generate_cover_letter` 迁移为调用新任务模块，Service 层不再承担生成逻辑。
+
+
 ### 2025-11-24 - Application Workflow Backend Implemented
 
 **Completed Tasks:**
