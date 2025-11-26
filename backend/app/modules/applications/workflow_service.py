@@ -1,6 +1,8 @@
 """Application workflow orchestration service (decoupled from API)."""
 from __future__ import annotations
 
+import logging
+
 from app.modules.applications.event_types import (
     ApplicationEventType,
     ApplicationCreatedPayload,
@@ -12,6 +14,8 @@ from app.modules.applications.repositories.task_repo import TaskRepository
 from app.modules.applications.repositories.workflow_repo import WorkflowRepository
 from app.modules.applications.tasks import generate_cover_letter_task
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowService:
@@ -92,25 +96,14 @@ class WorkflowService:
                 task_id=task.id,
             )
         except Exception as exc:  # noqa: BLE001
-            # Mark failure and emit failure event if dispatch fails
-            await WorkflowRepository.mark_failed(db, workflow, error_message=str(exc))
-            await TaskRepository.mark_failed(db, task, error_message=str(exc))
-            application_obj = await ApplicationRepository.get_by_id(db, payload.application_id)
-            if application_obj:
-                await ApplicationRepository.mark_failed(db, application_obj, str(exc))
-
-            await OutboxRepository.enqueue_event(
-                db,
-                event_type=ApplicationEventType.APPLICATION_FAILED.value,
-                aggregate_type="application",
-                aggregate_id=payload.application_id,
-                payload=ApplicationFailedPayload(
-                    application_id=payload.application_id,
-                    error=str(exc),
-                ).model_dump(),
-                meta={"user_id": payload.user_id},
+            # 仅记录调度异常，不修改任务/流程状态，也不写出 Outbox
+            logger.error(
+                "failed_to_dispatch_cover_letter_task",
+                exc_info=exc,
+                workflow_id=workflow.id,
+                task_id=task.id,
+                application_id=payload.application_id,
             )
-            await db.commit()
             raise
 
         return workflow, task
