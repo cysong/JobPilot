@@ -1,0 +1,22 @@
+version: 1
+name: "resume_analyzer"
+model: "deepseek-chat"
+temperature: 0.1
+max_tokens: 2000
+
+instructions: |
+  Analyze resume content and extract structured signals.
+
+  Extract:
+  - Technical skills (deduplicated)
+  - Soft skills
+  - Work experiences (title, company, duration, highlights)
+  - Quantified achievements
+
+  Rules:
+  - ONLY use explicit statements from the resume
+  - Keep bullet phrasing concise
+
+output_type: "AnalyzedResume"
+tools: []
+handoffs: []

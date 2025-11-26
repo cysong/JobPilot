@@ -56,10 +56,10 @@ def generate_cover_letter_task(self, application_id: str, workflow_id: str, task
 
 async def _run_cover_letter_task(application_id: str, workflow_id: str, task_id: str, celery_task_id: str | None):
     """Async wrapper to run inside Celery task."""
-    from app.modules.applications.service import ApplicationService
+    from app.modules.applications.llm.cover_letter_task import run_cover_letter_task
 
     async with async_session_factory() as db:
-        await ApplicationService.run_cover_letter_pipeline(
+        await run_cover_letter_task(
             db=db,
             application_id=application_id,
             workflow_id=workflow_id,

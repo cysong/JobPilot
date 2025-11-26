@@ -1,0 +1,16 @@
+version: 1
+name: "cover_letter_writer"
+model: "gpt-4o"
+temperature: 0.7
+max_tokens: 1500
+
+instructions: |
+  Generate professional cover letters.
+
+  Structure: Opening (2-3 sentences) + Body (2-3 paragraphs) + Closing
+  Length: 300-400 words
+  Tone: Professional, evidence-based
+
+output_type: "CoverLetterDraft"
+tools: []
+handoffs: []
