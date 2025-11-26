@@ -33,8 +33,18 @@ def task_status_guard(*, first: bool = False, last: bool = False) -> Callable[[T
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             db: AsyncSession = kwargs["db"]
-            workflow: WorkflowExecution = kwargs["workflow"]
-            task: TaskExecution = kwargs["task"]
+            workflow_id: str = kwargs["workflow_id"]
+            task_id: str = kwargs["task_id"]
+
+            workflow = await WorkflowRepository.get_by_id(db, workflow_id)
+            task = await TaskRepository.get_by_id(db, task_id)
+
+            if not workflow or not task:
+                logger.error(
+                    "task_status_guard_missing_entities",
+                    extra={"workflow_id": workflow_id, "task_id": task_id},
+                )
+                return
 
             start = time.perf_counter()
 
@@ -47,17 +57,24 @@ def task_status_guard(*, first: bool = False, last: bool = False) -> Callable[[T
                 result = await func(*args, **kwargs)
 
                 elapsed_ms = int((time.perf_counter() - start) * 1000)
+                task_output = {}
+                workflow_output = {}
+                if isinstance(result, dict):
+                    task_output = result.get("task_output_data", {}) or {}
+                    workflow_output = result.get(
+                        "workflow_output_data", {}) or {}
+
                 await TaskRepository.mark_success(
                     db,
                     task,
-                    output_data=getattr(task, "output_data", None) or {},
+                    output_data=task_output,
                     execution_time_ms=elapsed_ms,
                 )
                 if last:
                     await WorkflowRepository.mark_completed(
                         db,
                         workflow,
-                        output_data=getattr(workflow, "output_data", None) or {},
+                        output_data=workflow_output,
                     )
                 await db.commit()
                 return result
@@ -116,12 +133,39 @@ def generate_cover_letter_task(self, application_id: str, workflow_id: str, task
     )
 
 
-async def _run_cover_letter_task(application_id: str, workflow_id: str, task_id: str, celery_task_id: str | None):
-    """Async wrapper to run inside Celery task."""
+@task_status_guard(first=True, last=True)
+async def _execute_cover_letter_task(
+    *,
+    db: AsyncSession,
+    application_id: str,
+    workflow_id: str,
+    task_id: str,
+    celery_task_id: str | None,
+):
+    """Async wrapper to run inside Celery task with status management."""
     from app.modules.applications.llm.cover_letter_task import run_cover_letter_task
+    from app.modules.applications.repositories.application_repo import ApplicationRepository
+    application = await ApplicationRepository.get_with_dependencies(db, application_id)
 
+    await run_cover_letter_task(
+        db=db,
+        application=application,
+        workflow_id=workflow_id,
+        task_id=task_id,
+        celery_task_id=celery_task_id,
+    )
+
+
+async def _run_cover_letter_task(
+    application_id: str,
+    workflow_id: str,
+    task_id: str,
+    celery_task_id: str | None,
+):
+    """Async bootstrap to create DB session and invoke the decorated handler."""
     async with async_session_factory() as db:
-        await run_cover_letter_task(
+
+        await _execute_cover_letter_task(
             db=db,
             application_id=application_id,
             workflow_id=workflow_id,
