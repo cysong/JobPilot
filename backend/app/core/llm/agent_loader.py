@@ -28,7 +28,8 @@ class AgentLoader:
         *,
         config_dir: str | Path | None = None,
     ) -> None:
-        self.config_dir = Path(config_dir or llm_gateway_settings.AGENT_CONFIG_DIR)
+        self.config_dir = Path(
+            config_dir or llm_gateway_settings.AGENT_CONFIG_DIR)
 
     async def load_agent(self, agent_id: str) -> Agent:
         """
@@ -147,7 +148,7 @@ class AgentLoader:
             # Serialize Agent with pickle
             agent_data = pickle.dumps(agent, protocol=pickle.HIGHEST_PROTOCOL)
             # Store with 1 hour TTL
-            await backend.set(cache_key, agent_data, expire=3600)
+            await backend.set(cache_key, agent_data, expire=3600*24)
         except Exception:  # noqa: BLE001
             # Silently fail on cache write errors
             pass
@@ -161,8 +162,10 @@ class AgentLoader:
 
     def _resolve_schema(self, output_type_name: str | None):
         if not output_type_name:
-            raise ValueError("Agent config missing required field 'output_type'")
+            raise ValueError(
+                "Agent config missing required field 'output_type'")
         schema = SCHEMA_REGISTRY.get(output_type_name)
         if not schema:
-            raise ValueError(f"Unknown output_type '{output_type_name}' in agent config")
+            raise ValueError(
+                f"Unknown output_type '{output_type_name}' in agent config")
         return schema

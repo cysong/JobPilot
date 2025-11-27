@@ -1,4 +1,4 @@
-"""Unified gateway for executing Agents with logging and outbox events."""
+"""Unified gateway for executing Agents with logging."""
 from __future__ import annotations
 
 import time
@@ -11,36 +11,110 @@ from openai_agents.types import Usage
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING
 from app.core.llm.types import GatewayContext
-from app.modules.applications.repositories.outbox_repo import OutboxRepository
+from app.modules.applications.repositories.aicall_repo import AICallRepository
+from app.shared.enums import AICallStatus
 
 logger = structlog.get_logger()
 
 
 class AgentGateway:
-    """Central entrypoint for running Agents with observability hooks."""
+    """
+    Singleton gateway for executing Agents with observability.
+
+    Usage:
+        gateway = AgentGateway.get()
+        result, usage = await gateway.call("agent_id", input_data)
+    """
+
+    _instance: Optional["AgentGateway"] = None
 
     def __init__(self, loader: Optional[AgentLoader] = None) -> None:
+        """Internal constructor - use get() to obtain singleton instance."""
         self.loader = loader or AgentLoader()
+
+    @classmethod
+    def get(cls) -> "AgentGateway":
+        """Get singleton instance of AgentGateway."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     async def call(
         self,
         agent_id: str,
         input_data: Any,
         context: GatewayContext | None = None,
-    ) -> tuple[Any, Optional[Usage]]:
+    ) -> Any:
         """
-        Execute an Agent and return its output plus usage.
+        Execute an Agent and return its output.
 
         Args:
             agent_id: Agent identifier (YAML filename)
             input_data: Input prompt or payload
-            context: Additional metadata for logging/outbox
+            context: Additional metadata for logging
+
+        Returns:
+            Agent output (final_output)
         """
         context = context or {}
         start_time = time.time()
 
         agent = await self.loader.load_agent(agent_id)
+        self._log_start(agent_id, agent, context)
 
+        try:
+            result, usage = await self._execute_agent(agent, input_data)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            self._log_success(agent_id, agent, usage, latency_ms, context)
+            await self._record_ai_call(
+                agent_id=agent_id,
+                agent=agent,
+                status="success",
+                latency_ms=latency_ms,
+                usage=usage,
+                context=context,
+            )
+
+            return result
+
+        except Exception as exc:  # noqa: BLE001
+            error_type = self._classify_error(exc)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            self._log_error(agent_id, agent, error_type, exc, latency_ms, context)
+            await self._record_ai_call(
+                agent_id=agent_id,
+                agent=agent,
+                status=error_type,
+                latency_ms=latency_ms,
+                error_message=str(exc),
+                context=context,
+            )
+            raise
+
+    async def _execute_agent(
+        self, agent: Agent, input_data: Any
+    ) -> tuple[Any, Optional[Usage]]:
+        """
+        Execute Agent and extract result and usage.
+
+        Args:
+            agent: Agent instance
+            input_data: Input data
+
+        Returns:
+            Tuple of (final_output, usage)
+        """
+        result = await Runner.run(agent, input_data)
+        usage = getattr(getattr(result, "context_wrapper", None), "usage", None)
+        final_output = getattr(result, "final_output", None)
+        return final_output, usage
+
+    def _log_start(
+        self, agent_id: str, agent: Agent, context: GatewayContext
+    ) -> None:
+        """Log agent call started."""
         logger.info(
             "agent_call_started",
             agent_id=agent_id,
@@ -49,65 +123,122 @@ class AgentGateway:
             operation=context.get("operation"),
         )
 
-        try:
-            result = await Runner.run(agent, input_data)
-            usage = getattr(getattr(result, "context_wrapper", None), "usage", None)
+    def _log_success(
+        self,
+        agent_id: str,
+        agent: Agent,
+        usage: Optional[Usage],
+        latency_ms: int,
+        context: GatewayContext,
+    ) -> None:
+        """Log successful agent call with metrics."""
+        estimated_cost = self._calculate_cost(
+            getattr(agent, "model", ""),
+            getattr(usage, "input_tokens", 0) or 0,
+            getattr(usage, "output_tokens", 0) or 0,
+        )
 
-            latency_ms = int((time.time() - start_time) * 1000)
+        logger.info(
+            "agent_call_completed",
+            agent_id=agent_id,
+            model=getattr(agent, "model", None),
+            status="success",
+            latency_ms=latency_ms,
+            input_tokens=getattr(usage, "input_tokens", None),
+            output_tokens=getattr(usage, "output_tokens", None),
+            total_tokens=getattr(usage, "total_tokens", None),
+            requests=getattr(usage, "requests", None),
+            estimated_cost=estimated_cost,
+            workflow_id=context.get("workflow_id"),
+            operation=context.get("operation"),
+        )
+
+    def _log_error(
+        self,
+        agent_id: str,
+        agent: Agent,
+        error_type: str,
+        error: Exception,
+        latency_ms: int,
+        context: GatewayContext,
+    ) -> None:
+        """Log failed agent call."""
+        logger.error(
+            "agent_call_failed",
+            agent_id=agent_id,
+            model=getattr(agent, "model", None),
+            status=error_type,
+            error=str(error),
+            latency_ms=latency_ms,
+            workflow_id=context.get("workflow_id"),
+            operation=context.get("operation"),
+        )
+
+    async def _record_ai_call(
+        self,
+        *,
+        agent_id: str,
+        agent: Agent,
+        status: str,
+        latency_ms: int,
+        usage: Optional[Usage] = None,
+        error_message: Optional[str] = None,
+        context: GatewayContext,
+    ) -> None:
+        """
+        Record AI call to database (success or failure).
+
+        Creates an ai_call record for tracking and analytics.
+        """
+        db = context.get("db")
+        workflow_id = context.get("workflow_id")
+        task_id = context.get("task_id")
+        user_id = context.get("user_id")
+
+        # Skip recording if missing required context
+        if not db or not workflow_id or not task_id or not user_id:
+            return
+
+        # Map status string to AICallStatus enum
+        status_map = {
+            "success": AICallStatus.SUCCESS,
+            "error": AICallStatus.ERROR,
+            "ratelimit": AICallStatus.ERROR,
+            "timeout": AICallStatus.ERROR,
+            "auth_error": AICallStatus.ERROR,
+        }
+        ai_call_status = status_map.get(status, AICallStatus.ERROR)
+
+        # Calculate estimated cost
+        estimated_cost = None
+        if usage and ai_call_status == AICallStatus.SUCCESS:
             estimated_cost = self._calculate_cost(
                 getattr(agent, "model", ""),
                 getattr(usage, "input_tokens", 0) or 0,
                 getattr(usage, "output_tokens", 0) or 0,
             )
 
-            logger.info(
-                "agent_call_completed",
-                agent_id=agent_id,
-                model=getattr(agent, "model", None),
-                status="success",
-                latency_ms=latency_ms,
-                input_tokens=getattr(usage, "input_tokens", None),
-                output_tokens=getattr(usage, "output_tokens", None),
-                total_tokens=getattr(usage, "total_tokens", None),
-                requests=getattr(usage, "requests", None),
-                estimated_cost=estimated_cost,
-                workflow_id=context.get("workflow_id"),
-                operation=context.get("operation"),
-            )
-
-            await self._enqueue_outbox(
-                context=context,
-                agent=agent,
-                status="success",
-                usage=usage,
-                latency_ms=latency_ms,
-                estimated_cost=estimated_cost,
-            )
-
-            return getattr(result, "final_output", None), usage
-
-        except Exception as exc:  # noqa: BLE001
-            error_type = self._classify_error(exc)
-            latency_ms = int((time.time() - start_time) * 1000)
-
-            logger.error(
-                "agent_call_failed",
-                agent_id=agent_id,
-                model=getattr(agent, "model", None),
-                status=error_type,
-                error=str(exc),
-                latency_ms=latency_ms,
-                workflow_id=context.get("workflow_id"),
-            )
-
-            await self._enqueue_outbox(
-                context=context,
-                agent=agent,
-                status=error_type,
-                latency_ms=latency_ms,
-                error_message=str(exc),
-            )
-            raise
+        await AICallRepository.create(
+            db,
+            workflow_id=workflow_id,
+            task_id=task_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            agent_version=getattr(agent, "config_version", None),
+            model=getattr(agent, "model", ""),
+            status=ai_call_status,
+            latency_ms=latency_ms,
+            input_tokens=getattr(usage, "input_tokens", None) if usage else None,
+            output_tokens=getattr(usage, "output_tokens", None) if usage else None,
+            total_tokens=getattr(usage, "total_tokens", None) if usage else None,
+            requests=getattr(usage, "requests", None) if usage else None,
+            estimated_cost=estimated_cost,
+            error_message=error_message,
+            meta={
+                "operation": context.get("operation"),
+                "agent_id": agent_id,
+            },
+        )
 
     @staticmethod
     def _classify_error(error: Exception) -> str:
@@ -130,46 +261,4 @@ class AgentGateway:
             (input_tokens or 0) * pricing["input"]
             + (output_tokens or 0) * pricing["output"],
             6,
-        )
-
-    async def _enqueue_outbox(
-        self,
-        *,
-        context: GatewayContext,
-        agent: Agent,
-        status: str,
-        latency_ms: int,
-        estimated_cost: float | None = None,
-        usage: Usage | None = None,
-        error_message: str | None = None,
-    ) -> None:
-        """Write ai_call_completed event into Outbox when db/workflow info is provided."""
-        db = context.get("db")
-        workflow_id = context.get("workflow_id")
-
-        if not db or not workflow_id:
-            return
-
-        await OutboxRepository.enqueue_event(
-            db=db,
-            event_type="ai_call_completed",
-            aggregate_type="workflow",
-            aggregate_id=str(workflow_id),
-            payload={
-                "agent_id": getattr(agent, "agent_id", None),
-                "agent_version": getattr(agent, "config_version", None),
-                "model": getattr(agent, "model", None),
-                "status": status,
-                "input_tokens": getattr(usage, "input_tokens", None),
-                "output_tokens": getattr(usage, "output_tokens", None),
-                "total_tokens": getattr(usage, "total_tokens", None),
-                "requests": getattr(usage, "requests", None),
-                "estimated_cost": estimated_cost,
-                "latency_ms": latency_ms,
-                "operation": context.get("operation"),
-                "user_id": context.get("user_id"),
-                "task_id": context.get("task_id"),
-                "error_message": error_message,
-            },
-            meta={"user_id": context.get("user_id")},
         )

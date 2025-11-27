@@ -1,7 +1,6 @@
 """Cover letter generation task logic using AgentGateway + YAML agents."""
 from __future__ import annotations
 
-import time
 from typing import Optional, Tuple
 from uuid import uuid4
 
@@ -14,16 +13,12 @@ from app.modules.applications.event_types import (
     ApplicationEventType,
     ApplicationReadyPayload,
 )
-from app.modules.applications.models import (
-    AICall,
-    Application,
-)
+from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.applications.repositories.outbox_repo import OutboxRepository
 from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Document, DocumentFormat
 from app.modules.resumes.service import ResumeService
-from app.shared.enums import AICallStatus
 
 
 WORKFLOW_VERSION = "v1.0.0"
@@ -45,13 +40,11 @@ async def run_cover_letter_task(
         "user_id": application.user_id,
         "operation": "cover_letter",
     }
-    gateway = AgentGateway()
 
-    job_analysis, _ = await _analyze_job(gateway, application.job, ctx)
-    resume_analysis, _ = await _analyze_resume(gateway, application.resume_document, ctx)
+    job_analysis = await _analyze_job(application.job, ctx)
+    resume_analysis = await _analyze_resume(application.resume_document, ctx)
 
-    cover_letter_content, writer_usage, writer_latency_ms, review_result = await _generate_with_review(
-        gateway=gateway,
+    cover_letter_content, review_result = await _generate_with_review(
         application=application,
         job_analysis=job_analysis,
         resume_analysis=resume_analysis,
@@ -85,23 +78,6 @@ async def run_cover_letter_task(
         cover_letter_document_id=cover_doc_id,
     )
 
-    # Record AI call for writer agent (gateway already emits Outbox ai_call_completed)
-    ai_call = AICall(
-        workflow_id=workflow_id,
-        task_id=task_id,
-        user_id=application.user_id,
-        model="gpt-4o",
-        prompt_id="cover_letter_writer",
-        prompt_version=WORKFLOW_VERSION,
-        latency_ms=writer_latency_ms,
-        input_tokens=getattr(writer_usage, "input_tokens", None),
-        output_tokens=getattr(writer_usage, "output_tokens", None),
-        total_tokens=getattr(writer_usage, "total_tokens", None),
-        status=AICallStatus.SUCCESS,
-        meta={"application_id": application.id},
-    )
-    db.add(ai_call)
-
     await OutboxRepository.enqueue_event(
         db,
         event_type=ApplicationEventType.APPLICATION_READY.value,
@@ -122,50 +98,45 @@ async def run_cover_letter_task(
 
 
 async def _analyze_job(
-    gateway: AgentGateway,
     job: SeekJob,
     ctx: GatewayContext,
-) -> Tuple[AnalyzedJob, object]:
+) -> AnalyzedJob:
     """Run job_analyzer agent."""
     content = job.content or job.abstract or ""
-    result, usage = await gateway.call(
+    result = await AgentGateway.get().call(
         agent_id="job_analyzer",
         input_data=content,
         context={**ctx, "operation": "job_analysis"},
     )
     if isinstance(result, AnalyzedJob):
-        return result, usage
-    return AnalyzedJob(**result), usage
+        return result
+    return AnalyzedJob(**result)
 
 
 async def _analyze_resume(
-    gateway: AgentGateway,
     resume_document: Document,
     ctx: GatewayContext,
-) -> Tuple[AnalyzedResume, object]:
+) -> AnalyzedResume:
     """Run resume_analyzer agent."""
-    result, usage = await gateway.call(
+    result = await AgentGateway.get().call(
         agent_id="resume_analyzer",
         input_data=resume_document.content,
         context={**ctx, "operation": "resume_analysis"},
     )
     if isinstance(result, AnalyzedResume):
-        return result, usage
-    return AnalyzedResume(**result), usage
+        return result
+    return AnalyzedResume(**result)
 
 
 async def _generate_with_review(
-    gateway: AgentGateway,
     application: Application,
     job_analysis: AnalyzedJob,
     resume_analysis: AnalyzedResume,
     ctx: GatewayContext,
-) -> tuple[str, object, int, Optional[ReviewResult]]:
+) -> tuple[str, Optional[ReviewResult]]:
     """Generate draft, review, and iterate up to MAX_REVIEW_ITERATIONS."""
     feedback: str = ""
     last_review: Optional[ReviewResult] = None
-    writer_usage = None
-    writer_latency_ms = 0
 
     for attempt in range(MAX_REVIEW_ITERATIONS):
         writer_input = _build_writer_prompt(
@@ -174,14 +145,12 @@ async def _generate_with_review(
             tailoring_level=application.tailoring_level,
             feedback=feedback,
         )
-        writer_start = time.perf_counter()
-        draft_output, writer_usage = await gateway.call(
+        draft_output = await AgentGateway.get().call(
             agent_id="cover_letter_writer",
             input_data=writer_input,
             context={
                 **ctx, "operation": f"cover_letter_generate_attempt_{attempt+1}"},
         )
-        writer_latency_ms = int((time.perf_counter() - writer_start) * 1000)
         draft = draft_output if isinstance(
             draft_output, CoverLetterDraft) else CoverLetterDraft(**draft_output)
         draft_text = _render_cover_letter(draft)
@@ -191,7 +160,7 @@ async def _generate_with_review(
             job_analysis=job_analysis,
             tailoring_level=application.tailoring_level,
         )
-        review_output, _ = await gateway.call(
+        review_output = await AgentGateway.get().call(
             agent_id="reviewer",
             input_data=review_input,
             context={
@@ -201,12 +170,12 @@ async def _generate_with_review(
             review_output, ReviewResult) else ReviewResult(**review_output)
 
         if (not last_review.needs_revision) and (last_review.overall_score >= REVIEW_PASS_SCORE):
-            return draft_text, writer_usage, writer_latency_ms, last_review
+            return draft_text, last_review
 
         feedback = _build_feedback(last_review)
 
     # Return last attempt even if review not passing
-    return draft_text, writer_usage, writer_latency_ms, last_review
+    return draft_text, last_review
 
 
 def _render_cover_letter(draft: CoverLetterDraft) -> str:
