@@ -7,6 +7,9 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.exceptions import JobPilotException
 from app.api.v1.router import api_router
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from redis import asyncio as aioredis
 
 
 @asynccontextmanager
@@ -15,7 +18,16 @@ async def lifespan(app: FastAPI):
     # Startup
     print("🚀 JobPilot API is starting up...")
     print(f"Allowed Origins: {settings.CORS_ORIGINS}")
+
+    # Initialize cache
+    if settings.CACHE_ENABLED:
+        redis = aioredis.from_url(
+            settings.REDIS_URL, encoding="utf8", decode_responses=False)
+        FastAPICache.init(RedisBackend(redis), prefix="jobpilot:cache")
+        print("Cache initialized with Redis backend")
+
     yield
+
     # Shutdown
     print("👋 JobPilot API is shutting down...")
 

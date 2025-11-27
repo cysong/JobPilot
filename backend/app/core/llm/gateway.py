@@ -39,7 +39,7 @@ class AgentGateway:
         context = context or {}
         start_time = time.time()
 
-        agent = self.loader.load_agent(agent_id)
+        agent = await self.loader.load_agent(agent_id)
 
         logger.info(
             "agent_call_started",
