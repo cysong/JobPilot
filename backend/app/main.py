@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.exceptions import JobPilotException
 from app.api.v1.router import api_router
 from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
+from app.core.cache import RedisBackend
 from redis import asyncio as aioredis
 
 
@@ -16,7 +16,7 @@ from redis import asyncio as aioredis
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    print("🚀 JobPilot API is starting up...")
+    print("JobPilot API is starting up...")
     print(f"Allowed Origins: {settings.CORS_ORIGINS}")
 
     # Initialize cache
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    print("👋 JobPilot API is shutting down...")
+    print("JobPilot API is shutting down...")
 
 
 # Create FastAPI application
