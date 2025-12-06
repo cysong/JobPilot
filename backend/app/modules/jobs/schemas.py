@@ -147,3 +147,49 @@ class JobFiltersOptions(BaseModel):
     location_cities: list[str] = Field(default_factory=list, description="Available location cities")
     work_types: list[str] = Field(default_factory=list, description="Available work types")
     companies: list[str] = Field(default_factory=list, description="Available companies")
+
+
+# ============================================
+# Job Analysis Schemas
+# ============================================
+
+class JobAnalysisBase(BaseModel):
+    """Job analysis output schema"""
+
+    # Skills Requirements
+    required_skills: list[str] = Field(default_factory=list, description="Must-have technical skills")
+    preferred_skills: list[str] = Field(default_factory=list, description="Nice-to-have skills")
+    certifications: list[str] = Field(default_factory=list, description="Required or preferred certifications")
+    tech_stack: list[str] = Field(default_factory=list, description="Technologies, frameworks, and tools")
+
+    # Responsibilities & Requirements
+    seniority: Optional[str] = Field(None, description="Seniority level (Junior, Mid, Senior, Lead)")
+    key_responsibilities: list[str] = Field(default_factory=list, description="Main job responsibilities")
+    experience_years: Optional[str] = Field(None, description="Required experience (e.g., '3-5 years')")
+    education_requirement: Optional[str] = Field(None, description="Education requirement")
+
+    # Soft Requirements
+    soft_skills: list[str] = Field(default_factory=list, description="Soft skills")
+    company_culture_keywords: list[str] = Field(default_factory=list, description="Company culture descriptors")
+
+    # Agent Inference
+    hiring_priorities: list[str] = Field(default_factory=list, description="Agent's inference: top hiring priorities")
+
+
+class JobAnalysisResponse(JobAnalysisBase):
+    """API response for job analysis"""
+
+    id: str
+    job_id: int
+    analysis_version: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class JobAnalysisCreate(JobAnalysisBase):
+    """Schema for creating job analysis (internal use)"""
+
+    job_id: int
+    analysis_version: str = "v1.0.0"

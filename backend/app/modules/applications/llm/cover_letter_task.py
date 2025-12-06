@@ -41,7 +41,7 @@ async def run_cover_letter_task(
         "operation": "cover_letter",
     }
 
-    job_analysis = await _analyze_job(application.job, ctx)
+    job_analysis = await _get_job_analysis(application.job_id, db)
     resume_analysis = await _analyze_resume(application.resume_document, ctx)
 
     cover_letter_content, review_result = await _generate_with_review(
@@ -97,20 +97,62 @@ async def run_cover_letter_task(
     }
 
 
-async def _analyze_job(
-    job: SeekJob,
-    ctx: GatewayContext,
+async def _get_job_analysis(
+    job_id: int,
+    db: AsyncSession,
 ) -> AnalyzedJob:
-    """Run job_analyzer agent."""
-    content = job.content or job.abstract or ""
-    result = await AgentGateway.get().call(
-        agent_id="job_analyzer",
-        input_data=content,
-        context={**ctx, "operation": "job_analysis"},
+    """
+    Get cached job analysis or trigger async analysis.
+
+    Strategy:
+    1. Check job_analyses table
+    2. If exists and version matches, return cached result
+    3. If version outdated or missing, trigger analyze_job_async and raise Retry exception
+    """
+    from app.modules.jobs.repository import JobAnalysisRepository
+    from app.modules.jobs.tasks import analyze_job_async
+    from celery.exceptions import Retry
+
+    # Try to get cached analysis
+    cached = await JobAnalysisRepository.get_by_job_id(db, job_id)
+
+    if cached:
+        # Check if version is outdated
+        current_version = AnalyzedJob.__version__
+        if cached.analysis_version != current_version:
+            # Version mismatch: delete old analysis and trigger re-analysis
+            await JobAnalysisRepository.delete_by_job_id(db, job_id)
+            await db.commit()
+
+            analyze_job_async.delay(job_id)
+            raise Retry(
+                message=f"Job {job_id} analysis outdated (v{cached.analysis_version} -> v{current_version}), re-analyzing",
+                countdown=30,
+            )
+
+        # Version matches: convert DB model to Pydantic schema
+        return AnalyzedJob(
+            required_skills=cached.required_skills or [],
+            preferred_skills=cached.preferred_skills or [],
+            certifications=cached.certifications or [],
+            tech_stack=cached.tech_stack or [],
+            seniority=cached.seniority,
+            key_responsibilities=cached.key_responsibilities or [],
+            experience_years=cached.experience_years,
+            education_requirement=cached.education_requirement,
+            soft_skills=cached.soft_skills or [],
+            company_culture_keywords=cached.company_culture_keywords or [],
+            hiring_priorities=cached.hiring_priorities or [],
+        )
+
+    # Cache miss: trigger analysis and retry this task
+    analyze_job_async.delay(job_id)
+
+    # Raise Retry to reschedule this cover letter task
+    raise Retry(
+        message=f"Job {job_id} analysis in progress, retrying in 30s",
+        countdown=30,  # Retry after 30 seconds
     )
-    if isinstance(result, AnalyzedJob):
-        return result
-    return AnalyzedJob(**result)
 
 
 async def _analyze_resume(

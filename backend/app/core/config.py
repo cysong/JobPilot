@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # Job Analysis
     JOB_ANALYSIS_INTERVAL_HOURS: int = 1  # Run job analysis every N hours
     JOB_ANALYSIS_LOOKBACK_DAYS: int = 7  # Analyze jobs from past N days
+    MAX_JOBS_PER_POLL: int = 3  # Maximum jobs to analyze per polling cycle (for testing)
+    # Note: Analysis version now defined in AnalyzedJob.__version__ (agents/schemas.py)
 
     # Matching
     MATCH_SCORE_THRESHOLD: float = 0.6  # Minimum match score to recommend resume

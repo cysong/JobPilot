@@ -15,7 +15,8 @@ from app.modules.jobs.schemas import (
     JobDetail,
     JobListResponse,
     JobFiltersRequest,
-    JobFiltersOptions
+    JobFiltersOptions,
+    JobAnalysisResponse,
 )
 from app.shared.pagination import PaginationParams
 
@@ -138,3 +139,83 @@ async def get_similar_jobs(
     similar_jobs = await service.JobService.get_similar_jobs(db, job_id, limit)
 
     return [JobBase.model_validate(job) for job in similar_jobs]
+
+
+# ============================================
+# Job Analysis Endpoints (For Testing)
+# ============================================
+
+@router.get("/{job_id}/analysis", response_model=JobAnalysisResponse)
+async def get_job_analysis(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Get cached job analysis.
+
+    Returns 404 if analysis doesn't exist yet.
+    """
+    from app.modules.jobs.repository import JobAnalysisRepository
+
+    analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
+    if not analysis:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Analysis not found for job {job_id}. Try triggering analysis first."
+        )
+
+    return JobAnalysisResponse.model_validate(analysis)
+
+
+@router.post("/{job_id}/analyze")
+async def trigger_job_analysis(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Manually trigger job analysis (test/debug only).
+
+    Returns Celery task ID and task tracking ID.
+    """
+    from app.modules.jobs.tasks import analyze_job_async
+    from app.modules.jobs.repository import JobRepository
+
+    # Verify job exists
+    job = await JobRepository.get_by_id(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Trigger async task
+    task = analyze_job_async.delay(job_id)
+
+    return {
+        "message": "Analysis triggered",
+        "celery_task_id": task.id,
+        "job_id": job_id,
+    }
+
+
+@router.delete("/{job_id}/analysis")
+async def delete_job_analysis(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Delete cached job analysis (for re-analysis testing).
+
+    Returns 404 if analysis doesn't exist.
+    """
+    from app.modules.jobs.repository import JobAnalysisRepository
+
+    deleted = await JobAnalysisRepository.delete_by_job_id(db, job_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    await db.commit()
+
+    return {
+        "message": f"Analysis for job {job_id} deleted successfully"
+    }

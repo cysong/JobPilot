@@ -4,11 +4,17 @@ This table is maintained by external crawler system.
 """
 from datetime import datetime
 from typing import Optional
+from uuid import uuid4
 
-from sqlalchemy import Boolean, Integer, String, Text, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.shared.base_model import Base
+from app.shared.base_model import Base, TimestampMixin
+
+
+def _uuid() -> str:
+    """Generate UUID4 string for primary keys."""
+    return str(uuid4())
 
 
 class SeekJob(Base):
@@ -110,3 +116,90 @@ class SeekJob(Base):
     # Timestamps
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class JobAnalysis(Base, TimestampMixin):
+    """
+    AI-generated job analysis results.
+
+    Only successful analyses are stored here.
+    Failed attempts are tracked via TaskExecution.
+    """
+    __tablename__ = "job_analyses"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(255), primary_key=True, default=_uuid
+    )
+
+    # Foreign key to job (unique: one analysis per job)
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("seek_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="Reference to analyzed job"
+    )
+
+    # ============================================
+    # Skills Requirements
+    # ============================================
+    required_skills: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Must-have technical skills"
+    )
+    preferred_skills: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Nice-to-have skills"
+    )
+    certifications: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Required or preferred certifications"
+    )
+    tech_stack: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Technologies, frameworks, and tools"
+    )
+
+    # ============================================
+    # Responsibilities & Requirements
+    # ============================================
+    seniority: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, comment="Seniority level (Junior, Mid, Senior, Lead)"
+    )
+    key_responsibilities: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Main job responsibilities (3-5 key points)"
+    )
+    experience_years: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, comment="Required experience (e.g., '3-5 years', '5+ years')"
+    )
+    education_requirement: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True, comment="Education requirement"
+    )
+
+    # ============================================
+    # Soft Requirements
+    # ============================================
+    soft_skills: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Soft skills (teamwork, communication, etc.)"
+    )
+    company_culture_keywords: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, comment="Company culture descriptors"
+    )
+
+    # ============================================
+    # Agent Inference
+    # ============================================
+    hiring_priorities: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list,
+        comment="Agent's inference: what does company value most? (top 3)"
+    )
+
+    # ============================================
+    # Metadata
+    # ============================================
+    analysis_version: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="v1.0.0",
+        comment="Analysis schema version for future compatibility"
+    )
+
+    # ============================================
+    # Relationships
+    # ============================================
+    job: Mapped["SeekJob"] = relationship("SeekJob", backref="analysis")

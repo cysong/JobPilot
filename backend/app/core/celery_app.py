@@ -1,5 +1,6 @@
 """Celery application configuration for JobPilot"""
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -33,4 +34,13 @@ celery_app.conf.update(
 # Discover tasks from application modules
 celery_app.autodiscover_tasks([
     "app.modules.applications",
+    "app.modules.jobs",  # Add jobs module for job analysis tasks
 ])
+
+# Configure Celery Beat periodic tasks
+celery_app.conf.beat_schedule = {
+    'poll-unanalyzed-jobs': {
+        'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+}
