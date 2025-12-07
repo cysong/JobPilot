@@ -11,7 +11,7 @@ from agents import Usage
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING
 from app.core.llm.types import GatewayContext
-from app.modules.applications.repositories.aicall_repo import AICallRepository
+from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
 
 logger = structlog.get_logger()
