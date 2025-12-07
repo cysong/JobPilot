@@ -1,14 +1,14 @@
 """Repository layer for Job and JobAnalysis database operations."""
 import datetime
-from app.modules.jobs.models import SeekJob
-
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 from typing import Optional
 
+from sqlalchemy import and_, select, String
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+
 from app.modules.jobs.models import SeekJob, JobAnalysis
+from app.modules.workflow import WorkflowExecution
+from app.shared.enums import WorkflowType
 
 
 class JobRepository:
@@ -59,6 +59,42 @@ class JobRepository:
             .limit(limit)
         )
         return list[SeekJob](result.scalars().all())
+
+    @staticmethod
+    async def get_jobs_without_analysis_task(
+        db: AsyncSession,
+        limit: int = 100
+    ) -> list[SeekJob]:
+        """
+        Get jobs that have no Job Analysis workflow.
+
+        Filters by workflow_type='job_analysis' and entity_id=job.id in workflow_executions table.
+        This is the preferred method for finding jobs that need analysis (replaces get_unanalyzed_jobs).
+
+        Args:
+            db: Database session
+            limit: Maximum number of jobs to return
+
+        Returns:
+            List of SeekJob instances without Job Analysis workflow
+        """
+        result = await db.execute(
+            select(SeekJob)
+            .outerjoin(
+                WorkflowExecution,
+                and_(
+                    # Match by entity_id (job_id) in workflow
+                    WorkflowExecution.entity_id == SeekJob.id.cast(String),
+                    WorkflowExecution.workflow_type == WorkflowType.JOB_ANALYSIS.value
+                )
+            )
+            .where(WorkflowExecution.id.is_(None))  # No workflow exists
+            .where(SeekJob.is_expired == False)  # Only active jobs
+            .where(SeekJob.listed_at > (datetime.datetime.now() - datetime.timedelta(days=30)))
+            .order_by(SeekJob.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
 
 class JobAnalysisRepository:

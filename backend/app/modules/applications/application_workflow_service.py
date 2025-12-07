@@ -1,4 +1,8 @@
-"""Application workflow orchestration service (decoupled from API)."""
+"""Application workflow helper for cover letter generation.
+
+DEPRECATED: This module uses legacy workflow patterns.
+Consider migrating to app.modules.workflow.service.WorkflowService with TaskType enums.
+"""
 from __future__ import annotations
 
 import logging
@@ -10,16 +14,15 @@ from app.modules.applications.event_types import (
 )
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.applications.repositories.outbox_repo import OutboxRepository
-from app.modules.applications.repositories.task_repo import TaskRepository
-from app.modules.applications.repositories.workflow_repo import WorkflowRepository
+from app.modules.workflow import TaskRepository, WorkflowRepository
 from app.modules.applications.tasks import generate_cover_letter_task
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowService:
-    """Encapsulates workflow/task creation and dispatch for applications."""
+class ApplicationWorkflowHelper:
+    """Helper for creating cover letter generation workflows (legacy pattern)."""
 
     WORKFLOW_TYPE = "application_generation"
     CONFIG_VERSION = "v1.0.0"
@@ -33,7 +36,7 @@ class WorkflowService:
         if payload.is_retry:
             workflow = await WorkflowRepository.get_latest_by_entity(
                 db,
-                workflow_type=WorkflowService.WORKFLOW_TYPE,
+                workflow_type=ApplicationWorkflowHelper.WORKFLOW_TYPE,
                 entity_id=payload.application_id,
             )
             if workflow:
@@ -41,8 +44,8 @@ class WorkflowService:
             else:
                 workflow = await WorkflowRepository.create(
                     db,
-                    workflow_type=WorkflowService.WORKFLOW_TYPE,
-                    config_version=WorkflowService.CONFIG_VERSION,
+                    workflow_type=ApplicationWorkflowHelper.WORKFLOW_TYPE,
+                    config_version=ApplicationWorkflowHelper.CONFIG_VERSION,
                     user_id=payload.user_id,
                     entity_id=payload.application_id,
                     input_data={
@@ -54,8 +57,8 @@ class WorkflowService:
         else:
             workflow = await WorkflowRepository.create(
                 db,
-                workflow_type=WorkflowService.WORKFLOW_TYPE,
-                config_version=WorkflowService.CONFIG_VERSION,
+                workflow_type=ApplicationWorkflowHelper.WORKFLOW_TYPE,
+                config_version=ApplicationWorkflowHelper.CONFIG_VERSION,
                 user_id=payload.user_id,
                 entity_id=payload.application_id,
                 input_data={

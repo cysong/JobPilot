@@ -11,7 +11,7 @@ from app.modules.applications.event_types import (
     ApplicationEventType,
 )
 from app.modules.applications.models import OutboxEvent
-from app.modules.applications.workflow_service import WorkflowService
+from app.modules.applications.application_workflow_service import ApplicationWorkflowHelper
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ async def handle_application_created(db: AsyncSession, event: OutboxEvent) -> No
             f"user_id={payload.user_id}, is_retry={payload.is_retry}"
         )
 
-        await WorkflowService.init_workflow_for_application(db, payload)
+        await ApplicationWorkflowHelper.init_workflow_for_application(db, payload)
 
         logger.debug(
             f"Successfully initialized workflow for application_id={payload.application_id}"

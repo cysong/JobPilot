@@ -1,5 +1,6 @@
 """Global enumerations"""
 from enum import Enum
+from typing import NamedTuple, Optional
 
 
 class Role(str, Enum):
@@ -22,6 +23,13 @@ class ApplicationStatus(str, Enum):
     FAILED = "Failed"                # Application failed
 
 
+class WorkflowType(str, Enum):
+    """Workflow type enumeration"""
+    COVER_LETTER_GENERATION = "cover_letter_generation"
+    JOB_ANALYSIS = "job_analysis"
+    RESUME_ANALYSIS = "resume_analysis"
+
+
 class WorkflowStatus(str, Enum):
     """Workflow execution status"""
     PENDING = "Pending"
@@ -29,6 +37,117 @@ class WorkflowStatus(str, Enum):
     COMPLETED = "Completed"
     FAILED = "Failed"
     CANCELLED = "Cancelled"
+
+
+class TaskTypeInfo(NamedTuple):
+    """
+    Task type metadata container.
+
+    This NamedTuple holds all configuration for a task type.
+    Extensible: add new fields as needed (e.g., priority, tags, permissions).
+    """
+    value: str                          # Task type identifier (stored in DB)
+    workflow_type: "WorkflowType"       # Which workflow this task belongs to
+    display_name: str                   # Human-readable name
+    celery_task: str                    # Celery task function path
+    max_retries: int = 3                # Default retry count
+    timeout_seconds: Optional[int] = None  # Task timeout
+
+
+class TaskType(Enum):
+    """
+    Task type enumeration with rich metadata.
+
+    Each task type contains:
+    - value: String identifier stored in database
+    - workflow_type: Associated workflow type
+    - display_name: Human-readable name for UI
+    - celery_task: Full path to Celery task function
+    - max_retries: Default retry count
+    - timeout_seconds: Task timeout limit
+
+    Usage:
+        task_type = TaskType.JOB_ANALYSIS
+        task_type.value.value              # "job_analysis"
+        task_type.value.workflow_type      # WorkflowType.JOB_ANALYSIS
+        task_type.value.display_name       # "Job Analysis"
+        task_type.value.celery_task        # "app.modules.jobs.tasks.analyze_job_async"
+    """
+
+    # Job-related tasks
+    JOB_ANALYSIS = TaskTypeInfo(
+        value="job_analysis",
+        workflow_type=WorkflowType.JOB_ANALYSIS,
+        display_name="Job Analysis",
+        celery_task="app.modules.jobs.tasks.analyze_job_async",
+        max_retries=3,
+        timeout_seconds=300,
+    )
+
+    # Resume-related tasks
+    RESUME_ANALYSIS = TaskTypeInfo(
+        value="resume_analysis",
+        workflow_type=WorkflowType.RESUME_ANALYSIS,
+        display_name="Resume Analysis",
+        celery_task="app.modules.resumes.tasks.analyze_resume_async",
+        max_retries=3,
+        timeout_seconds=180,
+    )
+
+    # Cover Letter workflow tasks
+    COVER_LETTER_JOB_ANALYSIS = TaskTypeInfo(
+        value="cover_letter_job_analysis",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Cover Letter - Job Analysis",
+        celery_task="app.modules.jobs.tasks.analyze_job_async",
+        max_retries=3,
+        timeout_seconds=300,
+    )
+
+    COVER_LETTER_RESUME_ANALYSIS = TaskTypeInfo(
+        value="cover_letter_resume_analysis",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Cover Letter - Resume Analysis",
+        celery_task="app.modules.resumes.tasks.analyze_resume_async",
+        max_retries=3,
+        timeout_seconds=180,
+    )
+
+    COVER_LETTER_DRAFT = TaskTypeInfo(
+        value="cover_letter_draft",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Cover Letter - Draft Generation",
+        celery_task="app.modules.applications.tasks.generate_cover_letter_task",
+        max_retries=2,
+        timeout_seconds=600,
+    )
+
+    COVER_LETTER_REVIEW = TaskTypeInfo(
+        value="cover_letter_review",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Cover Letter - Quality Review",
+        celery_task="app.modules.applications.tasks.review_cover_letter_task",
+        max_retries=1,
+        timeout_seconds=120,
+    )
+
+    # Generic tasks (reserved for future use)
+    DOCUMENT_GENERATION = TaskTypeInfo(
+        value="document_generation",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Document Generation",
+        celery_task="app.modules.documents.tasks.generate_document_task",
+        max_retries=2,
+    )
+
+    QUALITY_CHECK = TaskTypeInfo(
+        value="quality_check",
+        workflow_type=WorkflowType.COVER_LETTER_GENERATION,
+        display_name="Quality Check",
+        celery_task="app.modules.quality.tasks.check_quality_task",
+        max_retries=1,
+        timeout_seconds=60,
+    )
 
 
 class TaskStatus(str, Enum):

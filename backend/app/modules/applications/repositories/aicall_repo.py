@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.models import AICall
+from app.modules.workflow import AICall
 from app.shared.enums import AICallStatus
 
 
@@ -49,6 +49,7 @@ class AICallRepository:
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens
             total_tokens: Total tokens used
+            requests: Number of API requests made
             estimated_cost: Estimated cost in USD
             error_message: Error message if failed
             meta: Additional metadata
@@ -61,8 +62,8 @@ class AICallRepository:
             task_id=task_id,
             user_id=user_id,
             model=model,
-            prompt_id=agent_id,
-            prompt_version=agent_version,
+            agent_id=agent_id,
+            agent_version=agent_version,
             status=status,
             latency_ms=latency_ms,
             input_tokens=input_tokens,

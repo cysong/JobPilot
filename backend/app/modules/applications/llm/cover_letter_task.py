@@ -102,15 +102,19 @@ async def _get_job_analysis(
     db: AsyncSession,
 ) -> AnalyzedJob:
     """
-    Get cached job analysis or trigger async analysis.
+    Get cached job analysis or create workflow and trigger async analysis.
 
     Strategy:
     1. Check job_analyses table
     2. If exists and version matches, return cached result
-    3. If version outdated or missing, trigger analyze_job_async and raise Retry exception
+    3. If version outdated or missing:
+       - Create Job Analysis Workflow
+       - Submit Job Analysis Task
+       - Raise Retry exception (wait 30s)
     """
     from app.modules.jobs.repository import JobAnalysisRepository
-    from app.modules.jobs.tasks import analyze_job_async
+    from app.modules.workflow.service import WorkflowService
+    from app.shared.enums import WorkflowType, TaskType
     from celery.exceptions import Retry
 
     # Try to get cached analysis
@@ -124,9 +128,25 @@ async def _get_job_analysis(
             await JobAnalysisRepository.delete_by_job_id(db, job_id)
             await db.commit()
 
-            analyze_job_async.delay(job_id)
+            # Create workflow and submit task
+            workflow = await WorkflowService.create_workflow(
+                db=db,
+                workflow_type=WorkflowType.JOB_ANALYSIS,
+                user_id=1,  # System user - TODO: make configurable
+                entity_id=str(job_id),
+                input_data={"job_id": job_id, "trigger": "version_upgrade"},
+            )
+
+            await WorkflowService.submit_task(
+                db=db,
+                workflow_id=workflow.id,
+                task_type=TaskType.JOB_ANALYSIS,  # Auto-configured
+                input_data={"job_id": job_id},
+                job_id=job_id,
+            )
+
             raise Retry(
-                message=f"Job {job_id} analysis outdated (v{cached.analysis_version} -> v{current_version}), re-analyzing",
+                message=f"Job {job_id} analysis version mismatch (v{cached.analysis_version} -> v{current_version}), re-analyzing",
                 countdown=30,
             )
 
@@ -145,13 +165,27 @@ async def _get_job_analysis(
             hiring_priorities=cached.hiring_priorities or [],
         )
 
-    # Cache miss: trigger analysis and retry this task
-    analyze_job_async.delay(job_id)
+    # Cache miss: create workflow and trigger analysis
+    workflow = await WorkflowService.create_workflow(
+        db=db,
+        workflow_type=WorkflowType.JOB_ANALYSIS,
+        user_id=1,  # System user - TODO: make configurable
+        entity_id=str(job_id),
+        input_data={"job_id": job_id, "trigger": "cover_letter_dependency"},
+    )
+
+    await WorkflowService.submit_task(
+        db=db,
+        workflow_id=workflow.id,
+        task_type=TaskType.JOB_ANALYSIS,  # Auto-configured
+        input_data={"job_id": job_id},
+        job_id=job_id,
+    )
 
     # Raise Retry to reschedule this cover letter task
     raise Retry(
-        message=f"Job {job_id} analysis in progress, retrying in 30s",
-        countdown=30,  # Retry after 30 seconds
+        message=f"Job {job_id} analysis not found, triggering analysis",
+        countdown=30,
     )
 
 
