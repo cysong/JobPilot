@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agents.schemas import AnalyzedJob, AnalyzedResume, CoverLetterDraft, ReviewResult
+from agent_configs.schemas import AnalyzedJob, AnalyzedResume, CoverLetterDraft, ReviewResult
 from app.core.llm.gateway import AgentGateway
 from app.core.llm.types import GatewayContext
 from app.modules.applications.event_types import (

@@ -8,9 +8,9 @@ from typing import Any
 
 import yaml
 from fastapi_cache import FastAPICache
-from openai_agents import Agent
+from agents import Agent
 
-from agents.schemas import SCHEMA_REGISTRY
+from agent_configs.schemas import SCHEMA_REGISTRY
 from app.core.config import settings
 from app.core.llm.config import llm_gateway_settings
 

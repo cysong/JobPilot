@@ -8,7 +8,7 @@ class LLMGatewaySettings(BaseSettings):
     """LLM Gateway configuration loaded from environment variables."""
 
     # Agent config directory
-    AGENT_CONFIG_DIR: str = "agents/config"
+    AGENT_CONFIG_DIR: str = "agent_configs/config"
 
     # Default timeouts
     AGENT_DEFAULT_TIMEOUT: int = 60

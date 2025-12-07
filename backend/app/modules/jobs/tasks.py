@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.core.llm.gateway import AgentGateway
 from app.modules.jobs.models import SeekJob
 from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
-from agents.schemas import AnalyzedJob
+from agent_configs.schemas import AnalyzedJob
 
 
 @celery_app.task(bind=True, max_retries=3)
