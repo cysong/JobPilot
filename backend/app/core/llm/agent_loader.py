@@ -3,16 +3,24 @@ from __future__ import annotations
 
 import hashlib
 import pickle
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 from fastapi_cache import FastAPICache
 from agents import Agent
+from agents.model_settings import ModelSettings
 
 from agent_configs.schemas import SCHEMA_REGISTRY
 from app.core.config import settings
 from app.core.llm.config import llm_gateway_settings
+
+# Ensure OpenAI client finds credentials when using agents SDK
+if settings.OPENAI_API_KEY:
+    os.environ.setdefault("OPENAI_API_KEY", settings.OPENAI_API_KEY)
+if settings.OPENAI_API_BASE:
+    os.environ.setdefault("OPENAI_BASE_URL", settings.OPENAI_API_BASE)
 
 
 class AgentLoader:
@@ -74,9 +82,14 @@ class AgentLoader:
             "handoffs": config.get("handoffs") or [],
         }
 
+        # Map tuning params into ModelSettings (Agent constructor doesn't accept them directly)
+        model_settings_data: dict[str, Any] = {}
         for optional_key in ("temperature", "max_tokens", "top_p"):
             if optional_key in config:
-                agent_kwargs[optional_key] = config[optional_key]
+                model_settings_data[optional_key] = config[optional_key]
+        if model_settings_data:
+            agent_kwargs["model_settings"] = ModelSettings(
+                **model_settings_data)
 
         agent = Agent(**agent_kwargs)
         setattr(agent, "agent_id", agent_id)
