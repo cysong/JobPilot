@@ -1,4 +1,5 @@
 """Repository layer for Job and JobAnalysis database operations."""
+import datetime
 from app.modules.jobs.models import SeekJob
 
 
@@ -53,6 +54,7 @@ class JobRepository:
             .outerjoin(JobAnalysis, SeekJob.id == JobAnalysis.job_id)
             .where(JobAnalysis.id.is_(None))  # No analysis exists
             .where(SeekJob.is_expired == False)  # Only active jobs
+            .where(SeekJob.listed_at.greater_than(datetime.datetime.now() - datetime.timedelta(days=30)))
             .order_by(SeekJob.created_at.desc())
             .limit(limit)
         )
