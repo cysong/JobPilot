@@ -13,7 +13,12 @@ from app.shared.base_model import Base
 from app.core.config import settings
 
 # Import all models for Alembic autogenerate
+# IMPORTANT: All models must be imported for autogenerate to detect them
 from app.modules.auth.models import User  # noqa: F401
+from app.modules.jobs.models import SeekJob, JobAnalysis  # noqa: F401
+from app.modules.resumes.models import Resume, Document  # noqa: F401
+from app.modules.applications.models import Application, OutboxEvent  # noqa: F401
+from app.modules.workflow.models import WorkflowExecution, TaskExecution, AICall  # noqa: F401
 
 # This is the Alembic Config object
 config = context.config
@@ -27,6 +32,26 @@ if config.config_file_name is not None:
 
 # Target metadata for 'autogenerate' support
 target_metadata = Base.metadata
+
+# Tables that should be excluded from autogenerate
+# WARNING: These tables will be completely ignored by Alembic migrations
+EXCLUDED_TABLES = {
+    'daily_sentences',    # Legacy data - DO NOT MODIFY
+    'seek_jobs1',         # Backup table - DO NOT MODIFY
+    'seek_jobs',          # Protected job data - DO NOT MODIFY
+}
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Filter objects to include/exclude from autogenerate.
+
+    Excludes tables in EXCLUDED_TABLES from all migration operations.
+    Returns False to exclude the object from autogenerate.
+    """
+    if type_ == "table" and name in EXCLUDED_TABLES:
+        return False
+    return True
 
 
 def run_migrations_offline() -> None:
@@ -46,6 +71,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -54,7 +80,11 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     """Run migrations with the given connection"""
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
