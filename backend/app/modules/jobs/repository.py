@@ -1,5 +1,5 @@
 """Repository layer for Job and JobAnalysis database operations."""
-from backend.app.modules.jobs.models import SeekJob
+from app.modules.jobs.models import SeekJob
 
 
 from sqlalchemy import select
