@@ -83,7 +83,7 @@ def analyze_job_async(self: Task, job_id: int) -> dict:
                 "job_id": job_id,
             }
 
-    return asyncio.run(_run())
+    return _run_sync(_run())
 
 
 @celery_app.task
@@ -116,4 +116,25 @@ def poll_unanalyzed_jobs() -> dict:
                 "total_found": len(jobs),
             }
 
-    return asyncio.run(_run())
+    return _run_sync(_run())
+
+
+def _run_sync(coro):
+    """
+    Run an async coroutine inside Celery worker without closing the loop.
+
+    asyncio.run() closes the loop after each call, which can break asyncpg
+    connection cleanup between tasks. We reuse or recreate a loop and keep
+    it alive for subsequent invocations.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(coro)
