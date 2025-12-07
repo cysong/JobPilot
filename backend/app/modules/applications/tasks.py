@@ -102,7 +102,7 @@ def setup_periodic_tasks(sender, **kwargs):
     logger.info(f"Registered outbox consumer with {interval}s interval")
 
 
-@celery_app.task(name="applications.run_outbox_consumer")
+@celery_app.task()
 def run_outbox_consumer():
     """
     Periodic task to drain application outbox events.
@@ -120,7 +120,7 @@ def run_outbox_consumer():
     asyncio.run(_run())
 
 
-@celery_app.task(name="applications.generate_cover_letter", bind=True)
+@celery_app.task(bind=True)
 def generate_cover_letter_task(self, application_id: str, workflow_id: str, task_id: str):
     """Entry point for cover letter generation Celery task."""
     asyncio.run(

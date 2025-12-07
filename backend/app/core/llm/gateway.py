@@ -5,8 +5,8 @@ import time
 from typing import Any, Optional
 
 import structlog
-from openai_agents import Agent, Runner
-from openai_agents.types import Usage
+from agents import Agent, Runner
+from agents import Usage
 
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING
@@ -82,7 +82,8 @@ class AgentGateway:
             error_type = self._classify_error(exc)
             latency_ms = int((time.time() - start_time) * 1000)
 
-            self._log_error(agent_id, agent, error_type, exc, latency_ms, context)
+            self._log_error(agent_id, agent, error_type,
+                            exc, latency_ms, context)
             await self._record_ai_call(
                 agent_id=agent_id,
                 agent=agent,
@@ -107,7 +108,8 @@ class AgentGateway:
             Tuple of (final_output, usage)
         """
         result = await Runner.run(agent, input_data)
-        usage = getattr(getattr(result, "context_wrapper", None), "usage", None)
+        usage = getattr(
+            getattr(result, "context_wrapper", None), "usage", None)
         final_output = getattr(result, "final_output", None)
         return final_output, usage
 
@@ -228,9 +230,12 @@ class AgentGateway:
             model=getattr(agent, "model", ""),
             status=ai_call_status,
             latency_ms=latency_ms,
-            input_tokens=getattr(usage, "input_tokens", None) if usage else None,
-            output_tokens=getattr(usage, "output_tokens", None) if usage else None,
-            total_tokens=getattr(usage, "total_tokens", None) if usage else None,
+            input_tokens=getattr(usage, "input_tokens",
+                                 None) if usage else None,
+            output_tokens=getattr(usage, "output_tokens",
+                                  None) if usage else None,
+            total_tokens=getattr(usage, "total_tokens",
+                                 None) if usage else None,
             requests=getattr(usage, "requests", None) if usage else None,
             estimated_cost=estimated_cost,
             error_message=error_message,

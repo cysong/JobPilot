@@ -5,6 +5,10 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
+from app.modules.auth.models import User
+from app.modules.jobs.models import SeekJob
+from app.modules.resumes.models import Resume, Document
+
 from sqlalchemy import (
     String,
     Text,

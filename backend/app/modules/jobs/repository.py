@@ -1,4 +1,7 @@
 """Repository layer for Job and JobAnalysis database operations."""
+from backend.app.modules.jobs.models import SeekJob
+
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -50,9 +53,10 @@ class JobRepository:
             .outerjoin(JobAnalysis, SeekJob.id == JobAnalysis.job_id)
             .where(JobAnalysis.id.is_(None))  # No analysis exists
             .where(SeekJob.is_expired == False)  # Only active jobs
+            .order_by(SeekJob.created_at.desc())
             .limit(limit)
         )
-        return list(result.scalars().all())
+        return list[SeekJob](result.scalars().all())
 
 
 class JobAnalysisRepository:
@@ -110,7 +114,8 @@ class JobAnalysisRepository:
             experience_years=analysis_data.get("experience_years"),
             education_requirement=analysis_data.get("education_requirement"),
             soft_skills=analysis_data.get("soft_skills", []),
-            company_culture_keywords=analysis_data.get("company_culture_keywords", []),
+            company_culture_keywords=analysis_data.get(
+                "company_culture_keywords", []),
             hiring_priorities=analysis_data.get("hiring_priorities", []),
             analysis_version=analysis_version,
         )
