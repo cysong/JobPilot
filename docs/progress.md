@@ -10,13 +10,58 @@
 ## Work Log
 
 
+### 2025-12-07 - Job Analysis 拆分与缓存实现
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- ✅ **数据模型**: 创建 `job_analyses` 表，存储 AI 分析结果（10+ 字段：skills, certifications, tech_stack, responsibilities, seniority, education, soft_skills, culture, hiring_priorities）
+- ✅ **Repository 层**: 新增 `JobRepository` 和 `JobAnalysisRepository`，统一数据库查询逻辑
+  - `get_by_id()`, `get_unanalyzed_jobs()` - Job 查询
+  - `get_by_job_id()`, `create()`, `delete_by_job_id()` - Analysis CRUD
+- ✅ **Agent 配置优化**: 更新 `job_analyzer.yaml`，扩展 prompt 指导（一致性、去广告、字段提取规则），提升分析质量
+- ✅ **Celery 任务**:
+  - `analyze_job_async(job_id)` - 异步分析单个 Job，成功后存入 `job_analyses` 表
+  - `poll_unanalyzed_jobs()` - 定时轮询未分析 Job，批量触发分析（每 5 分钟，每次 3 个 job）
+- ✅ **Celery Beat 调度**: 配置定时任务，自动分析新入库 Job
+- ✅ **重构 Cover Letter 流程**:
+  - 移除 `_analyze_job()` 函数（原每次重复调用 Agent）
+  - 新增 `_get_job_analysis()` 函数（优先读缓存，缓存缺失时触发异步分析并 Retry）
+  - 大幅降低 AI 成本和生成延迟
+- ✅ **配置项**: 新增 `MAX_JOBS_PER_POLL=3` 和 `JOB_ANALYSIS_VERSION=v1.0.0`
+- ✅ **API 端点** (用于测试):
+  - `GET /api/v1/jobs/{job_id}/analysis` - 查询缓存的分析结果
+  - `POST /api/v1/jobs/{job_id}/analyze` - 手动触发分析
+  - `DELETE /api/v1/jobs/{job_id}/analysis` - 删除缓存（用于重新分析）
+- ✅ **Alembic Migration**: `20251207_1159_b66996638246_add_job_analyses_table.py`
+
+**架构改进:**
+- **解耦设计**: Job Analysis 独立于 Cover Letter 生成流程
+- **缓存机制**: 同一 Job 分析结果复用，避免重复 AI 调用
+- **异步处理**: Polling + Celery 自动化分析，无需手动触发
+- **扩展性**: 通过 `analysis_version` 支持未来 Schema 升级
+
+**架构优化 (2025-12-07 下午):**
+- ✅ **Schema 版本自动化**: 所有 Agent Schema 定义 `__version__` 类属性（单一真实来源）
+- ✅ **自动版本检测**: Task 层自动从 Schema 读取版本，无需维护配置文件
+- ✅ **自动版本升级**: Service 层检测版本不匹配时自动触发重新分析（懒加载升级）
+- ✅ **文档完善**: 创建 [agent-schema-versioning.md](agent-schema-versioning.md) 版本管理指南
+
+**待测试:**
+- [ ] 手动触发 Job 分析（`POST /jobs/{id}/analyze`）
+- [ ] 验证分析结果存储正确（`GET /jobs/{id}/analysis`）
+- [ ] Cover Letter 生成使用缓存（检查 AI 调用次数）
+- [ ] Celery Beat 自动轮询（启动 worker + beat）
+
+---
+
 ### 2025-11-26 - LLM Gateway 与 Cover Letter Agent 编排
 
 **Completed Tasks:**
 
 **Backend Implementation:**
 - 引入 LLM Gateway 基础设施：新增 `backend/app/core/llm/`（config/loader/gateway/types）与 YAML Agent 配置（`backend/agents/config/*.yaml`），统一 Agent 定义与成本计算。
-- 定义结构化输出模型与注册表 `backend/agents/schemas.py`，支持 AnalyzedJob/AnalyzedResume/CoverLetterDraft/ReviewResult。
+- 定义结构化输出模型与注册表 `backend/agent_configs/schemas.py`，支持 AnalyzedJob/AnalyzedResume/CoverLetterDraft/ReviewResult。
 - 重构封面信任务：`backend/app/modules/applications/llm/cover_letter_task.py` 使用 AgentGateway 调用 `job_analyzer`、`resume_analyzer`、`cover_letter_writer`、`reviewer`，支持最多 2 次迭代与评分阈值 8.0，保持文档生成、Workflow/Task 状态更新、AI 调用记录与 Outbox 事件。
 - Celery 入口 `applications.generate_cover_letter` 迁移为调用新任务模块，Service 层不再承担生成逻辑。
 
