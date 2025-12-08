@@ -15,7 +15,13 @@ class AnalyzedJob(BaseModel):
     """
 
     # Schema version (class-level constant)
-    __version__ = "v1.0.0"
+    __version__ = "v1.1.0"
+
+    # Job Title Normalization
+    normalized_job_title: Optional[str] = Field(
+        default=None,
+        description="Standardized job title stripped of seniority/modifiers (e.g., 'Backend Developer')"
+    )
 
     # Skills Requirements
     required_skills: list[str] = Field(
@@ -91,7 +97,13 @@ class AnalyzedResume(BaseModel):
     """Structured resume analysis output."""
 
     # Schema version (class-level constant)
-    __version__ = "v1.0.0"
+    __version__ = "v1.1.0"
+
+    # Target job titles (for downstream matching)
+    target_job_titles: list[str] = Field(
+        default_factory=list,
+        description="3-5 suitable job titles for the candidate, ordered by relevance"
+    )
 
     # Basic information
     candidate_name: str = Field(..., description="Candidate full name")

@@ -93,6 +93,12 @@ class Resume(Base, TimestampMixin):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Analysis fields
+    target_job_titles: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+        comment="Top recommended job titles from resume analysis (3-5 items)"
+    )
     analysis_result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     analysis_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

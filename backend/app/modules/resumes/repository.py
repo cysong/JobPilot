@@ -47,6 +47,7 @@ class ResumeRepository:
             raise ValueError(f"Resume {resume_id} not found")
 
         now = datetime.now(timezone.utc)
+        resume.target_job_titles = analysis_data.get("target_job_titles") or []
         resume.analysis_result = analysis_data
         resume.analysis_version = analysis_version
         resume.analyzed_at = now

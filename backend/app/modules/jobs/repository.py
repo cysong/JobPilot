@@ -165,6 +165,7 @@ class JobAnalysisRepository:
         """
         analysis = JobAnalysis(
             job_id=job_id,
+            normalized_job_title=analysis_data.get("normalized_job_title"),
             required_skills=analysis_data.get("required_skills", []),
             preferred_skills=analysis_data.get("preferred_skills", []),
             certifications=analysis_data.get("certifications", []),
@@ -210,18 +211,25 @@ class JobAnalysisRepository:
         existing = await JobAnalysisRepository.get_by_job_id(db, job_id)
 
         if existing:
+            existing.normalized_job_title = analysis_data.get(
+                "normalized_job_title")
             # Update existing record
             existing.required_skills = analysis_data.get("required_skills", [])
-            existing.preferred_skills = analysis_data.get("preferred_skills", [])
+            existing.preferred_skills = analysis_data.get(
+                "preferred_skills", [])
             existing.certifications = analysis_data.get("certifications", [])
             existing.tech_stack = analysis_data.get("tech_stack", [])
             existing.seniority = analysis_data.get("seniority")
-            existing.key_responsibilities = analysis_data.get("key_responsibilities", [])
+            existing.key_responsibilities = analysis_data.get(
+                "key_responsibilities", [])
             existing.experience_years = analysis_data.get("experience_years")
-            existing.education_requirement = analysis_data.get("education_requirement")
+            existing.education_requirement = analysis_data.get(
+                "education_requirement")
             existing.soft_skills = analysis_data.get("soft_skills", [])
-            existing.company_culture_keywords = analysis_data.get("company_culture_keywords", [])
-            existing.hiring_priorities = analysis_data.get("hiring_priorities", [])
+            existing.company_culture_keywords = analysis_data.get(
+                "company_culture_keywords", [])
+            existing.hiring_priorities = analysis_data.get(
+                "hiring_priorities", [])
             existing.analysis_version = analysis_version
             existing.needs_reanalysis = False  # Clear re-analysis flag
 
@@ -232,16 +240,20 @@ class JobAnalysisRepository:
             # Create new record
             analysis = JobAnalysis(
                 job_id=job_id,
+                normalized_job_title=analysis_data.get("normalized_job_title"),
                 required_skills=analysis_data.get("required_skills", []),
                 preferred_skills=analysis_data.get("preferred_skills", []),
                 certifications=analysis_data.get("certifications", []),
                 tech_stack=analysis_data.get("tech_stack", []),
                 seniority=analysis_data.get("seniority"),
-                key_responsibilities=analysis_data.get("key_responsibilities", []),
+                key_responsibilities=analysis_data.get(
+                    "key_responsibilities", []),
                 experience_years=analysis_data.get("experience_years"),
-                education_requirement=analysis_data.get("education_requirement"),
+                education_requirement=analysis_data.get(
+                    "education_requirement"),
                 soft_skills=analysis_data.get("soft_skills", []),
-                company_culture_keywords=analysis_data.get("company_culture_keywords", []),
+                company_culture_keywords=analysis_data.get(
+                    "company_culture_keywords", []),
                 hiring_priorities=analysis_data.get("hiring_priorities", []),
                 analysis_version=analysis_version,
                 needs_reanalysis=False,

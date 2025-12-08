@@ -22,6 +22,7 @@ instructions: |
 
   **Field Extraction Guidelines:**
 
+  - **normalized_job_title**: Standardized title stripped of seniority/location/technology modifiers (e.g., "Senior Backend Engineer (Python/FastAPI)" -> "Backend Developer")
   - **required_skills**: Hard skills marked as "required", "must-have", or essential
   - **preferred_skills**: Skills marked as "preferred", "nice to have", or "plus"
   - **certifications**: Certifications like AWS, Azure, PMP, CISSP, etc.
