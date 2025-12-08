@@ -126,16 +126,24 @@ pnpm run dev
 
 ### Development
 
-Run both services simultaneously:
+Run all services simultaneously:
 
 ```bash
-# Terminal 1 - Backend
+# Terminal 1 - Backend API
 cd backend
 uv run uvicorn app.main:app --reload
 
 # Terminal 2 - Frontend
 cd frontend
 pnpm run dev
+
+# Terminal 3 - Celery Worker (async tasks)
+cd backend
+uv run python run_celery_worker.py
+
+# Terminal 4 - Celery Beat (scheduled tasks)
+cd backend
+uv run python run_celery_beat.py
 ```
 
 ## Development Roadmap
