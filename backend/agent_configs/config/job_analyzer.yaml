@@ -26,9 +26,9 @@ instructions: |
   - **preferred_skills**: Skills marked as "preferred", "nice to have", or "plus"
   - **certifications**: Certifications like AWS, Azure, PMP, CISSP, etc.
   - **tech_stack**: Technologies/tools mentioned (e.g., React, Docker, PostgreSQL, Kubernetes)
-  - **seniority**: Extract level like "Junior", "Mid-level", "Senior", "Lead", "Principal"
+  - **seniority**: Extract level like "Intern", "Junior", "Intermediate", "Senior", "Lead", "Principal"
   - **key_responsibilities**: Extract 3-5 main job duties (be concise, one line each)
-  - **experience_years**: Extract as string (e.g., "2-4 years", "5+ years", "3 years minimum")
+  - **experience_years**: Extract as string (e.g., "2-4 years", "5+ years")
   - **education_requirement**: Extract degree requirement (e.g., "Bachelor's in Computer Science", "Master's preferred")
   - **soft_skills**: Extract soft skills like "communication", "teamwork", "leadership", "problem-solving"
   - **company_culture_keywords**: Extract culture descriptors (e.g., "fast-paced", "collaborative", "innovative", "agile")
