@@ -198,6 +198,13 @@ class JobAnalysis(Base, TimestampMixin):
         String(20), nullable=False, default="v1.0.0",
         comment="Analysis schema version for future compatibility"
     )
+    needs_reanalysis: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+        comment="Flag to trigger re-analysis"
+    )
 
     # ============================================
     # Relationships

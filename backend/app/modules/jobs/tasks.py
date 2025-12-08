@@ -71,36 +71,33 @@ async def _execute_job_analysis(
     - Handles errors
 
     This function only contains pure business logic.
+    Supports both new analysis and re-analysis (upsert mode).
     """
     # 1. Load job
     job = await JobRepository.get_by_id(db, job_id)
     if not job:
         raise ValueError(f"Job {job_id} not found")
 
-    # 2. Check cache (optional optimization)
-    existing = await JobAnalysisRepository.get_by_job_id(db, job_id)
-    if existing:
-        return {"analysis_id": existing.id, "status": "cached"}
-
-    # 3. Prepare input content
+    # 2. Prepare input content
     content = job.content or job.abstract or ""
     if not content:
         raise ValueError(f"Job {job_id} has no content to analyze")
 
-    # 4. Call AI Agent
+    # 3. Call AI Agent
     result = await AgentGateway.get().call(
         agent_id="job_analyzer",
         input_data=content,
         context={"db": db, "operation": "job_analysis", "job_id": job_id},
     )
 
-    # 5. Parse and save result
+    # 4. Parse result
     if isinstance(result, AnalyzedJob):
         analysis_data = result.model_dump()
     else:
         analysis_data = result
 
-    analysis = await JobAnalysisRepository.create(
+    # 5. Upsert (create or update, and clear needs_reanalysis flag)
+    analysis = await JobAnalysisRepository.upsert(
         db=db,
         job_id=job_id,
         analysis_data=analysis_data,
@@ -123,7 +120,11 @@ async def _execute_job_analysis(
 @celery_app.task
 def poll_unanalyzed_jobs() -> dict:
     """
-    Periodic task: find jobs without analysis workflow and create workflows.
+    Periodic task: find jobs needing analysis and create workflows.
+
+    Priority:
+    1. Jobs marked for re-analysis (needs_reanalysis=True)
+    2. Jobs without analysis workflow
 
     Schedule: Every 5 minutes via Celery Beat
     Batch size: Controlled by MAX_JOBS_PER_POLL config
@@ -133,38 +134,71 @@ def poll_unanalyzed_jobs() -> dict:
     """
     async def _run():
         async for db in get_db():
-            # Get jobs without analysis workflow (limited by config)
-            jobs = await JobRepository.get_jobs_without_analysis_task(
+            total_created = 0
+            reanalysis_created = 0
+
+            # 1. Priority: Process jobs marked for re-analysis
+            reanalysis_records = await JobAnalysisRepository.get_pending_reanalysis(
                 db,
                 limit=settings.MAX_JOBS_PER_POLL
             )
 
-            # Create workflow and submit task for each job
-            created_count = 0
-            for job in jobs:
-                # Create workflow
+            for analysis in reanalysis_records:
+                # Create workflow for re-analysis
                 workflow = await WorkflowService.create_workflow(
                     db=db,
                     workflow_type=WorkflowType.JOB_ANALYSIS,
                     user_id=1,  # System user ID - TODO: make configurable
-                    entity_id=str(job.id),
-                    input_data={"job_id": job.id},
+                    entity_id=str(analysis.job_id),
+                    input_data={"job_id": analysis.job_id},
                 )
 
-                # Create and submit task (auto-configured from TaskType enum)
+                # Create and submit task
                 await WorkflowService.submit_task(
                     db=db,
                     workflow_id=workflow.id,
-                    task_type=TaskType.JOB_ANALYSIS,  # All config from enum
-                    input_data={"job_id": job.id},
+                    task_type=TaskType.JOB_ANALYSIS,
+                    input_data={"job_id": analysis.job_id},
                     # Celery task arguments
-                    job_id=job.id,
+                    job_id=analysis.job_id,
                 )
-                created_count += 1
+                reanalysis_created += 1
+
+            total_created += reanalysis_created
+
+            # 2. If quota remaining, process new jobs without analysis
+            remaining = settings.MAX_JOBS_PER_POLL - reanalysis_created
+            if remaining > 0:
+                jobs = await JobRepository.get_jobs_without_analysis_task(
+                    db,
+                    limit=remaining
+                )
+
+                for job in jobs:
+                    # Create workflow
+                    workflow = await WorkflowService.create_workflow(
+                        db=db,
+                        workflow_type=WorkflowType.JOB_ANALYSIS,
+                        user_id=1,
+                        entity_id=str(job.id),
+                        input_data={"job_id": job.id},
+                    )
+
+                    # Create and submit task
+                    await WorkflowService.submit_task(
+                        db=db,
+                        workflow_id=workflow.id,
+                        task_type=TaskType.JOB_ANALYSIS,
+                        input_data={"job_id": job.id},
+                        # Celery task arguments
+                        job_id=job.id,
+                    )
+                    total_created += 1
 
             return {
-                "workflows_created": created_count,
-                "total_found": len(jobs),
+                "workflows_created": total_created,
+                "reanalysis_count": reanalysis_created,
+                "new_analysis_count": total_created - reanalysis_created,
             }
 
     return _run_sync(_run())

@@ -120,6 +120,29 @@ class JobAnalysisRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_pending_reanalysis(
+        db: AsyncSession,
+        limit: int = 100
+    ) -> list[JobAnalysis]:
+        """
+        Get job analyses marked for re-analysis.
+
+        Args:
+            db: Database session
+            limit: Maximum number of records to return
+
+        Returns:
+            List of JobAnalysis instances marked for re-analysis
+        """
+        result = await db.execute(
+            select(JobAnalysis)
+            .where(JobAnalysis.needs_reanalysis == True)
+            .order_by(JobAnalysis.updated_at.asc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def create(
         db: AsyncSession,
         job_id: int,
@@ -160,6 +183,73 @@ class JobAnalysisRepository:
         await db.flush()
         await db.refresh(analysis)
         return analysis
+
+    @staticmethod
+    async def upsert(
+        db: AsyncSession,
+        job_id: int,
+        analysis_data: dict,
+        analysis_version: str = "v1.0.0"
+    ) -> JobAnalysis:
+        """
+        Create or update analysis record.
+
+        If analysis exists, update it and clear needs_reanalysis flag.
+        Otherwise, create new record.
+
+        Args:
+            db: Database session
+            job_id: Job ID
+            analysis_data: Dictionary containing all analysis fields
+            analysis_version: Schema version
+
+        Returns:
+            JobAnalysis instance (created or updated)
+        """
+        # Check if analysis exists
+        existing = await JobAnalysisRepository.get_by_job_id(db, job_id)
+
+        if existing:
+            # Update existing record
+            existing.required_skills = analysis_data.get("required_skills", [])
+            existing.preferred_skills = analysis_data.get("preferred_skills", [])
+            existing.certifications = analysis_data.get("certifications", [])
+            existing.tech_stack = analysis_data.get("tech_stack", [])
+            existing.seniority = analysis_data.get("seniority")
+            existing.key_responsibilities = analysis_data.get("key_responsibilities", [])
+            existing.experience_years = analysis_data.get("experience_years")
+            existing.education_requirement = analysis_data.get("education_requirement")
+            existing.soft_skills = analysis_data.get("soft_skills", [])
+            existing.company_culture_keywords = analysis_data.get("company_culture_keywords", [])
+            existing.hiring_priorities = analysis_data.get("hiring_priorities", [])
+            existing.analysis_version = analysis_version
+            existing.needs_reanalysis = False  # Clear re-analysis flag
+
+            await db.flush()
+            await db.refresh(existing)
+            return existing
+        else:
+            # Create new record
+            analysis = JobAnalysis(
+                job_id=job_id,
+                required_skills=analysis_data.get("required_skills", []),
+                preferred_skills=analysis_data.get("preferred_skills", []),
+                certifications=analysis_data.get("certifications", []),
+                tech_stack=analysis_data.get("tech_stack", []),
+                seniority=analysis_data.get("seniority"),
+                key_responsibilities=analysis_data.get("key_responsibilities", []),
+                experience_years=analysis_data.get("experience_years"),
+                education_requirement=analysis_data.get("education_requirement"),
+                soft_skills=analysis_data.get("soft_skills", []),
+                company_culture_keywords=analysis_data.get("company_culture_keywords", []),
+                hiring_priorities=analysis_data.get("hiring_priorities", []),
+                analysis_version=analysis_version,
+                needs_reanalysis=False,
+            )
+            db.add(analysis)
+            await db.flush()
+            await db.refresh(analysis)
+            return analysis
 
     @staticmethod
     async def delete_by_job_id(db: AsyncSession, job_id: int) -> bool:
