@@ -1,4 +1,5 @@
 """User authentication models"""
+from __future__ import annotations
 from typing import TYPE_CHECKING
 from sqlalchemy import String, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -56,6 +57,7 @@ class User(Base, TimestampMixin):
     # Relationships
     resumes: Mapped[list["Resume"]] = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
     created_documents: Mapped[list["Document"]] = relationship("Document", back_populates="creator", foreign_keys="Document.created_by")
+    skills: Mapped[list["UserSkill"]] = relationship("UserSkill", back_populates="user", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (

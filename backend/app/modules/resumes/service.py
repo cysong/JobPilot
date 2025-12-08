@@ -13,6 +13,9 @@ from fastapi import HTTPException, status
 
 from app.modules.resumes.models import Resume, Document, DocumentFormat
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
+from app.modules.resumes.repository import ResumeRepository
+from app.modules.workflow.service import WorkflowService
+from app.shared.enums import WorkflowType, TaskType
 
 
 # Global configuration for formal resume limit (can be moved to config later)
@@ -46,7 +49,8 @@ class ResumeService:
         """
         # Create initial document
         document_id = str(uuid4())
-        content_hash = ResumeService._calculate_content_hash(resume_data.content)
+        content_hash = ResumeService._calculate_content_hash(
+            resume_data.content)
 
         document = Document(
             id=document_id,
@@ -175,10 +179,12 @@ class ResumeService:
 
         # Get current document
         current_doc = resume.document
+        previous_hash = current_doc.content_hash if current_doc else None
 
         # Create new document version
         new_doc_id = str(uuid4())
-        content_hash = ResumeService._calculate_content_hash(update_data.content)
+        content_hash = ResumeService._calculate_content_hash(
+            update_data.content)
 
         new_document = Document(
             id=new_doc_id,
@@ -197,6 +203,14 @@ class ResumeService:
         resume.document_id = new_doc_id
         db.add(resume)
 
+        # Trigger analysis if formal resume and content changed/new
+        await ResumeService._trigger_analysis_if_needed(
+            db,
+            resume,
+            user_id,
+            previous_content_hash=previous_hash,
+            new_content_hash=content_hash,
+        )
         await db.commit()
         await db.refresh(resume)
         await db.refresh(new_document)
@@ -265,12 +279,6 @@ class ResumeService:
                 detail="Resume not found"
             )
 
-        if not resume.is_draft:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Resume is already a formal version"
-            )
-
         # Check formal resume limit
         can_create, current_count = await ResumeService.check_formal_resume_limit(db, user_id)
         if not can_create:
@@ -281,6 +289,7 @@ class ResumeService:
 
         resume.is_draft = False
         db.add(resume)
+        await ResumeService._trigger_analysis_if_needed(db, resume, user_id)
         await db.commit()
         await db.refresh(resume)
 
@@ -356,6 +365,56 @@ class ResumeService:
         return can_create_more, current_count
 
     @staticmethod
+    async def _trigger_analysis_if_needed(
+        db: AsyncSession,
+        resume: Resume,
+        user_id: int,
+        *,
+        previous_content_hash: str | None = None,
+        new_content_hash: str | None = None,
+    ) -> None:
+        """
+        Trigger resume analysis workflow if needed.
+
+        Conditions:
+        - Resume is formal (not draft)
+        - Never analyzed OR analyzed_at missing OR content hash changed
+        """
+        if resume.is_draft:
+            return
+
+        content_changed = (
+            previous_content_hash
+            and new_content_hash
+            and previous_content_hash != new_content_hash
+        )
+
+        should_analyze = (
+            resume.analysis_result is None
+            or resume.analyzed_at is None
+            or content_changed
+        )
+
+        if not should_analyze:
+            return
+
+        workflow = await WorkflowService.create_workflow(
+            db=db,
+            workflow_type=WorkflowType.RESUME_ANALYSIS,
+            user_id=user_id,
+            entity_id=resume.id,
+            input_data={"resume_id": resume.id},
+        )
+
+        await WorkflowService.submit_task(
+            db=db,
+            workflow_id=workflow.id,
+            task_type=TaskType.RESUME_ANALYSIS,
+            input_data={"resume_id": resume.id},
+            resume_id=resume.id,
+        )
+
+    @staticmethod
     async def get_resume_versions(
         db: AsyncSession,
         resume_id: str,
@@ -390,6 +449,69 @@ class ResumeService:
 
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def trigger_resume_analysis(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        manual_trigger: bool = False,
+    ):
+        """
+        Manually trigger resume analysis workflow.
+
+        Always creates a new workflow/task after ownership validation.
+        """
+        resume = await ResumeRepository.get_by_id(db, resume_id)
+        if not resume or resume.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume not found"
+            )
+
+        workflow = await WorkflowService.create_workflow(
+            db=db,
+            workflow_type=WorkflowType.RESUME_ANALYSIS,
+            user_id=user_id,
+            entity_id=resume_id,
+            input_data={"resume_id": resume_id,
+                        "manual_trigger": manual_trigger},
+        )
+
+        await WorkflowService.submit_task(
+            db=db,
+            workflow_id=workflow.id,
+            task_type=TaskType.RESUME_ANALYSIS,
+            input_data={"resume_id": resume_id},
+            resume_id=resume_id,
+        )
+
+        await db.commit()
+        return workflow
+
+    @staticmethod
+    async def get_resume_analysis(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+    ) -> Resume:
+        """
+        Fetch resume analysis after ownership validation.
+        """
+        resume = await ResumeRepository.get_with_document(db, resume_id)
+        if not resume or resume.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume not found"
+            )
+
+        if not resume.analysis_result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Analysis not found. Please trigger analysis first."
+            )
+
+        return resume
 
     @staticmethod
     async def export_resume_to_pdf(

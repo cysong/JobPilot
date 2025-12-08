@@ -36,6 +36,7 @@ celery_app.conf.update(
 celery_app.autodiscover_tasks([
     "app.modules.applications",
     "app.modules.jobs",  # Add jobs module for job analysis tasks
+    "app.modules.resumes",  # Resume analysis tasks
 ])
 
 # Configure Celery Beat periodic tasks

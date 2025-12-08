@@ -21,7 +21,9 @@ from app.modules.resumes.schemas import (
     FormalResumeLimit,
     DocumentVersion,
     ResumeExportRequest,
-    ResumeExportResponse
+    ResumeExportResponse,
+    ResumeAnalysisResponse,
+    WorkflowResponse,
 )
 from app.modules.resumes.service import FORMAL_RESUME_LIMIT
 
@@ -247,3 +249,50 @@ async def get_available_templates():
     """
     from app.modules.resumes.export import DocumentExportService
     return DocumentExportService.get_available_templates("resume")
+
+
+@router.post("/{resume_id}/analyze", response_model=WorkflowResponse)
+async def trigger_resume_analysis(
+    resume_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Manually trigger resume analysis and create workflow.
+    """
+    workflow = await service.ResumeService.trigger_resume_analysis(
+        db=db,
+        resume_id=resume_id,
+        user_id=current_user.id,
+        manual_trigger=True,
+    )
+
+    return WorkflowResponse(
+        workflow_id=workflow.id,
+        status=workflow.status,
+        message="Resume analysis started",
+    )
+
+
+@router.get("/{resume_id}/analysis", response_model=ResumeAnalysisResponse)
+async def get_resume_analysis(
+    resume_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Get resume analysis results if available.
+    """
+    resume = await service.ResumeService.get_resume_analysis(
+        db=db,
+        resume_id=resume_id,
+        user_id=current_user.id,
+    )
+
+    return ResumeAnalysisResponse(
+        id=resume.id,
+        resume_id=resume.id,
+        analysis_result=resume.analysis_result,
+        analysis_version=resume.analysis_version,
+        analyzed_at=resume.analyzed_at,
+    )

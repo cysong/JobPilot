@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+from app.shared.enums import ProficiencyLevel
 
 
 class AnalyzedJob(BaseModel):
@@ -69,16 +70,58 @@ class AnalyzedJob(BaseModel):
     )
 
 
+class Skill(BaseModel):
+    """Standardized skill with proficiency."""
+
+    name: str = Field(..., description="Standardized skill name (e.g., 'Python', 'React', 'Docker')")
+    proficiency: ProficiencyLevel = Field(..., description="Proficiency level")
+
+
+class WorkExperience(BaseModel):
+    """Work experience entry."""
+
+    company: str = Field(..., description="Company name")
+    role: str = Field(..., description="Job title/role")
+    duration: tuple[str, str] = Field(..., description="Start and end date [from, to]")
+    key_achievements: list[str] = Field(default_factory=list, description="Key achievements")
+    technologies_used: list[str] = Field(default_factory=list, description="Technologies used")
+
+
 class AnalyzedResume(BaseModel):
-    """Resume analysis output."""
+    """Structured resume analysis output."""
 
     # Schema version (class-level constant)
     __version__ = "v1.0.0"
 
-    technical_skills: list[str]
-    soft_skills: list[str]
-    work_experiences: list[dict[str, Any]]
-    quantified_achievements: list[str]
+    # Basic information
+    candidate_name: str = Field(..., description="Candidate full name")
+    current_title: str = Field(..., description="Current or most recent job title")
+    total_experience_years: int = Field(..., ge=0, description="Total years of professional experience")
+
+    # Skills (with proficiency assessment)
+    technical_skills: list[Skill] = Field(default_factory=list, description="Technical skills with proficiency levels")
+    soft_skills: list[str] = Field(default_factory=list, description="Soft skills list")
+
+    # Work history
+    work_experiences: list[WorkExperience] = Field(default_factory=list, description="Work experience history")
+
+    # Achievements
+    quantified_achievements: list[str] = Field(
+        default_factory=list,
+        description="Quantified achievements (e.g., 'Reduced latency by 40%')"
+    )
+
+    # Education (sorted by most recent first, then highest degree first)
+    education: list[str] = Field(
+        default_factory=list,
+        description="Education history (most recent to oldest, highest to lowest degree)"
+    )
+    certifications: list[str] = Field(default_factory=list, description="Professional certifications")
+
+    # Location and work authorization
+    location: str = Field(..., description="Current location or preferred work location")
+    relocate_willing: bool | None = Field(None, description="Willingness to relocate")
+    work_right: str = Field(..., description="Work authorization/visa status")
 
 
 class CoverLetterDraft(BaseModel):
@@ -117,6 +160,8 @@ SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
 
 __all__ = [
     "AnalyzedJob",
+    "Skill",
+    "WorkExperience",
     "AnalyzedResume",
     "CoverLetterDraft",
     "ReviewResult",

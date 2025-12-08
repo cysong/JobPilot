@@ -9,6 +9,9 @@ Document uses chained version model:
 from datetime import datetime
 from typing import Optional
 from enum import Enum
+from datetime import datetime
+from typing import Optional
+from enum import Enum
 
 from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -88,6 +91,11 @@ class Resume(Base, TimestampMixin):
     # Soft delete
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Analysis fields
+    analysis_result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    analysis_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="resumes", foreign_keys=[user_id])

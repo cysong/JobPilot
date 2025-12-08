@@ -270,7 +270,9 @@ def _build_writer_prompt(
     required_skills = ", ".join(job_analysis.required_skills or [])
     optional_skills = ", ".join(job_analysis.optional_skills or [])
     soft_skills = ", ".join(job_analysis.soft_skills or [])
-    tech_skills = ", ".join(resume_analysis.technical_skills or [])
+    tech_skills = ", ".join(
+        [skill.name for skill in (resume_analysis.technical_skills or [])]
+    )
     resume_soft_skills = ", ".join(resume_analysis.soft_skills or [])
     achievements = "\n- ".join(resume_analysis.quantified_achievements or [])
 

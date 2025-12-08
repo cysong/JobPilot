@@ -109,6 +109,28 @@ class ResumeListResponse(BaseModel):
     formal_count: int
 
 
+# ============================================
+# Analysis Schemas
+# ============================================
+
+class ResumeAnalysisResponse(BaseModel):
+    """Resume analysis result response"""
+    id: str
+    resume_id: str
+    analysis_result: dict
+    analysis_version: Optional[str] = None
+    analyzed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class WorkflowResponse(BaseModel):
+    """Workflow creation response"""
+    workflow_id: str
+    status: str
+    message: str
+
+
 class FormalResumeLimit(BaseModel):
     """Formal resume limit check response"""
     limit: int
