@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
+from app import models  # noqa: F401  # Register all ORM models for metadata consistency
 from app.core.exceptions import JobPilotException
 from app.api.v1.router import api_router
 from fastapi_cache import FastAPICache

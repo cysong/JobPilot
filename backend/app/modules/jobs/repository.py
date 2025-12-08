@@ -4,7 +4,6 @@ from typing import Optional
 
 from sqlalchemy import and_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from app.modules.jobs.models import SeekJob, JobAnalysis
 from app.modules.workflow import WorkflowExecution

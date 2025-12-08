@@ -20,7 +20,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import WorkflowStatus, TaskStatus, AICallStatus
 
-
 def _uuid() -> str:
     """Generate UUID4 string for primary keys."""
     return str(uuid4())
@@ -125,7 +124,8 @@ class AICall(Base, TimestampMixin):
         Integer, nullable=True)
     total_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     requests: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    estimated_cost: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    estimated_cost: Mapped[Optional[float]
+                           ] = mapped_column(Float, nullable=True)
     status: Mapped[AICallStatus] = mapped_column(
         SQLEnum(AICallStatus, native_enum=False),
         nullable=False,

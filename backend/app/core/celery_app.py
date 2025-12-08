@@ -3,6 +3,7 @@ from celery import Celery
 from celery.schedules import crontab
 
 from app.core.config import settings
+from app import models  # noqa: F401  # Ensure all ORM models are registered before Celery tasks load
 
 # Initialize Celery using Redis for broker and backend
 celery_app = Celery(
