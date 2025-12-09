@@ -95,7 +95,7 @@ class Resume(Base, TimestampMixin):
     # Analysis fields
     target_job_titles: Mapped[list[str]] = mapped_column(
         JSON,
-        nullable=False,
+        nullable=True,
         default=list,
         comment="Top recommended job titles from resume analysis (3-5 items)"
     )
