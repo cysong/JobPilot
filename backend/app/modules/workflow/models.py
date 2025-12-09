@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import WorkflowStatus, TaskStatus, AICallStatus
 
+
 def _uuid() -> str:
     """Generate UUID4 string for primary keys."""
     return str(uuid4())
@@ -36,7 +37,7 @@ class WorkflowExecution(Base, TimestampMixin):
     config_version: Mapped[str] = mapped_column(
         String(20), nullable=False, default="v1.0.0")
     user_id: Mapped[int] = mapped_column(ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False, index=True)
+        "users.id", ondelete="CASCADE"), nullable=True, index=True)
     entity_id: Mapped[str] = mapped_column(
         String(255), nullable=True, index=True)
     status: Mapped[WorkflowStatus] = mapped_column(
