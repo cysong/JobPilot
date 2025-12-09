@@ -143,6 +143,22 @@ class JobAnalysisRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_updated_since(
+        db: AsyncSession,
+        *,
+        since: datetime.datetime,
+        limit: int = 500
+    ) -> list[JobAnalysis]:
+        """Get job analyses updated since a timestamp."""
+        result = await db.execute(
+            select(JobAnalysis)
+            .where(JobAnalysis.updated_at >= since)
+            .order_by(JobAnalysis.updated_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def create(
         db: AsyncSession,
         job_id: int,

@@ -162,11 +162,30 @@ class ReviewResult(BaseModel):
     needs_revision: bool
 
 
+class MatchAnalysis(BaseModel):
+    """AI match analysis output."""
+
+    __version__ = "v1.0.0"
+
+    ai_match_score: float = Field(..., ge=0, le=100)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    tailoring_suggestions: list[str] = Field(default_factory=list)
+    hidden_matches: list[str] = Field(default_factory=list)
+    coverletter_strategies: list[str] = Field(
+        default_factory=list,
+        description="3 concise angles to emphasize in a cover letter (e.g., technical edge, industry experience, culture fit)",
+        min_length=0,
+        max_length=5,
+    )
+
+
 SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
     "AnalyzedJob": AnalyzedJob,
     "AnalyzedResume": AnalyzedResume,
     "CoverLetterDraft": CoverLetterDraft,
     "ReviewResult": ReviewResult,
+    "MatchAnalysis": MatchAnalysis,
 }
 
 
@@ -177,5 +196,6 @@ __all__ = [
     "AnalyzedResume",
     "CoverLetterDraft",
     "ReviewResult",
+    "MatchAnalysis",
     "SCHEMA_REGISTRY",
 ]

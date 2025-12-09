@@ -413,6 +413,15 @@ class ResumeService:
             input_data={"resume_id": resume.id},
             resume_id=resume.id,
         )
+        await WorkflowService.submit_task(
+            db=db,
+            workflow_id=workflow.id,
+            task_type=TaskType.MATCH_USER_JOBS,
+            input_data={"resume_id": resume.id,
+                        "user_id": user_id, "days": 30},
+            user_id=user_id,
+            days=30,
+        )
 
     @staticmethod
     async def get_resume_versions(
@@ -478,12 +487,23 @@ class ResumeService:
                         "manual_trigger": manual_trigger},
         )
 
-        await WorkflowService.submit_task(
+        resume_task, _ = await WorkflowService.submit_task(
             db=db,
             workflow_id=workflow.id,
             task_type=TaskType.RESUME_ANALYSIS,
             input_data={"resume_id": resume_id},
             resume_id=resume_id,
+        )
+        # Enqueue matching task dependent on resume analysis
+        await WorkflowService.submit_task(
+            db=db,
+            workflow_id=workflow.id,
+            task_type=TaskType.MATCH_USER_JOBS,
+            input_data={"resume_id": resume_id,
+                        "user_id": user_id, "days": 30},
+            depends_on=[resume_task.id],
+            user_id=user_id,
+            days=30,
         )
 
         await db.commit()

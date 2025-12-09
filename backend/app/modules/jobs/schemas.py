@@ -193,3 +193,63 @@ class JobAnalysisCreate(JobAnalysisBase):
 
     job_id: int
     analysis_version: str = "v1.0.0"
+
+
+# ============================================
+# Matching Schemas
+# ============================================
+
+
+class JobBriefInfo(BaseModel):
+    """Minimal job info for match list."""
+
+    id: int
+    title: str
+    advertiser_name: Optional[str]
+    location_label: Optional[str]
+    work_types_label: Optional[str]
+    salary_label: Optional[str]
+    listed_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+class ResumeBriefInfo(BaseModel):
+    """Minimal resume info for matches."""
+
+    id: str
+    title: str
+
+    model_config = {"from_attributes": True}
+
+
+class UserJobMatchResponse(BaseModel):
+    """Match list item for current user."""
+
+    id: str
+    job: JobBriefInfo
+    skill_match_score: float = Field(..., description="Skill match score (0-100)")
+    resume_match_score: Optional[float] = Field(None, description="Resume match score (0-100)")
+    ai_match_score: Optional[float] = Field(None, description="AI match score (0-100)")
+    recommended_resume: Optional[ResumeBriefInfo]
+    skill_match_details: dict
+    ai_analysis: Optional[dict] = None
+    calculated_at: datetime
+    ai_analyzed_at: Optional[datetime]
+
+
+class UserJobMatchDetailResponse(BaseModel):
+    """Detailed match info for current user on a job."""
+
+    id: str
+    job: JobDetail  # full job
+    job_analysis: JobAnalysisResponse
+    skill_match_score: float
+    skill_match_details: dict
+    resume_match_score: Optional[float]
+    resume_match_details: Optional[dict]
+    recommended_resume: Optional[ResumeBriefInfo]
+    ai_match_score: Optional[float]
+    ai_analysis: Optional[dict]
+    calculated_at: datetime
+    ai_analyzed_at: Optional[datetime]

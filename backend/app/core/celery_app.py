@@ -37,6 +37,7 @@ celery_app.autodiscover_tasks([
     "app.modules.applications",
     "app.modules.jobs",  # Add jobs module for job analysis tasks
     "app.modules.resumes",  # Resume analysis tasks
+    "app.modules.matching",  # Matching tasks
 ])
 
 # Configure Celery Beat periodic tasks
@@ -44,5 +45,9 @@ celery_app.conf.beat_schedule = {
     'poll-unanalyzed-jobs': {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+    'calculate-job-matches-hourly': {
+        'task': 'matching.calculate_job_user_matches',
+        'schedule': crontab(minute=0),  # Hourly
     },
 }

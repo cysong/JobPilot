@@ -62,3 +62,18 @@ class UserSkillRepository:
                     existing_skill.promote(new_proficiency)
                     existing_skill.extracted_from_id = resume_id
                     existing_skill.extra_metadata = {"source": "resume_analysis"}
+
+    @staticmethod
+    async def get_by_user_id(db: AsyncSession, user_id: int) -> list[dict]:
+        """Return user skills as dictionaries for matching."""
+        result = await db.execute(select(UserSkill).where(UserSkill.user_id == user_id))
+        skills = []
+        for skill in result.scalars().all():
+            skills.append(
+                {
+                    "skill_name": skill.skill_name,
+                    "proficiency": skill.proficiency,
+                    "skill_type": skill.skill_type,
+                }
+            )
+        return skills

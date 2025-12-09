@@ -17,10 +17,100 @@ from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobFiltersOptions,
     JobAnalysisResponse,
+    UserJobMatchResponse,
+    UserJobMatchDetailResponse,
+    JobBriefInfo,
+    ResumeBriefInfo,
 )
 from app.shared.pagination import PaginationParams
+from app.modules.matching.repository import UserJobMatchRepository
+from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
+from app.modules.resumes.repository import ResumeRepository
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.get("/matches", response_model=list[UserJobMatchResponse])
+async def list_my_matches(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    min_score: float = Query(40, ge=0, le=100, description="Minimum skill match score"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """List matches for current user."""
+    matches = await UserJobMatchRepository.get_user_matches(
+        db=db,
+        user_id=current_user.id,
+        min_score=min_score,
+        limit=limit,
+        offset=offset,
+    )
+
+    results: list[UserJobMatchResponse] = []
+    for match in matches:
+        job = await JobRepository.get_by_id(db, match.job_id)
+        if not job:
+            continue
+        resume = None
+        if match.recommended_resume_id:
+            resume = await ResumeRepository.get_by_id(db, match.recommended_resume_id)
+
+        results.append(
+            UserJobMatchResponse(
+                id=match.id,
+                job=JobBriefInfo.model_validate(job) if job else None,
+                skill_match_score=match.skill_match_score,
+                resume_match_score=match.resume_match_score,
+                ai_match_score=match.ai_match_score,
+                recommended_resume=ResumeBriefInfo.model_validate(resume) if resume else None,
+                skill_match_details=match.skill_match_details,
+                ai_analysis=match.ai_analysis,
+                calculated_at=match.calculated_at,
+                ai_analyzed_at=match.ai_analyzed_at,
+            )
+        )
+
+    return results
+
+
+@router.get("/matches/{job_id}", response_model=UserJobMatchDetailResponse)
+async def get_my_match_detail(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get match detail for current user on a specific job."""
+    match = await UserJobMatchRepository.get_by_user_and_job(
+        db=db,
+        user_id=current_user.id,
+        job_id=job_id,
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    job = await JobRepository.get_by_id(db, job_id)
+    job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
+    if not job or not job_analysis:
+        raise HTTPException(status_code=404, detail="Job or analysis not found")
+    resume = None
+    if match.recommended_resume_id:
+        resume = await ResumeRepository.get_by_id(db, match.recommended_resume_id)
+
+    return UserJobMatchDetailResponse(
+        id=match.id,
+        job=JobDetail.model_validate(job),
+        job_analysis=JobAnalysisResponse.model_validate(job_analysis) if job_analysis else None,
+        skill_match_score=match.skill_match_score,
+        skill_match_details=match.skill_match_details,
+        resume_match_score=match.resume_match_score,
+        resume_match_details=match.resume_match_details,
+        recommended_resume=ResumeBriefInfo.model_validate(resume) if resume else None,
+        ai_match_score=match.ai_match_score,
+        ai_analysis=match.ai_analysis,
+        calculated_at=match.calculated_at,
+        ai_analyzed_at=match.ai_analyzed_at,
+    )
 
 
 @router.get("/", response_model=JobListResponse)
