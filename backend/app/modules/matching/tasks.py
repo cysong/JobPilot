@@ -16,7 +16,6 @@ from app.modules.matching.repository import UserJobMatchRepository
 from app.modules.matching.service import (
     calculate_skill_match_score,
     find_best_resume_for_user,
-    get_recent_job_analyses,
     prefilter_candidates_by_title,
     get_recent_jobs_with_analysis,
     user_has_title_target,
@@ -28,12 +27,12 @@ from app.core.llm.gateway import AgentGateway
 
 
 @celery_app.task(name="matching.calculate_job_user_matches")
-def calculate_job_user_matches_task(hours: int = 24) -> dict:
-    """Batch matching for recently analyzed jobs."""
+def calculate_job_user_matches_task(job_analysis_id: int) -> dict:
+    """Match users for a single job analysis."""
 
     async def _run():
         async for db in get_db():
-            return await _calculate(db=db, hours=hours)
+            return await _calculate(db=db, job_analysis_id=job_analysis_id)
 
     return _run_sync(_run())
 
@@ -49,8 +48,11 @@ def match_user_recent_jobs_task(user_id: int, days: int = 30) -> dict:
     return _run_sync(_run())
 
 
-async def _calculate(db: AsyncSession, *, hours: int) -> dict:
-    analyses = await get_recent_job_analyses(db, hours=hours)
+async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
+    analysis = await JobAnalysisRepository.get_by_id(db, job_analysis_id)
+    if not analysis:
+        return {"status": "job_analysis_not_found", "job_analysis_id": job_analysis_id}
+    analyses = [analysis]
     total_candidates = 0
     total_after_title = 0
     total_after_skill = 0

@@ -120,6 +120,30 @@ class JobAnalysisRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_ids(
+        db: AsyncSession,
+        job_analysis_ids: list[int]
+    ) -> list[JobAnalysis]:
+        if not job_analysis_ids:
+            return []
+        result = await db.execute(
+            select(JobAnalysis).where(JobAnalysis.id.in_(job_analysis_ids))
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_by_ids_with_job(
+        db: AsyncSession,
+        job_analysis_ids: list[int]
+    ) -> list[JobAnalysis]:
+        if not job_analysis_ids:
+            return []
+        result = await db.execute(
+            select(JobAnalysis).where(JobAnalysis.id.in_(job_analysis_ids))
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def get_pending_reanalysis(
         db: AsyncSession,
         limit: int = 100

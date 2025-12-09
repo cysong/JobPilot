@@ -46,8 +46,8 @@ celery_app.conf.beat_schedule = {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
     },
-    'calculate-job-matches-hourly': {
-        'task': 'matching.calculate_job_user_matches',
-        'schedule': crontab(minute=0),  # Hourly
+    'pull-unmatched-jobs': {
+        'task': 'matching.pull_unmatched_jobs',
+        'schedule': crontab(minute='*/5'),
     },
 }

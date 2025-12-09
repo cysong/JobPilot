@@ -103,6 +103,15 @@ class TaskType(Enum):
         timeout_seconds=300,
     )
 
+    JOB_USER_MATCHES = TaskTypeInfo(
+        value="job_user_matches",
+        workflow_type=WorkflowType.JOB_ANALYSIS,
+        display_name="Job User Matches",
+        celery_task="app.modules.matching.tasks.calculate_job_user_matches_task",
+        max_retries=3,
+        timeout_seconds=600,
+    )
+
     # Cover Letter workflow tasks
     COVER_LETTER_JOB_ANALYSIS = TaskTypeInfo(
         value="cover_letter_job_analysis",
