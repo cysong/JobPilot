@@ -1,5 +1,7 @@
-import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
-import { ApiError, ApiResponse } from '@/types/api'
+import axios from 'axios'
+import type { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
+import type { ApiResponse } from '@/types/api'
+import { ApiError } from '@/types/api'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
