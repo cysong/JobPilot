@@ -1,18 +1,19 @@
 """Application APIs for creating and managing job applications."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import get_current_user
-from app.modules.auth.models import User
+from app.core.exceptions import NotFoundError
 from app.modules.applications.schemas import (
     ApplicationCreateRequest,
     ApplicationDetail,
     ApplicationListResponse,
 )
 from app.modules.applications.service import ApplicationService
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
 from app.shared.pagination import PaginationParams
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -48,8 +49,7 @@ async def get_application(
     """Get application detail for current user."""
     application = await ApplicationService.get_application_by_id(db, application_id, current_user)
     if not application:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+        raise NotFoundError("Application not found")
     return application
 
 
