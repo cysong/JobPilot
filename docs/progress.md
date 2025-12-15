@@ -10,6 +10,39 @@
 ## Work Log
 
 
+### 2025-12-15 - Unified API Response Format (Backend & Frontend)
+**Completed Tasks:**
+
+**Backend Implementation:**
+- Added unified response code/model/route: `backend/app/core/response_codes.py`, `response.py`, `custom_route.py`; updated exceptions to carry `response_code`.
+- Applied global handlers and custom route: `backend/app/main.py`, `backend/app/api/v1/router.py`.
+- Refactored auth/jobs/resumes/applications routers and services to use unified exceptions and auto-wrapping; async task endpoints (job analysis) return `{code,message,data}`; kept file download passthrough.
+- Updated auth security dependency to emit unified errors.
+
+**Frontend Implementation:**
+- Added unified types and ApiError: `frontend/src/types/api.ts`.
+- Axios client now unwraps `{code,message,data}`, handles 401/419/403/1001/1002, and passes through binary downloads.
+- Adapted API clients (auth/jobs/resumes/applications) to use unwrapped payloads.
+- Updated UI error handling to use ApiError in auth screens and applications hooks.
+
+**Pending:**
+- Run frontend build/lint (`pnpm build`/`pnpm lint`) and backend smoke tests (health, 404, pagination, business code paths).
+
+### 2025-12-15 - Task Execution Refactor (Celery + Single Task Table)
+**Completed Tasks:**
+
+- **DB schema**: Added `entity_type/entity_id/user_id` to `task_executions`, backfilled from workflows with mapping (job_analysis→job, resume_analysis→resume, cover_letter_generation→application), dropped `workflow_executions` table, new indexes; Alembic script `20251215_1300_switch_to_single_task_table.py` (not executed).
+- **Task bases**: Introduced `AsyncBaseTask` (async + self.db) and `DBTrackingTask` (status/elapsed/retry_count tracking) replacing `_run_sync`/decorators.
+- **Service layer**: Added `TaskService.submit_task` and `submit_sequential_tasks` (Celery chain) with `TaskSubmissionSpec`; `WorkflowService` deprecated.
+- **Task migrations**: Jobs/resumes/matching/applications Celery tasks now use new bases and drop `get_db` loops; retry count persisted via `request.retries`; matching puller/outbox consumer updated.
+- **Resume flows**: `_trigger_analysis_if_needed` & `trigger_resume_analysis` submit sequential `resume_analysis` → `match_user_jobs` via chain.
+- **Legacy cleanup**: Removed workflow decorator/template code; `AICall` detached from workflow FK; model imports aligned.
+
+**Pending:**
+- Run Alembic upgrade manually.
+- Restart Celery workers/beat to load new task bases and chains.
+- Smoke test chained tasks (resume analysis → match) and tracked task state updates.
+
 ### 2025-12-07 - Job Analysis 拆分与缓存实现
 
 **Completed Tasks:**
