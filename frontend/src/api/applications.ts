@@ -3,24 +3,24 @@ import type { Application, ApplicationListResponse, CreateApplicationRequest } f
 
 export const applicationApi = {
     create: async (data: CreateApplicationRequest) => {
-        const response = await client.post<Application>('/applications', data);
-        return response.data;
+        const result = await client.post<Application, Application>('/applications', data);
+        return result;
     },
 
     get: async (id: string) => {
-        const response = await client.get<Application>(`/applications/${id}`);
-        return response.data;
+        const result = await client.get<Application, Application>(`/applications/${id}`);
+        return result;
     },
 
     list: async (page = 1, size = 20) => {
-        const response = await client.get<ApplicationListResponse>('/applications', {
+        const result = await client.get<ApplicationListResponse, ApplicationListResponse>('/applications', {
             params: { page, size }
         });
-        return response.data;
+        return result;
     },
 
     retryCoverLetter: async (id: string) => {
-        const response = await client.post<Application>(`/applications/${id}/retry-coverletter`);
-        return response.data;
+        const result = await client.post<Application, Application>(`/applications/${id}/retry-coverletter`);
+        return result;
     }
 };

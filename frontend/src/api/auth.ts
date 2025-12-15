@@ -9,23 +9,23 @@ export const authApi = {
    * Register a new user account
    */
   register: async (data: RegisterRequest): Promise<User> => {
-    const response = await apiClient.post<User>('/auth/register', data)
-    return response.data
+    const result = await apiClient.post<User, User>('/auth/register', data)
+    return result
   },
 
   /**
    * Login with email and password
    */
   login: async (data: LoginRequest): Promise<TokenResponse> => {
-    const response = await apiClient.post<TokenResponse>('/auth/login', data)
-    return response.data
+    const result = await apiClient.post<TokenResponse, TokenResponse>('/auth/login', data)
+    return result
   },
 
   /**
    * Get current authenticated user information
    */
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<User>('/auth/me')
-    return response.data
+    const result = await apiClient.get<User, User>('/auth/me')
+    return result
   },
 }

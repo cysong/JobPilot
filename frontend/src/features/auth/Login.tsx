@@ -30,6 +30,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { ApiError } from '@/types/api'
 
 // Validation Schema
 const loginSchema = z.object({
@@ -80,7 +81,11 @@ export default function Login() {
       // Redirect to jobs page
       navigate('/jobs')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid email or password. Please try again.')
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err?.response?.data?.detail || err?.message || 'Invalid email or password. Please try again.'
+      setError(message)
     } finally {
       setIsLoading(false)
     }

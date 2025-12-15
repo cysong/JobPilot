@@ -30,6 +30,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { ApiError } from '@/types/api'
 
 // Validation Schema
 const registerSchema = z
@@ -99,7 +100,11 @@ export default function Register() {
 
       navigate('/jobs')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err?.response?.data?.detail || err?.message || 'Something went wrong. Please try again.'
+      setError(message)
     } finally {
       setIsLoading(false)
     }

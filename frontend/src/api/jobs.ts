@@ -59,31 +59,31 @@ export const jobsApi = {
       params.append('listed_before', filters.listed_before)
     }
 
-    const response = await apiClient.get<JobListResponse>(`/jobs?${params.toString()}`)
-    return response.data
+    const result = await apiClient.get<JobListResponse, JobListResponse>(`/jobs?${params.toString()}`)
+    return result
   },
 
   /**
    * Get job details by ID
    */
   getJobById: async (jobId: number): Promise<JobDetail> => {
-    const response = await apiClient.get<JobDetail>(`/jobs/${jobId}`)
-    return response.data
+    const result = await apiClient.get<JobDetail, JobDetail>(`/jobs/${jobId}`)
+    return result
   },
 
   /**
    * Get similar jobs (same company and classification)
    */
   getSimilarJobs: async (jobId: number, limit = 5): Promise<Job[]> => {
-    const response = await apiClient.get<Job[]>(`/jobs/${jobId}/similar?limit=${limit}`)
-    return response.data
+    const result = await apiClient.get<Job[], Job[]>(`/jobs/${jobId}/similar?limit=${limit}`)
+    return result
   },
 
   /**
    * Get available filter options for UI dropdowns
    */
   getFilterOptions: async (): Promise<JobFiltersOptions> => {
-    const response = await apiClient.get<JobFiltersOptions>('/jobs/filters')
-    return response.data
+    const result = await apiClient.get<JobFiltersOptions, JobFiltersOptions>('/jobs/filters')
+    return result
   }
 }

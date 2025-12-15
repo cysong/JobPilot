@@ -3,6 +3,7 @@ import { applicationApi } from '@/api/applications'
 import type { CreateApplicationRequest } from '@/types/application'
 import { useToast } from '@/components/ui/use-toast'
 import { useNavigate } from 'react-router-dom'
+import { ApiError } from '@/types/api'
 
 export const useApplications = (page = 1, size = 20) => {
     return useQuery({
@@ -33,9 +34,12 @@ export const useApplicationMutations = () => {
             // For now, let's let the component handle navigation if needed, or just invalidate
         },
         onError: (error: any) => {
+            const message = error instanceof ApiError
+                ? error.message
+                : error?.response?.data?.detail || 'Failed to create application'
             toast({
                 title: 'Error',
-                description: error.response?.data?.detail || 'Failed to create application',
+                description: message,
                 variant: 'destructive'
             })
         }

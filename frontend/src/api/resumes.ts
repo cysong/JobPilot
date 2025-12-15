@@ -10,25 +10,25 @@ import type {
 
 export const resumeApi = {
     getResumes: async (page = 1, size = 100) => {
-        const response = await client.get<ResumeListResponse>('/resumes', {
+        const result = await client.get<ResumeListResponse, ResumeListResponse>('/resumes', {
             params: { page, size }
         })
-        return response.data
+        return result
     },
 
     getResumeById: async (id: string) => {
-        const response = await client.get<Resume>(`/resumes/${id}`)
-        return response.data
+        const result = await client.get<Resume, Resume>(`/resumes/${id}`)
+        return result
     },
 
     createResume: async (data: CreateResumeRequest) => {
-        const response = await client.post<Resume>('/resumes', data)
-        return response.data
+        const result = await client.post<Resume, Resume>('/resumes', data)
+        return result
     },
 
     updateResume: async (id: string, data: UpdateResumeRequest) => {
-        const response = await client.put<Resume>(`/resumes/${id}`, data)
-        return response.data
+        const result = await client.put<Resume, Resume>(`/resumes/${id}`, data)
+        return result
     },
 
     deleteResume: async (id: string) => {
@@ -36,19 +36,19 @@ export const resumeApi = {
     },
 
     finalizeResume: async (id: string) => {
-        const response = await client.patch<Resume>(`/resumes/${id}/finalize`)
-        return response.data
+        const result = await client.patch<Resume, Resume>(`/resumes/${id}/finalize`)
+        return result
     },
 
     // Returns the blob for the PDF
     exportResume: async (id: string, options?: ResumeExportRequest) => {
-        const response = await client.post(`/resumes/${id}/export`, {
+        const result = await client.post<Blob, Blob>(`/resumes/${id}/export`, {
             template: options?.template || 'modern',
             font_size: options?.font_size || 12,
             include_metadata: options?.include_metadata ?? true
         }, {
             responseType: 'blob'
         })
-        return response.data
+        return result
     }
 }
