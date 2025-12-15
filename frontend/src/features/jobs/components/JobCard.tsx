@@ -1,4 +1,4 @@
-import { MapPin, Building2, Clock, DollarSign } from 'lucide-react'
+import { MapPin, Building2, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -56,10 +56,9 @@ export function JobCard({ job }: JobCardProps) {
                         <span>{job.work_types_label}</span>
                     </div>
                     {job.salary_label && (
-                        <div className="flex items-center gap-1">
-                            <DollarSign className="h-3.5 w-3.5" />
-                            <span>{job.salary_label}</span>
-                        </div>
+                    <div className="flex items-center gap-1">
+                        <span>{job.salary_label}</span>
+                    </div>
                     )}
                 </div>
 

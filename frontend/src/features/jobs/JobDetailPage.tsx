@@ -5,7 +5,6 @@ import {
   Building2,
   MapPin,
   Clock,
-  DollarSign,
   ArrowLeft,
   Share2,
   ExternalLink,
@@ -175,7 +174,6 @@ export default function JobDetailPage() {
                 </div>
                 {job.salary_label && (
                   <div className="flex items-center gap-1.5">
-                    <DollarSign className="h-4 w-4 text-slate-400" />
                     <span>{job.salary_label}</span>
                   </div>
                 )}
