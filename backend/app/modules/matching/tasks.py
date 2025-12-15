@@ -8,6 +8,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.modules.jobs.repository import JobAnalysisRepository, JobRepository
 from app.modules.matching.repository import UserJobMatchRepository
+from app.modules.matching.pull import pull_unmatched_jobs  # ensure Celery registers periodic pull task
 from app.modules.matching.service import (
     calculate_skill_match_score,
     find_best_resume_for_user,
