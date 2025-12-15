@@ -113,8 +113,8 @@ async def _get_job_analysis(
        - Raise Retry exception (wait 30s)
     """
     from app.modules.jobs.repository import JobAnalysisRepository
-    from app.modules.workflow.service import WorkflowService
-    from app.shared.enums import WorkflowType, TaskType
+    from app.modules.workflow.service import TaskService
+    from app.shared.enums import TaskType
     from celery.exceptions import Retry
 
     # Try to get cached analysis
@@ -129,19 +129,14 @@ async def _get_job_analysis(
             await db.commit()
 
             # Create workflow and submit task
-            workflow = await WorkflowService.create_workflow(
+            await TaskService.submit_task(
                 db=db,
-                workflow_type=WorkflowType.JOB_ANALYSIS,
-                user_id=1,  # System user - TODO: make configurable
+                workflow_id=str(uuid4()),
+                task_type=TaskType.JOB_ANALYSIS,
+                entity_type="job",
                 entity_id=str(job_id),
+                user_id=1,
                 input_data={"job_id": job_id, "trigger": "version_upgrade"},
-            )
-
-            await WorkflowService.submit_task(
-                db=db,
-                workflow_id=workflow.id,
-                task_type=TaskType.JOB_ANALYSIS,  # Auto-configured
-                input_data={"job_id": job_id},
                 job_id=job_id,
             )
 
@@ -165,20 +160,15 @@ async def _get_job_analysis(
             hiring_priorities=cached.hiring_priorities or [],
         )
 
-    # Cache miss: create workflow and trigger analysis
-    workflow = await WorkflowService.create_workflow(
+    # Cache miss: create task and trigger analysis
+    await TaskService.submit_task(
         db=db,
-        workflow_type=WorkflowType.JOB_ANALYSIS,
-        user_id=1,  # System user - TODO: make configurable
+        workflow_id=str(uuid4()),
+        task_type=TaskType.JOB_ANALYSIS,
+        entity_type="job",
         entity_id=str(job_id),
+        user_id=1,
         input_data={"job_id": job_id, "trigger": "cover_letter_dependency"},
-    )
-
-    await WorkflowService.submit_task(
-        db=db,
-        workflow_id=workflow.id,
-        task_type=TaskType.JOB_ANALYSIS,  # Auto-configured
-        input_data={"job_id": job_id},
         job_id=job_id,
     )
 

@@ -14,8 +14,8 @@ from fastapi import HTTPException, status
 from app.modules.resumes.models import Resume, Document, DocumentFormat
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.resumes.repository import ResumeRepository
-from app.modules.workflow.service import WorkflowService
-from app.shared.enums import WorkflowType, TaskType
+from app.modules.workflow.service import TaskService, TaskSubmissionSpec
+from app.shared.enums import TaskType
 
 
 # Global configuration for formal resume limit (can be moved to config later)
@@ -398,29 +398,21 @@ class ResumeService:
         if not should_analyze:
             return
 
-        workflow = await WorkflowService.create_workflow(
+        await TaskService.submit_sequential_tasks(
             db=db,
-            workflow_type=WorkflowType.RESUME_ANALYSIS,
-            user_id=user_id,
+            entity_type="resume",
             entity_id=resume.id,
-            input_data={"resume_id": resume.id},
-        )
-
-        await WorkflowService.submit_task(
-            db=db,
-            workflow_id=workflow.id,
-            task_type=TaskType.RESUME_ANALYSIS,
-            input_data={"resume_id": resume.id},
-            resume_id=resume.id,
-        )
-        await WorkflowService.submit_task(
-            db=db,
-            workflow_id=workflow.id,
-            task_type=TaskType.MATCH_USER_JOBS,
-            input_data={"resume_id": resume.id,
-                        "user_id": user_id, "days": 30},
             user_id=user_id,
-            days=30,
+            tasks=[
+                TaskSubmissionSpec(
+                    task_type=TaskType.RESUME_ANALYSIS,
+                    input_data={"resume_id": resume.id},
+                ),
+                TaskSubmissionSpec(
+                    task_type=TaskType.MATCH_USER_JOBS,
+                    input_data={"resume_id": resume.id, "user_id": user_id, "days": 30},
+                ),
+            ],
         )
 
     @staticmethod
@@ -478,36 +470,27 @@ class ResumeService:
                 detail="Resume not found"
             )
 
-        workflow = await WorkflowService.create_workflow(
-            db=db,
-            workflow_type=WorkflowType.RESUME_ANALYSIS,
-            user_id=user_id,
-            entity_id=resume_id,
-            input_data={"resume_id": resume_id,
-                        "manual_trigger": manual_trigger},
-        )
+        tasks = [
+            TaskSubmissionSpec(
+                task_type=TaskType.RESUME_ANALYSIS,
+                input_data={"resume_id": resume_id, "manual_trigger": manual_trigger},
+            ),
+            TaskSubmissionSpec(
+                task_type=TaskType.MATCH_USER_JOBS,
+                input_data={"resume_id": resume_id, "user_id": user_id, "days": 30},
+            ),
+        ]
 
-        resume_task, _ = await WorkflowService.submit_task(
+        created_tasks = await TaskService.submit_sequential_tasks(
             db=db,
-            workflow_id=workflow.id,
-            task_type=TaskType.RESUME_ANALYSIS,
-            input_data={"resume_id": resume_id},
-            resume_id=resume_id,
-        )
-        # Enqueue matching task dependent on resume analysis
-        await WorkflowService.submit_task(
-            db=db,
-            workflow_id=workflow.id,
-            task_type=TaskType.MATCH_USER_JOBS,
-            input_data={"resume_id": resume_id,
-                        "user_id": user_id, "days": 30},
-            depends_on=[resume_task.id],
+            entity_type="resume",
+            entity_id=resume_id,
             user_id=user_id,
-            days=30,
+            tasks=tasks,
         )
 
         await db.commit()
-        return workflow
+        return created_tasks[0].workflow_id
 
     @staticmethod
     async def get_resume_analysis(

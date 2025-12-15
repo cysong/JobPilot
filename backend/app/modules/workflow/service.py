@@ -1,192 +1,89 @@
-"""Universal workflow orchestration service for task management."""
+"""Task submission service (single-table task model)."""
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from importlib import import_module
-from typing import Optional, Any
+from typing import Any, Optional
+from uuid import uuid4
+
+from celery import chain
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.workflow.models import WorkflowExecution, TaskExecution
-from app.modules.workflow.repositories import WorkflowRepository, TaskRepository
-from app.shared.enums import WorkflowType, TaskType, TaskTypeInfo
+from app.modules.workflow.models import TaskExecution
+from app.modules.workflow.repositories import TaskRepository
+from app.shared.enums import TaskType, TaskTypeInfo
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowService:
-    """
-    Universal workflow orchestration service.
+@dataclass
+class TaskSubmissionSpec:
+    """Spec for a single task in a sequential chain."""
 
-    Provides high-level API for creating and submitting tasks to Celery queue.
-    Business modules should use this service for all task submissions.
-    """
+    task_type: TaskType
+    input_data: Optional[dict] = field(default_factory=dict)
+    celery_kwargs: Optional[dict] = field(default_factory=dict)
 
-    # ============================================
-    # Workflow Management
-    # ============================================
 
-    @staticmethod
-    async def create_workflow(
-        db: AsyncSession,
-        *,
-        workflow_type: WorkflowType,
-        user_id: int,
-        entity_id: str,
-        input_data: Optional[dict] = None,
-        config_version: str = "v1.0.0",
-    ) -> WorkflowExecution:
-        """
-        Create a new workflow.
-
-        Args:
-            db: Database session
-            workflow_type: Type of workflow
-            user_id: User ID
-            entity_id: Entity ID (e.g., job_id, application_id)
-            input_data: Workflow input data
-            config_version: Workflow config version
-
-        Returns:
-            Created WorkflowExecution instance
-        """
-        workflow = await WorkflowRepository.create(
-            db=db,
-            workflow_type=workflow_type.value,  # Convert enum to string
-            config_version=config_version,
-            user_id=user_id,
-            entity_id=entity_id,
-            input_data=input_data or {},
-        )
-        await db.flush()
-        return workflow
-
-    # ============================================
-    # Task Creation and Submission
-    # ============================================
-
-    @staticmethod
-    async def create_task(
-        db: AsyncSession,
-        *,
-        workflow_id: str,
-        task_type: str,
-        task_name: str,
-        input_data: Optional[dict] = None,
-        depends_on: Optional[list[str]] = None,
-    ) -> TaskExecution:
-        """
-        Create a new task within a workflow.
-
-        Args:
-            db: Database session
-            workflow_id: Parent workflow ID
-            task_type: Type of task (string value)
-            task_name: Human-readable task name
-            input_data: Task input data
-            depends_on: List of task IDs this task depends on
-
-        Returns:
-            Created TaskExecution instance
-        """
-        task = await TaskRepository.create(
-            db=db,
-            workflow_id=workflow_id,
-            task_type=task_type,
-            task_name=task_name,
-            input_data=input_data or {},
-        )
-        await db.flush()
-        return task
+class TaskService:
+    """Create and submit tracked tasks to Celery."""
 
     @staticmethod
     async def submit_task(
         db: AsyncSession,
         *,
-        workflow_id: str,
         task_type: TaskType,
+        entity_type: str,
+        entity_id: str,
+        user_id: int | None = None,
         input_data: Optional[dict] = None,
-        **celery_task_kwargs,
-    ) -> tuple[TaskExecution, Any]:
+        workflow_id: str | None = None,
+        depends_on: Optional[list[str]] = None,
+        **celery_kwargs: Any,
+    ) -> TaskExecution:
         """
-        Create task record and submit to Celery queue with auto-configuration from enum.
+        Create a task_executions row and dispatch Celery task.
 
-        This is the recommended way to submit tasks from business modules.
-        Task metadata (name, celery_task, max_retries, timeout) are automatically
-        extracted from TaskType enum.
-
-        Args:
-            db: Database session
-            workflow_id: Parent workflow ID
-            task_type: Type of task (TaskType enum)
-            input_data: Task input data (stored in DB)
-            **celery_task_kwargs: Additional arguments for task execution (passed to Celery)
-
-        Returns:
-            Tuple of (TaskExecution, Celery AsyncResult)
-
-        Example:
-            # Job Analysis - all config from enum
-            task, result = await WorkflowService.submit_task(
-                db=db,
-                workflow_id=workflow.id,
-                task_type=TaskType.JOB_ANALYSIS,
-                input_data={"job_id": 123},
-                job_id=123,  # Passed to Celery task
-            )
-
-            # Cover Letter - override timeout
-            task, result = await WorkflowService.submit_task(
-                db=db,
-                workflow_id=workflow.id,
-                task_type=TaskType.COVER_LETTER_DRAFT,
-                input_data={"application_id": "abc"},
-                application_id="abc",
-                time_limit=900,  # Override default 600s timeout
-            )
+        If workflow_id is not provided, a single-task workflow uses task_id as workflow_id.
         """
-        # Extract metadata from TaskType enum
         info: TaskTypeInfo = task_type.value
+        task_id = str(uuid4())
+        workflow_id = workflow_id or task_id
 
-        # 1. Create task record (store string value in DB)
-        task = await WorkflowService.create_task(
+        task = await TaskRepository.create(
             db=db,
+            id=task_id,
             workflow_id=workflow_id,
-            task_type=info.value,  # Store string: "job_analysis"
-            task_name=info.display_name,  # Auto from enum: "Job Analysis"
-            input_data=input_data,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_id=user_id,
+            task_type=info.value,
+            task_name=info.display_name,
+            input_data=input_data or {},
+            depends_on=depends_on,
         )
+        await db.flush()
         await db.commit()
 
-        # 2. Get Celery task function by path
-        # e.g., "app.modules.jobs.tasks.analyze_job_async" -> actual function
         module_path, func_name = info.celery_task.rsplit(".", 1)
         module = import_module(module_path)
         celery_task = getattr(module, func_name)
 
-        # 3. Build Celery options from enum (allow kwargs to override)
-        celery_options = {}
+        celery_options: dict[str, Any] = {}
         if info.max_retries is not None:
             celery_options["max_retries"] = info.max_retries
         if info.timeout_seconds is not None:
             celery_options["time_limit"] = info.timeout_seconds
+        celery_options.update(celery_kwargs)
 
-        # Merge with user overrides
-        celery_options.update(celery_task_kwargs)
-
-        # 4. Submit to Celery queue
-        # Always pass workflow_id and task_id to Celery task
         task_kwargs = {
             "workflow_id": workflow_id,
-            "task_id": task.id,
+            "task_id": task_id,
+            **(input_data or {}),
         }
-        task_kwargs.update(input_data or {})
 
-        async_result = celery_task.apply_async(
-            kwargs=task_kwargs,
-            **celery_options,
-        )
-
-        # 5. Store Celery task ID
+        async_result = celery_task.apply_async(kwargs=task_kwargs, **celery_options)
         task.celery_task_id = async_result.id
         await db.commit()
 
@@ -194,39 +91,101 @@ class WorkflowService:
             "task_submitted_to_celery",
             extra={
                 "workflow_id": workflow_id,
-                "task_id": task.id,
+                "task_id": task_id,
                 "task_type": info.value,
                 "celery_task_id": async_result.id,
             },
         )
 
-        return task, async_result
-
-    # ============================================
-    # Helper Methods
-    # ============================================
+        return task
 
     @staticmethod
-    async def get_workflow_by_entity(
+    async def submit_sequential_tasks(
         db: AsyncSession,
+        *,
+        entity_type: str,
         entity_id: str,
-        workflow_type: Optional[WorkflowType] = None,
-    ) -> Optional[WorkflowExecution]:
+        user_id: int | None,
+        tasks: list[TaskSubmissionSpec],
+        workflow_id: str | None = None,
+    ) -> list[TaskExecution]:
         """
-        Get workflow by entity.
-
-        Useful for checking if a workflow already exists for an entity.
+        Create tasks in order and dispatch via Celery chain to enforce sequencing.
 
         Args:
-            db: Database session
-            entity_id: Entity ID
-            workflow_type: Optional workflow type filter
-
-        Returns:
-            WorkflowExecution if found, None otherwise
+            db: AsyncSession
+            entity_type: business entity type (job/resume/application)
+            entity_id: business entity id
+            user_id: optional user id
+            tasks: ordered list of task specifications
+            workflow_id: optional workflow id (defaults to first task id)
         """
-        return await WorkflowRepository.get_latest_by_entity(
-            db,
-            workflow_type=workflow_type.value if workflow_type else None,
-            entity_id=entity_id,
+        if not tasks:
+            raise ValueError("tasks list cannot be empty")
+
+        workflow_id = workflow_id or str(uuid4())
+        created: list[TaskExecution] = []
+        signatures = []
+        prev_task_id: str | None = None
+
+        for spec in tasks:
+            info: TaskTypeInfo = spec.task_type.value
+            task_id = str(uuid4())
+            task = await TaskRepository.create(
+                db=db,
+                id=task_id,
+                workflow_id=workflow_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                user_id=user_id,
+                task_type=info.value,
+                task_name=info.display_name,
+                input_data=spec.input_data or {},
+                depends_on=[prev_task_id] if prev_task_id else None,
+            )
+            await db.flush()
+            created.append(task)
+
+            module_path, func_name = info.celery_task.rsplit(".", 1)
+            module = import_module(module_path)
+            celery_task = getattr(module, func_name)
+
+            task_kwargs = {"workflow_id": workflow_id, "task_id": task_id}
+            task_kwargs.update(spec.input_data or {})
+
+            sig = celery_task.s(**task_kwargs)
+            if info.max_retries is not None:
+                sig.set(max_retries=info.max_retries)
+            if info.timeout_seconds is not None:
+                sig.set(time_limit=info.timeout_seconds)
+            if spec.celery_kwargs:
+                sig.set(**spec.celery_kwargs)
+
+            signatures.append(sig)
+            prev_task_id = task_id
+
+        await db.commit()
+
+        chain_result = chain(*signatures).apply_async()
+
+        # Propagate Celery task IDs back to TaskExecution records (walk parents)
+        current_result = chain_result
+        for task in reversed(created):
+            task.celery_task_id = getattr(current_result, "id", None)
+            current_result = getattr(current_result, "parent", None)
+        await db.commit()
+
+        logger.info(
+            "sequential_tasks_submitted",
+            extra={
+                "workflow_id": workflow_id,
+                "task_ids": [t.id for t in created],
+                "task_types": [t.task_type for t in created],
+            },
         )
+
+        return created
+
+
+# Backward alias for callers still importing WorkflowService
+WorkflowService = TaskService

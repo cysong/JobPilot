@@ -1,15 +1,11 @@
 """Celery tasks for application workflows and outbox consumption."""
 from __future__ import annotations
 
-import asyncio
 import logging
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.celery_app import celery_app
-from app.core.database import async_session_factory
 from app.modules.applications.config import app_module_settings
-from app.modules.workflow import task_status_guard
+from app.modules.workflow import AsyncBaseTask, DBTrackingTask
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +22,8 @@ def setup_periodic_tasks(sender, **kwargs):
     logger.info(f"Registered outbox consumer with {interval}s interval")
 
 
-@celery_app.task()
-def run_outbox_consumer():
+@celery_app.task(base=AsyncBaseTask)
+async def run_outbox_consumer(self):
     """
     Periodic task to drain application outbox events.
 
@@ -36,49 +32,25 @@ def run_outbox_consumer():
     """
     from app.modules.applications.outbox_consumer import process_outbox_batch
 
-    async def _run():
-        async with async_session_factory() as db:
-            batch_size = app_module_settings.OUTBOX_BATCH_SIZE
-            await process_outbox_batch(db, batch_size=batch_size)
-
-    asyncio.run(_run())
+    batch_size = app_module_settings.OUTBOX_BATCH_SIZE
+    await process_outbox_batch(self.db, batch_size=batch_size)
 
 
-@celery_app.task(bind=True)
-def generate_cover_letter_task(self, application_id: str, workflow_id: str, task_id: str):
+@celery_app.task(bind=True, base=DBTrackingTask)
+async def generate_cover_letter_task(self, application_id: str, workflow_id: str, task_id: str):
     """Entry point for cover letter generation Celery task."""
-    asyncio.run(
-        _run_cover_letter_task(
-            application_id=application_id,
-            workflow_id=workflow_id,
-            task_id=task_id,
-            celery_task_id=self.request.id,
-        )
+    await _execute_cover_letter_task(
+        application_id=application_id,
+        workflow_id=workflow_id,
+        task_id=task_id,
+        celery_task_id=self.request.id,
+        db=self.db,
     )
 
 
-async def _run_cover_letter_task(
-    application_id: str,
-    workflow_id: str,
-    task_id: str,
-    celery_task_id: str | None,
-):
-    """Async bootstrap to create DB session and invoke the decorated handler."""
-    async with async_session_factory() as db:
-
-        await _execute_cover_letter_task(
-            db=db,
-            application_id=application_id,
-            workflow_id=workflow_id,
-            task_id=task_id,
-            celery_task_id=celery_task_id,
-        )
-
-
-@task_status_guard(first=True, last=True)
 async def _execute_cover_letter_task(
     *,
-    db: AsyncSession,
+    db,
     application_id: str,
     workflow_id: str,
     task_id: str,
@@ -87,6 +59,7 @@ async def _execute_cover_letter_task(
     """Async wrapper to run inside Celery task with status management."""
     from app.modules.applications.llm.cover_letter_task import run_cover_letter_task
     from app.modules.applications.repositories.application_repo import ApplicationRepository
+
     application = await ApplicationRepository.get_with_dependencies(db, application_id)
 
     await run_cover_letter_task(

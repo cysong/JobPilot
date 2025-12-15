@@ -6,8 +6,8 @@ from sqlalchemy import and_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.jobs.models import SeekJob, JobAnalysis
-from app.modules.workflow import WorkflowExecution
-from app.shared.enums import WorkflowType
+from app.modules.workflow.models import TaskExecution
+from app.shared.enums import TaskType
 
 
 class JobRepository:
@@ -65,10 +65,7 @@ class JobRepository:
         limit: int = 100
     ) -> list[SeekJob]:
         """
-        Get jobs that have no Job Analysis workflow.
-
-        Filters by workflow_type='job_analysis' and entity_id=job.id in workflow_executions table.
-        This is the preferred method for finding jobs that need analysis (replaces get_unanalyzed_jobs).
+        Get jobs that have no Job Analysis task record.
 
         Args:
             db: Database session
@@ -80,14 +77,14 @@ class JobRepository:
         result = await db.execute(
             select(SeekJob)
             .outerjoin(
-                WorkflowExecution,
+                TaskExecution,
                 and_(
-                    # Match by entity_id (job_id) in workflow
-                    WorkflowExecution.entity_id == SeekJob.id.cast(String),
-                    WorkflowExecution.workflow_type == WorkflowType.JOB_ANALYSIS.value
-                )
+                    TaskExecution.entity_type == "job",
+                    TaskExecution.entity_id == SeekJob.id.cast(String),
+                    TaskExecution.task_type == TaskType.JOB_ANALYSIS.value.value,
+                ),
             )
-            .where(WorkflowExecution.id.is_(None))  # No workflow exists
+            .where(TaskExecution.id.is_(None))  # No task exists
             .where(SeekJob.is_expired == False)  # Only active jobs
             .where(SeekJob.listed_at > (datetime.datetime.now() - datetime.timedelta(days=30)))
             .order_by(SeekJob.created_at.desc())

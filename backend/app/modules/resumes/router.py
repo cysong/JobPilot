@@ -260,7 +260,7 @@ async def trigger_resume_analysis(
     """
     Manually trigger resume analysis and create workflow.
     """
-    workflow = await service.ResumeService.trigger_resume_analysis(
+    workflow_id = await service.ResumeService.trigger_resume_analysis(
         db=db,
         resume_id=resume_id,
         user_id=current_user.id,
@@ -268,8 +268,7 @@ async def trigger_resume_analysis(
     )
 
     return WorkflowResponse(
-        workflow_id=workflow.id,
-        status=workflow.status,
+        workflow_id=workflow_id,
         message="Resume analysis started",
     )
 

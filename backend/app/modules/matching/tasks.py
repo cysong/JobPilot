@@ -1,16 +1,11 @@
 """Celery tasks for user-job matching."""
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from celery import Task
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.core.database import get_db
 from app.modules.jobs.repository import JobAnalysisRepository, JobRepository
 from app.modules.matching.repository import UserJobMatchRepository
 from app.modules.matching.service import (
@@ -22,30 +17,21 @@ from app.modules.matching.service import (
 )
 from app.modules.resumes.repository import ResumeRepository
 from app.modules.users.repository import UserSkillRepository
+from app.modules.workflow import AsyncBaseTask
 from agent_configs.schemas import MatchAnalysis
 from app.core.llm.gateway import AgentGateway
 
 
-@celery_app.task(name="matching.calculate_job_user_matches")
-def calculate_job_user_matches_task(job_analysis_id: int) -> dict:
+@celery_app.task(base=AsyncBaseTask, bind=True, name="matching.calculate_job_user_matches")
+async def calculate_job_user_matches_task(self, job_analysis_id: int) -> dict:
     """Match users for a single job analysis."""
-
-    async def _run():
-        async for db in get_db():
-            return await _calculate(db=db, job_analysis_id=job_analysis_id)
-
-    return _run_sync(_run())
+    return await _calculate(db=self.db, job_analysis_id=job_analysis_id)
 
 
-@celery_app.task(name="app.modules.matching.tasks.match_user_recent_jobs_task")
-def match_user_recent_jobs_task(user_id: int, days: int = 30) -> dict:
+@celery_app.task(base=AsyncBaseTask, bind=True, name="app.modules.matching.tasks.match_user_recent_jobs_task")
+async def match_user_recent_jobs_task(self, user_id: int, days: int = 30) -> dict:
     """Match a single user against recent jobs (listed within days) that already have analyses."""
-
-    async def _run():
-        async for db in get_db():
-            return await _match_user(db=db, user_id=user_id, days=days)
-
-    return _run_sync(_run())
+    return await _match_user(db=self.db, user_id=user_id, days=days)
 
 
 async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
@@ -123,62 +109,57 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
 
 
 @celery_app.task(
+    base=AsyncBaseTask,
     name="matching.analyze_match_with_ai",
     bind=True,
     max_retries=2,
     retry_backoff=True,
 )
-def analyze_match_with_ai_task(
-    self: Task,
+async def analyze_match_with_ai_task(
+    self,
     match_id: str,
     user_id: int,
     job_id: int,
     resume_id: str,
 ):
     """Run AI review for a match."""
+    try:
+        job_analysis = await JobAnalysisRepository.get_by_job_id(self.db, job_id)
+        job = await JobRepository.get_by_id(self.db, job_id)
+        resume = await ResumeRepository.get_by_id(self.db, resume_id)
+        user_skills = await UserSkillRepository.get_by_user_id(self.db, user_id=user_id)
 
-    async def _run():
-        async for db in get_db():
-            try:
-                job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
-                job = await JobRepository.get_by_id(db, job_id)
-                resume = await ResumeRepository.get_by_id(db, resume_id)
-                user_skills = await UserSkillRepository.get_by_user_id(db, user_id=user_id)
+        if not all([job_analysis, job, resume, resume.analysis_result, user_skills]):
+            raise ValueError("Missing required data for AI analysis")
 
-                if not all([job_analysis, job, resume, resume.analysis_result, user_skills]):
-                    raise ValueError("Missing required data for AI analysis")
+        payload = {
+            "job": {
+                "title": job.title,
+                "advertiser_name": job.advertiser_name,
+                "location_label": job.location_label,
+            },
+            "job_analysis": job_analysis,
+            "resume_analysis": resume.analysis_result,
+            "user_skills": user_skills,
+        }
+        result = await AgentGateway.get().call(
+            agent_id="match_analyzer",
+            input_data=payload,
+        )
+        ai_result = result.model_dump() if isinstance(result, MatchAnalysis) else result
 
-                payload = {
-                    "job": {
-                        "title": job.title,
-                        "advertiser_name": job.advertiser_name,
-                        "location_label": job.location_label,
-                    },
-                    "job_analysis": job_analysis,
-                    "resume_analysis": resume.analysis_result,
-                    "user_skills": user_skills,
-                }
-                result = await AgentGateway.get().call(
-                    agent_id="match_analyzer",
-                    input_data=payload,
-                )
-                ai_result = result.model_dump() if isinstance(result, MatchAnalysis) else result
-
-                await UserJobMatchRepository.update_ai_analysis(
-                    db=db,
-                    match_id=match_id,
-                    ai_match_score=ai_result.get("ai_match_score", 0),
-                    ai_analysis=ai_result,
-                    ai_analyzed_at=datetime.now(timezone.utc),
-                )
-                await db.commit()
-            except Exception as exc:  # noqa: BLE001
-                if self.request.retries < self.max_retries:
-                    raise self.retry(exc=exc, countdown=60 *
-                                     (self.request.retries + 1))
-                raise
-
-    return _run_sync(_run())
+        await UserJobMatchRepository.update_ai_analysis(
+            db=self.db,
+            match_id=match_id,
+            ai_match_score=ai_result.get("ai_match_score", 0),
+            ai_analysis=ai_result,
+            ai_analyzed_at=datetime.now(timezone.utc),
+        )
+        await self.db.commit()
+    except Exception as exc:  # noqa: BLE001
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
+        raise
 
 
 async def _match_user(db: AsyncSession, *, user_id: int, days: int) -> dict:
@@ -234,17 +215,3 @@ async def _match_user(db: AsyncSession, *, user_id: int, days: int) -> dict:
             ai_submitted += 1
 
     return {"jobs_considered": len(job_analyses), "processed": processed, "ai_submitted": ai_submitted}
-
-
-def _run_sync(coro):
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(coro)
