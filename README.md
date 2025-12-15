@@ -140,6 +140,8 @@ pnpm run dev
 # Terminal 3 - Celery Worker (async tasks)
 cd backend
 uv run python run_celery_worker.py
+# Graceful shutdown for Celery worker
+celery -A jobpilot control shutdown
 
 # Terminal 4 - Celery Beat (scheduled tasks)
 cd backend
