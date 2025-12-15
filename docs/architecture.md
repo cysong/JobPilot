@@ -152,6 +152,7 @@ frontend/
 │   │   ├── jobStore.ts
 │   │   └── uiStore.ts
 │   ├── types/                  # TypeScript类型
+│   │   ├── api.ts              # 统一API响应类型
 │   │   ├── job.ts
 │   │   ├── application.ts
 │   │   └── resume.ts
@@ -182,7 +183,10 @@ backend/
 │   │   ├── database.py               # 数据库连接池
 │   │   ├── security.py               # JWT/密码工具
 │   │   ├── exceptions.py             # 自定义异常
-│   │   └── celery_app.py             # Celery 配置
+│   │   ├── celery_app.py             # Celery 配置
+│   │   ├── response_codes.py         # 响应码定义
+│   │   ├── response.py               # 统一响应模型
+│   │   └── custom_route.py           # 自定义路由类
 │   │
 │   ├── modules/                      # 业务模块 (按功能领域划分)
 │   │   │
@@ -782,6 +786,183 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 
 ---
 
+### 8. API Response & Error Handling (统一响应格式)
+
+**设计理念**：
+- **统一响应结构**: 所有接口返回 `{code, message, data}` 格式
+- **简化响应码**: 只定义需要前端特殊处理的场景（9个核心码）
+- **零业务侵入**: Custom APIRoute 自动包装，业务代码直接返回数据
+- **前端友好**: Axios 拦截器自动解包，业务层直接使用 data
+
+---
+
+#### 8.1 响应格式规范
+
+**成功响应**：
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {...}  // 实际业务数据
+}
+```
+
+**错误响应**：
+```json
+{
+  "code": 1001,
+  "message": "简历数量已达上限",
+  "data": null
+}
+```
+
+**分页响应**：
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "items": [...],
+    "total": 100,
+    "page": 1,
+    "page_size": 20,
+    "total_pages": 5
+  }
+}
+```
+
+---
+
+#### 8.2 响应码设计（简化版）
+
+**核心原则**: 只定义需要前端特殊处理的场景
+
+| Code | 说明 | HTTP | 前端处理场景 |
+|------|------|------|-------------|
+| `0` | 成功 | 200 | 正常展示数据 |
+| `401` | 未登录 | 401 | 跳转登录页 |
+| `419` | Token过期 | 419 | 刷新token或重新登录 |
+| `403` | 无权限 | 403 | 显示权限不足提示 |
+| `1001` | 简历数量超限 ⭐ | 400 | 显示升级套餐弹窗 |
+| `1002` | AI配额耗尽 ⭐ | 400 | 显示充值/升级提示 |
+| `400` | 请求参数错误 | 400 | 显示错误信息 |
+| `404` | 资源不存在 | 404 | 显示404页面 |
+| `500` | 服务器错误 | 500 | 显示错误提示 |
+
+**说明**: ⭐ 标记的是需要自定义响应码的业务场景，其他场景直接使用 HTTP 状态码
+
+**使用场景示例**：
+
+```python
+# 场景1：简历数量超限（需要自定义码）
+if formal_count >= FORMAL_RESUME_LIMIT:
+    raise BusinessError(
+        "简历数量已达上限",
+        response_code=ResponseCode.RESUME_LIMIT_EXCEEDED
+    )
+
+# 场景2：AI配额耗尽（需要自定义码）
+if user.monthly_token_left <= 0:
+    raise BusinessError(
+        "AI配额已用尽",
+        response_code=ResponseCode.QUOTA_EXCEEDED
+    )
+
+# 场景3：普通错误（使用HTTP状态码）
+if not user:
+    raise NotFoundError("用户不存在")  # 自动映射为 404
+```
+
+---
+
+#### 8.3 后端实现机制
+
+**Custom APIRoute 自动包装**：
+
+```python
+# 业务代码（零侵入）
+@router.post("/register")
+async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
+    user = await create_user(db, user_data)
+    return user  # 直接返回数据
+
+# CustomAPIRoute 自动包装为：
+# {
+#   "code": 0,
+#   "message": "ok",
+#   "data": {"id": "user_123", "email": "user@example.com", ...}
+# }
+```
+
+**特殊场景处理**：
+- **文件下载**: 返回 `Response` 对象，不包装
+- **204 删除**: 返回 `None`，自动识别为 204 No Content
+- **WebSocket**: 不受影响，保持原有协议
+
+---
+
+#### 8.4 前端 Axios 拦截器
+
+**自动解包 data 字段**：
+
+```typescript
+// 拦截器自动处理
+apiClient.interceptors.response.use(
+  (response: AxiosResponse<ApiResponse>) => {
+    const { code, message, data } = response.data
+
+    // 成功：自动返回 data
+    if (code === 0) return data
+
+    // 失败：抛出错误（包含 code 和 message）
+    const error: any = new Error(message)
+    error.code = code
+    return Promise.reject(error)
+  }
+)
+
+// 业务代码（直接使用）
+const jobs = await getJobs({ page: 1 })
+console.log(jobs.items)  // 直接访问 items，无需 jobs.data.items
+```
+
+**错误处理示例**：
+
+```typescript
+try {
+  await createResume(data)
+} catch (error: any) {
+  if (error.code === 1001) {
+    // 简历超限：显示升级弹窗
+    Modal.confirm({
+      title: '简历数量已达上限',
+      content: '升级为 VIP 可创建更多简历',
+      onOk: () => router.push('/upgrade')
+    })
+  } else if (error.code === 1002) {
+    // 配额耗尽：显示充值提示
+    showQuotaRechargeModal()
+  } else {
+    // 其他错误：显示通用提示
+    message.error(error.message)
+  }
+}
+```
+
+---
+
+#### 8.5 核心优势
+
+| 维度 | 传统方案 | 新方案 | 改进 |
+|------|---------|-------|------|
+| **响应码数量** | 无业务码或36+个 | 9个精简码 | 维护成本↓75% |
+| **业务代码** | 手动包装响应 | 直接返回数据 | 零侵入 |
+| **前端处理** | 手动解包data | 自动解包 | 简化调用 |
+| **错误精度** | 字符串匹配 | 业务码匹配 | 健壮可靠 |
+| **特殊场景** | 需要特殊处理 | 自动识别 | 无需关注 |
+
+---
+
 ## 模块间协作流程
 
 ### 完整申请流程示例（简化后）
@@ -873,6 +1054,23 @@ Application 关联 TimelineEvent[]
 - workflow_id 只是 UUID 分组标识
 - task 是唯一执行单元
 - 通过 entity_type + entity_id 直接关联业务实体
+```
+
+**6. 统一响应格式模式**：
+```
+Custom APIRoute 自动包装 + 简化响应码
+
+后端层：
+  • Custom APIRoute 拦截响应并自动包装为 {code, message, data}
+  • 业务代码零侵入，直接返回数据或抛异常
+  • 只定义9个核心响应码（需要特殊处理的场景）
+  • 其他场景使用标准 HTTP 状态码
+
+前端层：
+  • Axios 拦截器自动解包 data 字段
+  • 业务代码直接使用数据，无需 response.data.data
+  • 通过 error.code 精确匹配业务场景
+  • 特殊场景（1001/1002）触发定制 UI
 ```
 
 ---
