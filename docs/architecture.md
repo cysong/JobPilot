@@ -237,6 +237,17 @@ backend/
 │   │   │   ├── models.py             # UserSkill 模型
 │   │   │   └── schemas.py            # 用户请求/响应模式
 │   │   │
+│   │   ├── workflow/                 # 工作流模块
+│   │   │   ├── __init__.py
+│   │   │   ├── base_task.py          # Celery Task 基类
+│   │   │   │                         # - AsyncBaseTask (异步+DB)
+│   │   │   │                         # - DBTrackingTask (追踪)
+│   │   │   ├── task_service.py       # 任务服务 (提交/查询)
+│   │   │   ├── models.py             # TaskExecution 模型
+│   │   │   ├── schemas.py            # 任务请求/响应模式
+│   │   │   ├── repositories.py       # TaskRepository
+│   │   │   └── enums.py              # TaskStatus/TaskType 枚举
+│   │   │
 │   │   ├── ai_agent/                 # AI Agent 模块
 │   │   │   ├── __init__.py
 │   │   │   ├── service.py            # AI Agent 统一服务
@@ -485,110 +496,196 @@ Resume (简历元数据：title, isDraft, 软删除标记)
 
 ---
 
-### 6. Workflow Module (工作流管理)
+### 6. Task Execution Module (任务执行系统)
 
-**功能覆盖**：
-- 工作流定义和执行
-- 任务依赖管理 (串行/并行)
-- 状态持久化和恢复
-- 失败重试机制
-- 版本管理
-- 执行历史追踪
+**设计理念**：
+- **极简化数据库**：单表设计（task_executions），workflow 作为逻辑概念
+- **双层基类架构**：AsyncBaseTask（异步+DB）+ DBTrackingTask（追踪）
+- **零样板代码**：自动会话管理、自动状态追踪
+- **渐进式增强**：简单任务用 AsyncBaseTask，复杂任务用 DBTrackingTask
 
-**架构分层**：
+**核心目标**：
+- ✅ 消除异步包装器和装饰器
+- ✅ 自动注入 `self.db` 数据库会话
+- ✅ 自动追踪任务状态（PENDING → RUNNING → SUCCESS/FAILED）
+- ✅ 简化数据模型（从2张表降至1张表）
+
+---
+
+#### 6.1 Celery Task 基类架构
+
+**双层基类设计**：
+
 ```
-API Layer (FastAPI)
-  ↓ 创建工作流
-Orchestration Layer (Workflow Service)
-  ↓ 构建 DAG
-Execution Layer (Celery Workers)
-  ↓ 执行任务
-Storage Layer (PostgreSQL + Redis)
+celery.Task
+    ↓
+AsyncBaseTask (第一层)
+  • 自动检测 async 函数
+  • 自动创建并注入 db session
+  • 提供 self.db 属性
+  • 自动会话生命周期管理
+  • 错误时自动回滚
+    ↓
+DBTrackingTask (第二层)
+  • 继承 AsyncBaseTask 所有能力
+  • 任务状态自动追踪
+  • 生命周期钩子 (before_start, on_success, on_failure)
+  • 执行时间记录
 ```
 
-**核心工作流类型**：
+**任务类型选择**：
 
-**1. Job Analysis Workflow**：
-```
-fetch_html → html_to_markdown → translate_job → extract_skills → 更新 Job 表
+| 任务类型 | 基类 | 使用场景 |
+|---------|------|---------|
+| 追踪任务 | `DBTrackingTask` | Job分析、简历定制、求职信生成 |
+| 批处理/定时任务 | `AsyncBaseTask` | 批量匹配、定时清理 |
+| 简单任务 | 无基类 | 纯计算、外部API调用 |
+
+**使用示例**：
+
+```python
+# 批处理任务：使用 AsyncBaseTask
+@celery_app.task(base=AsyncBaseTask, bind=True)
+async def batch_processing(self, params):
+    results = await process_batch(self.db, params)
+    await self.db.commit()
+    return results
+
+# 追踪任务：使用 DBTrackingTask
+@celery_app.task(base=DBTrackingTask, bind=True)
+async def analyze_job(self, job_id: int):
+    job = await JobRepository.get_by_id(self.db, job_id)
+    result = await process(self.db, job_id)
+    await self.db.commit()
+    return {"output_data": {...}}
 ```
 
-**2. Application Generation Workflow** (并行执行)：
-```
-                ┌─ tailor_resume ─┐
-开始 ─┤                          ├─ quality_check → 完成
-                └─ generate_cover_letter ─┘
+---
+
+#### 6.2 数据库设计（极简单表）
+
+**核心理念**：
+- 去掉 `workflow_executions` 表
+- `workflow_id` 只是逻辑分组ID，多个task共享表示同一批次
+- `task` 是唯一执行单元，独立追踪状态
+
+**task_executions 表核心字段**：
+- `workflow_id`: 逻辑分组ID（非外键）
+- `entity_type` + `entity_id`: 业务实体关联
+- `user_id`: 用户ID
+- `task_type` + `task_name`: 任务类型和名称
+- `status`: 任务状态（PENDING/RUNNING/SUCCESS/FAILED）
+- `input_data` + `output_data`: 任务输入输出（JSON）
+- `celery_task_id`: Celery任务ID
+- `execution_time_ms`: 执行耗时
+
+**使用模式**：
+
+**单任务**（最常见）：
+```python
+# workflow_id = task_id (单任务场景)
+await TaskService.submit_task(
+    db,
+    task_type=TaskType.JOB_ANALYSIS,
+    entity_type="job",
+    entity_id="123",
+    user_id=1,
+    job_id=123  # 传给 Celery
+)
 ```
 
-**工作流状态**：
-- `pending`: 等待执行
-- `running`: 执行中
-- `completed`: 已完成
-- `failed`: 失败
-- `cancelled`: 已取消
+**多任务批次**：
+```python
+workflow_id = str(uuid4())  # 共享批次ID
+
+# Task 1: 分析简历
+await TaskService.submit_task(
+    db, workflow_id=workflow_id,
+    task_type=TaskType.RESUME_ANALYSIS,
+    entity_type="resume", entity_id=resume_id
+)
+
+# Task 2: 匹配工作（使用 Celery chain 串行执行）
+await TaskService.submit_task(
+    db, workflow_id=workflow_id,
+    task_type=TaskType.MATCH_JOBS,
+    entity_type="resume", entity_id=resume_id
+)
+```
 
 **任务状态**：
-- `pending`: 等待执行
-- `running`: 执行中
-- `success`: 成功
-- `failed`: 失败
-- `retry`: 重试中
+- `PENDING`: 等待执行
+- `RUNNING`: 执行中
+- `SUCCESS`: 成功
+- `FAILED`: 失败
 
-**执行流程**：
+---
+
+#### 6.3 任务执行流程
+
+**简化的执行流程**：
 ```
 1. API 接收请求
-2. 创建 WorkflowExecution 记录 (status: pending)
-3. 创建所有 TaskExecution 记录 (预占位)
-4. 加载工作流配置 (从 YAML)
-5. 构建 Celery Canvas (chain/chord)
-6. 提交执行 (apply_async)
-7. Worker 逐步执行任务，更新状态
-8. WebSocket 推送进度通知
-9. 完成后更新 WorkflowExecution (status: completed)
+2. TaskService.submit_task()
+   - 创建 TaskExecution 记录 (status: PENDING)
+   - 提交到 Celery
+3. Worker 执行任务
+   - before_start 钩子：更新为 RUNNING
+   - 执行 task.run()
+   - on_success 钩子：更新为 SUCCESS，保存 output_data
+   - on_failure 钩子：更新为 FAILED，记录错误
+4. WebSocket 推送进度通知
 ```
 
-**版本管理方案**：
+**对比旧流程**（已废弃）：
+- ❌ 旧流程：创建 WorkflowExecution → 创建 TaskExecution → 加载 YAML → 构建 Canvas → 更新多个状态
+- ✅ 新流程：创建 TaskExecution → 提交 Celery（基类自动处理状态）
 
-**目录结构**：
-```
-workflows/
-├── job_analysis/
-│   ├── v1.0.0.yaml
-│   ├── v1.1.0.yaml
-│   └── v2.0.0.yaml
-├── application_generation/
-│   ├── v1.0.0.yaml
-│   └── v1.1.0.yaml
-└── registry.yaml  # 版本注册表 (记录 active_version)
+**查询批次任务**：
+```python
+# 查询某批次所有任务
+tasks = await session.execute(
+    select(TaskExecution)
+    .where(TaskExecution.workflow_id == workflow_id)
+    .order_by(TaskExecution.created_at)
+)
+
+# 查询某个实体的历史
+tasks = await session.execute(
+    select(TaskExecution)
+    .where(
+        TaskExecution.entity_type == "job",
+        TaskExecution.entity_id == "123"
+    )
+)
 ```
 
-**版本切换**：
-```
-1. 编辑 registry.yaml (修改 active_version)
-2. 重启 Worker 或调用热更新 API
-3. 新创建的工作流自动使用新版本
-4. 数据库记录每次执行的 config_version
-```
+---
 
-**异常处理**：
+#### 6.4 异常处理
 
 **任务级重试** (Celery 原生)：
 - 指数退避策略 (60s, 120s, 240s)
 - 可配置最大重试次数
 - 区分可重试错误 (RateLimitError) 和不可重试错误 (InvalidAPIKey)
 
+**钩子错误处理原则**：
+- 钩子失败**不应**导致任务失败
+- 记录日志但不抛出异常
+- 状态追踪是可观测性，非核心业务逻辑
+
 **僵尸任务清理**：
 - 定时任务扫描 (每 5 分钟)
-- 检测超时未更新的 `running` 任务
-- 对比 PostgreSQL 和 Celery 状态
-- 自动标记失败并告警
+- 检测超时未更新的 `RUNNING` 任务
+- 自动标记为 FAILED 并告警
 
-**定时任务协调**：
+---
 
-系统使用 **Celery Beat** 作为定时任务调度器，负责触发周期性工作流：
+#### 6.5 定时任务协调
+
+系统使用 **Celery Beat** 作为定时任务调度器：
 
 ```python
-# celery_beat_schedule 配置示例
 {
     'quota-reset-monthly': {
         'task': 'tasks.quota.reset_monthly_quota',
@@ -596,19 +693,28 @@ workflows/
     },
     'zombie-task-cleanup': {
         'task': 'tasks.workflow.cleanup_zombie_tasks',
-        'schedule': crontab(minute='*/5'),  # 每5分钟
+        'schedule': crontab(minute='*/5'),
     },
 }
 ```
 
-**工作流触发方式**：
-1. **用户操作触发**: API 接收请求后直接创建工作流（如创建 Application）
-2. **定时任务触发**: Celery Beat 按时间表触发（如配额重置、僵尸任务清理）
-3. **事件驱动触发**: 通过 Outbox Pattern 发布的事件触发后续工作流（如 Job 分析完成后触发简历推荐）
+**任务触发方式**：
+1. **用户操作触发**: API 直接调用 `TaskService.submit_task()`
+2. **定时任务触发**: Celery Beat 按时间表触发
+3. **事件驱动触发**: 通过 Outbox Pattern 触发后续任务
 
-**注意事项**：
-- 批量操作（如批量导入 Job）**不会自动触发工作流**，需要用户显式触发分析
-- 定时任务失败会记录到 `TaskExecution` 表，并通过告警系统通知管理员
+---
+
+#### 6.6 核心优势总结
+
+| 维度 | 旧设计 | 新设计 | 改进 |
+|------|-------|-------|------|
+| **表数量** | 2张 (workflow + task) | 1张 (task) | 简化50% |
+| **样板代码** | 多层嵌套包装器 | 零样板 | 减少2-3层缩进 |
+| **状态追踪** | 手动装饰器 | 自动钩子 | 完全自动化 |
+| **DB会话** | 手动获取 | 自动注入 `self.db` | 开箱即用 |
+| **创建API** | 2步（workflow+task）| 1步（task） | 简化50% |
+| **查询复杂度** | JOIN两表 | 单表查询 | 性能提升 |
 
 ---
 
@@ -678,24 +784,28 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 
 ## 模块间协作流程
 
-### 完整申请流程示例
+### 完整申请流程示例（简化后）
 
 ```
 1. 用户在 Job 详情页点击"申请"
    ↓
 2. Application Module 创建申请 (status: Pending)
    ↓
-3. Workflow Module 启动 application_generation 工作流
+3. Task Module 提交任务
+   - TaskService.submit_task(task_type=TAILOR_RESUME)
+   - TaskService.submit_task(task_type=GENERATE_COVER_LETTER)
+   - 两个任务共享同一个 workflow_id
    ↓
-4. AI Agent Module 并行执行：
-   - 简历定制 (基于用户选择的 Resume)
-   - 求职信生成
+4. Celery Workers 并行执行（DBTrackingTask 自动追踪状态）
+   - tailor_resume_task (使用 self.db)
+   - generate_cover_letter_task (使用 self.db)
    ↓
-5. Resume Module 创建定制文档：
-   - 创建 Document (parentId: 模板Document.id, rootId: 自身id)
-   - 创建 Document (parentId: null, rootId: 自身id)
+5. Resume Module 创建定制文档
+   - 创建 Document (parentId: 模板Document.id, rootId: 新UUID)
+   - 创建 Document (parentId: null, rootId: 新UUID)
    ↓
-6. AI Agent Module 质量检查
+6. DBTrackingTask 自动更新任务状态
+   - on_success 钩子：标记 SUCCESS，保存 output_data
    ↓
 7. Application Module 更新状态 (status: Ready)
    - 关联定制文档 (resumeDocumentId, coverLetterDocumentId)
@@ -703,14 +813,34 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
    ↓
 8. WebSocket Gateway 推送完成通知
    ↓
-9. 前端跳转到申请详情页，展示定制材料
+9. 前端展示定制材料
 ```
+
+**对比旧流程**：
+- ❌ 旧流程：创建 WorkflowExecution → 创建多个 TaskExecution → 加载 YAML → 手动状态管理
+- ✅ 新流程：直接提交 Task → 基类自动处理状态 → 简洁清晰
 
 ---
 
 ## 核心设计模式
 
-**1. Document 链式版本模式**：
+**1. 双层 Celery Task 基类模式**：
+```
+关注点分离：异步执行 vs 状态追踪
+
+AsyncBaseTask (第一层)
+  • 解决：Celery 同步调用 + async 函数 + 数据库会话管理
+  • 提供：self.db 属性，自动会话生命周期
+  • 适用：所有需要数据库访问的异步任务
+
+DBTrackingTask (第二层)
+  • 解决：任务状态追踪、执行时间记录、错误追溯
+  • 继承：AsyncBaseTask 所有能力
+  • 提供：自动状态更新钩子
+  • 适用：需要追踪的业务任务
+```
+
+**2. Document 链式版本模式**：
 ```
 所有文档内容 (简历/求职信) 统一存储在 Document 表
 - 链式版本：rootId 聚合文档家族，parentId 追溯内容来源
@@ -719,7 +849,7 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 - 业务元数据分离：metadata JSON 字段由业务层自定义
 ```
 
-**2. 软删除模式**：
+**3. 软删除模式**：
 ```
 关键业务实体 (Application, Resume) 采用软删除
 - isDeleted + deletedAt 字段
@@ -728,7 +858,7 @@ Worker → 更新状态 → WebSocket Gateway → emit('progress', data) → 客
 - Document 表不处理软删除，由业务层管理
 ```
 
-**3. 时间线记录模式**：
+**4. 时间线记录模式**：
 ```
 Application 关联 TimelineEvent[]
 - 记录所有状态变更
@@ -736,12 +866,13 @@ Application 关联 TimelineEvent[]
 - 支持审计追踪
 ```
 
-**4. 配置驱动工作流**：
+**5. 极简任务追踪模式**：
 ```
-工作流定义存储在 YAML 文件
-- 代码与配置分离
-- 支持版本管理
-- 无需重新部署即可修改流程
+单表设计 + workflow 逻辑分组
+- 去掉 workflow_executions 表
+- workflow_id 只是 UUID 分组标识
+- task 是唯一执行单元
+- 通过 entity_type + entity_id 直接关联业务实体
 ```
 
 ---
@@ -768,6 +899,13 @@ enum ApplicationStatus {
   Interviewing    // 面试中
   Offer           // 获得Offer
   Rejected        // 被拒绝
+}
+
+enum TaskStatus {
+  PENDING         // 等待执行
+  RUNNING         // 执行中
+  SUCCESS         // 成功
+  FAILED          // 失败
 }
 
 enum ProficiencyLevel {
@@ -1013,6 +1151,38 @@ CREATE TABLE timeline_events (
 CREATE INDEX idx_timeline_events_application_timestamp_desc ON timeline_events (application_id, timestamp DESC);
 ```
 
+### task_executions
+```sql
+CREATE TABLE task_executions (
+  id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  user_id TEXT,
+  task_type TEXT NOT NULL,
+  task_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  input_data JSONB,
+  output_data JSONB,
+  error_message TEXT,
+  celery_task_id TEXT,
+  worker_id TEXT,
+  execution_time_ms INTEGER,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  CONSTRAINT fk_task_executions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 索引设计
+CREATE INDEX idx_task_executions_workflow_id ON task_executions (workflow_id);
+CREATE INDEX idx_task_executions_entity ON task_executions (entity_type, entity_id);
+CREATE INDEX idx_task_executions_status ON task_executions (status);
+CREATE INDEX idx_task_executions_user_id ON task_executions (user_id);
+CREATE INDEX idx_task_executions_entity_type_task ON task_executions (entity_type, entity_id, task_type, created_at DESC);
+```
+
 ### user_skills
 ```sql
 CREATE TABLE user_skills (
@@ -1036,6 +1206,8 @@ CREATE INDEX idx_user_skills_user_skill_type ON user_skills (user_id, skill_type
 CREATE TABLE ai_usage (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  task_id TEXT,
+  workflow_id TEXT,
   model TEXT NOT NULL,
   input_tokens INTEGER NOT NULL,
   output_tokens INTEGER NOT NULL,
@@ -1045,11 +1217,14 @@ CREATE TABLE ai_usage (
   operation TEXT NOT NULL,
   object_id TEXT,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT fk_ai_usage_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_ai_usage_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_usage_task FOREIGN KEY (task_id) REFERENCES task_executions(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_ai_usage_user_timestamp ON ai_usage (user_id, timestamp);
 CREATE INDEX idx_ai_usage_user_operation ON ai_usage (user_id, operation);
+CREATE INDEX idx_ai_usage_task_id ON ai_usage (task_id);
+CREATE INDEX idx_ai_usage_workflow_id ON ai_usage (workflow_id);
 ```
 
 
