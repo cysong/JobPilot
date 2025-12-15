@@ -9,6 +9,7 @@ from celery import Task
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
+from app.core.celery_lifecycle import get_worker_loop
 from app.modules.workflow.repositories import TaskRepository
 
 
@@ -39,7 +40,7 @@ class AsyncBaseTask(Task):
                 finally:
                     self._db_session = None
 
-        return asyncio.run(_execute())
+        return get_worker_loop().run_until_complete(_execute())
 
     @property
     def db(self) -> AsyncSession:
@@ -65,7 +66,7 @@ class DBTrackingTask(AsyncBaseTask):
     def on_retry(self, exc: Exception, task_id: str, args: Any, kwargs: Any, einfo: Any) -> None:
         """Update retry count when Celery schedules a retry."""
         retry_count = getattr(self.request, "retries", None)
-        asyncio.run(self._update_retry_status(task_id, retry_count))
+        get_worker_loop().run_until_complete(self._update_retry_status(task_id, retry_count))
         return super().on_retry(exc, task_id, args, kwargs, einfo)
 
     def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
@@ -114,7 +115,7 @@ class DBTrackingTask(AsyncBaseTask):
                 finally:
                     self._db_session = None
 
-        return asyncio.run(_execute())
+        return get_worker_loop().run_until_complete(_execute())
 
     async def _update_retry_status(self, task_id: str, retry_count: int | None) -> None:
         if retry_count is None:
