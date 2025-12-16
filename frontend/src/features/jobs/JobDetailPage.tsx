@@ -196,12 +196,26 @@ export default function JobDetailPage() {
             </div>
 
             {/* Job Description */}
-            <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                Job Description
-              </h2>
+            <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold tracking-wide">
+                  JD
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Job description</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">What you will do and what we expect</p>
+                </div>
+              </div>
               <div
-                className="prose prose-slate max-w-none prose-headings:text-slate-900 prose-a:text-indigo-600"
+                className="prose prose-slate max-w-none 
+                  prose-headings:font-bold prose-headings:text-slate-900 prose-headings:mb-3 prose-headings:mt-8 first:prose-headings:mt-0 prose-headings:tracking-tight
+                  prose-h3:text-lg 
+                  prose-p:text-slate-700 prose-p:leading-relaxed prose-p:mb-4
+                  prose-li:text-slate-700 prose-li:marker:text-slate-500 prose-li:my-0.5
+                  [&_li_p]:m-0
+                  prose-ul:my-4 prose-ul:mb-6
+                  prose-strong:font-bold prose-strong:text-slate-900
+                  prose-a:text-indigo-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline"
                 dangerouslySetInnerHTML={{
                   __html: job.content || "<p>No description available.</p>",
                 }}
