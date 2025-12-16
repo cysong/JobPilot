@@ -16,8 +16,10 @@ class ApplicationRepository:
 
     @staticmethod
     async def get_by_user_and_job(db: AsyncSession, user_id: int, job_id: int) -> Application | None:
-        query = select(Application).where(
-            and_(Application.user_id == user_id, Application.job_id == job_id)
+        query = (
+            select(Application)
+            .where(and_(Application.user_id == user_id, Application.job_id == job_id))
+            .options(selectinload(Application.job))
         )
         result = await db.execute(query)
         return result.scalar_one_or_none()

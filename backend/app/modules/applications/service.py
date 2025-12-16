@@ -41,7 +41,7 @@ class ApplicationService:
             db, user.id, payload.job_id
         )
         if existing:
-            return existing
+            return await ApplicationRepository.get_by_id_for_user(db, existing.id, user.id)
 
         working_document = await ApplicationService._copy_resume_for_application(
             db, resume_template, user.id
@@ -67,6 +67,8 @@ class ApplicationService:
 
         await db.commit()
         await db.refresh(application)
+        # Ensure job is attached to avoid lazy-load during response serialization
+        application.job = job
         return application
 
     @staticmethod
@@ -171,4 +173,3 @@ class ApplicationService:
     ) -> Optional[Application]:
         """Load application with dependencies needed for processing."""
         return await ApplicationRepository.get_with_dependencies(db, application_id)
-
