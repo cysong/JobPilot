@@ -41,9 +41,61 @@ async def run_cover_letter_task(
         "operation": "cover_letter",
     }
 
-    job_analysis = await _get_job_analysis(application.job_id, db)
-    resume_analysis = await _analyze_resume(application.resume_document, ctx)
+    # Fetch pre-calculated analysis
+    from app.modules.jobs.repository import JobAnalysisRepository
+    from app.modules.resumes.repository import ResumeRepository
+    from agent_configs.schemas import AnalyzedJob, AnalyzedResume
 
+    job_analysis_model = await JobAnalysisRepository.get_by_job_id(db, application.job_id)
+    if not job_analysis_model:
+        raise ValueError(f"Job analysis missing for job {application.job_id}")
+    
+    # Convert SQL model to Pydantic
+    job_analysis = AnalyzedJob(
+        required_skills=job_analysis_model.required_skills or [],
+        preferred_skills=job_analysis_model.preferred_skills or [],
+        certifications=job_analysis_model.certifications or [],
+        tech_stack=job_analysis_model.tech_stack or [],
+        seniority=job_analysis_model.seniority,
+        key_responsibilities=job_analysis_model.key_responsibilities or [],
+        experience_years=job_analysis_model.experience_years,
+        education_requirement=job_analysis_model.education_requirement,
+        soft_skills=job_analysis_model.soft_skills or [],
+        company_culture_keywords=job_analysis_model.company_culture_keywords or [],
+        hiring_priorities=job_analysis_model.hiring_priorities or [],
+    )
+
+    # Use the tailored resume document if available, otherwise fallback (should be available)
+    # The application.resume_document_id should have been updated by resume_tailoring_task
+    resume_doc = application.resume_document
+    if not resume_doc:
+         raise ValueError(f"Resume document missing for application {application.id}")
+         
+    # We treat the tailored resume content as the input for the writer.
+    # We also fetch the STRUCTURAL analysis of the original resume for context (skills etc)
+    # Wait, the writer prompt uses `resume_analysis.technical_skills`. 
+    # We should fetch the original resume analysis.
+    
+    source_resume = application.source_resume
+    if not source_resume:
+        # Fallback query if relationship triggers lazy loading issue or similar, though joined load expected
+        source_resume = await ResumeRepository.get_with_document(db, application.source_resume_id)
+        
+    analysis_data = source_resume.analysis
+    if not analysis_data:
+        raise ValueError(f"Resume analysis missing for resume {application.source_resume_id}")
+
+    resume_analysis = AnalyzedResume(**analysis_data)
+    
+    # NOTE: The prompts currently rely on 'AnalyzeResume' structure.
+    # But we also want to use the TAILORED content.
+    # The `_build_writer_prompt` uses `resume_analysis` (skills lists) AND potentially the content.
+    # Currently it seems it ONLY uses the analysis structure (skills, achievements).
+    # If we want the cover letter to reflect the TAILORED resume, we might need to assume the 
+    # Resume Analysis reflects the tailored one OR we just use the original skills but the user 
+    # expects the cover letter to align with the new resume.
+    # For now, we stick to using the Analysis Object for data points.
+    
     cover_letter_content, review_result = await _generate_with_review(
         application=application,
         job_analysis=job_analysis,
@@ -66,11 +118,10 @@ async def run_cover_letter_task(
     )
     db.add(cover_document)
 
-    workflow_output_data = {
+    task_output_data = {
         "cover_letter_document_id": cover_doc_id,
         "review_result": review_result.model_dump() if review_result else None,
     }
-    task_output_data = {"cover_letter_document_id": cover_doc_id}
 
     await ApplicationRepository.mark_ready(
         db,
@@ -78,120 +129,10 @@ async def run_cover_letter_task(
         cover_letter_document_id=cover_doc_id,
     )
 
-    await OutboxRepository.enqueue_event(
-        db,
-        event_type=ApplicationEventType.APPLICATION_READY.value,
-        aggregate_type="application",
-        aggregate_id=application.id,
-        payload=ApplicationReadyPayload(
-            application_id=application.id,
-            cover_letter_document_id=cover_doc_id,
-            status=application.status.value,
-        ).model_dump(),
-        meta={"user_id": application.user_id},
-    )
-
-    return {
-        "task_output_data": task_output_data,
-        "workflow_output_data": workflow_output_data,
-    }
+    return task_output_data
 
 
-async def _get_job_analysis(
-    job_id: int,
-    db: AsyncSession,
-) -> AnalyzedJob:
-    """
-    Get cached job analysis or create workflow and trigger async analysis.
 
-    Strategy:
-    1. Check job_analyses table
-    2. If exists and version matches, return cached result
-    3. If version outdated or missing:
-       - Create Job Analysis Workflow
-       - Submit Job Analysis Task
-       - Raise Retry exception (wait 30s)
-    """
-    from app.modules.jobs.repository import JobAnalysisRepository
-    from app.modules.workflow.service import TaskService
-    from app.shared.enums import TaskType
-    from celery.exceptions import Retry
-
-    # Try to get cached analysis
-    cached = await JobAnalysisRepository.get_by_job_id(db, job_id)
-
-    if cached:
-        # Check if version is outdated
-        current_version = AnalyzedJob.__version__
-        if cached.analysis_version != current_version:
-            # Version mismatch: delete old analysis and trigger re-analysis
-            await JobAnalysisRepository.delete_by_job_id(db, job_id)
-            await db.commit()
-
-            # Create workflow and submit task
-            await TaskService.submit_task(
-                db=db,
-                workflow_id=str(uuid4()),
-                task_type=TaskType.JOB_ANALYSIS,
-                entity_type="job",
-                entity_id=str(job_id),
-                user_id=1,
-                input_data={"job_id": job_id, "trigger": "version_upgrade"},
-                job_id=job_id,
-            )
-
-            raise Retry(
-                message=f"Job {job_id} analysis version mismatch (v{cached.analysis_version} -> v{current_version}), re-analyzing",
-                countdown=30,
-            )
-
-        # Version matches: convert DB model to Pydantic schema
-        return AnalyzedJob(
-            required_skills=cached.required_skills or [],
-            preferred_skills=cached.preferred_skills or [],
-            certifications=cached.certifications or [],
-            tech_stack=cached.tech_stack or [],
-            seniority=cached.seniority,
-            key_responsibilities=cached.key_responsibilities or [],
-            experience_years=cached.experience_years,
-            education_requirement=cached.education_requirement,
-            soft_skills=cached.soft_skills or [],
-            company_culture_keywords=cached.company_culture_keywords or [],
-            hiring_priorities=cached.hiring_priorities or [],
-        )
-
-    # Cache miss: create task and trigger analysis
-    await TaskService.submit_task(
-        db=db,
-        workflow_id=str(uuid4()),
-        task_type=TaskType.JOB_ANALYSIS,
-        entity_type="job",
-        entity_id=str(job_id),
-        user_id=1,
-        input_data={"job_id": job_id, "trigger": "cover_letter_dependency"},
-        job_id=job_id,
-    )
-
-    # Raise Retry to reschedule this cover letter task
-    raise Retry(
-        message=f"Job {job_id} analysis not found, triggering analysis",
-        countdown=30,
-    )
-
-
-async def _analyze_resume(
-    resume_document: Document,
-    ctx: GatewayContext,
-) -> AnalyzedResume:
-    """Run resume_analyzer agent."""
-    result = await AgentGateway.get().call(
-        agent_id="resume_analyzer",
-        input_data=resume_document.content,
-        context={**ctx, "operation": "resume_analysis"},
-    )
-    if isinstance(result, AnalyzedResume):
-        return result
-    return AnalyzedResume(**result)
 
 
 async def _generate_with_review(

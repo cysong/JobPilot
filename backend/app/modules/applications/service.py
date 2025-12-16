@@ -7,13 +7,9 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, NotFoundError
-from app.modules.applications.event_types import (
-    ApplicationCreatedPayload,
-    ApplicationEventType,
-)
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
-from app.modules.applications.repositories.outbox_repo import OutboxRepository
 from app.modules.applications.schemas import ApplicationCreateRequest
 from app.modules.auth.models import User
 from app.modules.jobs.service import JobService
@@ -30,7 +26,7 @@ class ApplicationService:
     async def create_application(
         db: AsyncSession, user: User, payload: ApplicationCreateRequest
     ) -> Application:
-        """Create application, working resume copy, workflow, and enqueue cover letter generation."""
+        """Create application, working resume copy, and trigger sequential workflow."""
         job = await JobService.get_job_by_id(db, payload.job_id)
         if not job:
             raise NotFoundError("Job not found")
@@ -58,23 +54,30 @@ class ApplicationService:
             resume_document_id=working_document.id,
             status=ApplicationStatus.PENDING,
             tailoring_level=payload.tailoring_level or "light",
+            tailoring_progress={"steps": {}, "current_step": "created"}
         )
         await ApplicationRepository.create(db, application=application)
-
-        await OutboxRepository.enqueue_event(
-            db,
-            event_type=ApplicationEventType.APPLICATION_CREATED.value,
-            aggregate_type="application",
-            aggregate_id=application.id,
-            payload=ApplicationCreatedPayload(
-                application_id=application.id,
-                user_id=user.id,
-                job_id=payload.job_id,
-                resume_document_id=working_document.id,
-                tailoring_level=payload.tailoring_level,
-                is_retry=False,
-            ).model_dump(),
-            meta={"user_id": user.id},
+        
+        # Trigger Workflow directly via Orchestrator Task
+        from app.modules.workflow.service import TaskService
+        from app.shared.enums import TaskType
+        
+        await TaskService.submit_task(
+            db=db,
+            task_type=TaskType.APPLICATION_INITIALIZATION,
+            entity_type="application",
+            entity_id=application.id,
+            user_id=user.id,
+            input_data={
+                "application_id": application.id,
+                "job_id": payload.job_id,
+                "resume_id": payload.resume_template_id,
+                "tailoring_level": payload.tailoring_level or "light",
+            },
+            application_id=application.id,
+            job_id=payload.job_id,
+            resume_id=payload.resume_template_id,
+            tailoring_level=payload.tailoring_level or "light",
         )
 
         await db.commit()
@@ -103,30 +106,39 @@ class ApplicationService:
     async def retry_cover_letter(
         db: AsyncSession, application_id: str, user: User
     ) -> Application:
-        """Retry cover letter generation for failed applications."""
+        """Retry application workflow."""
         application = await ApplicationService.get_application_by_id(db, application_id, user)
         if not application:
             raise NotFoundError("Application not found")
 
-        if application.status != ApplicationStatus.FAILED:
-            raise BadRequestError("Only failed applications can be retried")
-
+        # Allow retry if Failed OR Stuck in Tailoring (handled by caller logic usually, but here strict check removed)
+        # Assuming UI only calls this on explicit retry action.
+        
         await ApplicationRepository.mark_pending(db, application)
+        
+        # Reset progress
+        application.tailoring_progress = {"steps": {}, "current_step": "retrying", "message": "Restarting workflow"}
 
-        await OutboxRepository.enqueue_event(
-            db,
-            event_type=ApplicationEventType.APPLICATION_CREATED.value,
-            aggregate_type="application",
-            aggregate_id=application.id,
-            payload=ApplicationCreatedPayload(
-                application_id=application.id,
-                user_id=user.id,
-                job_id=application.job_id,
-                resume_document_id=application.resume_document_id,
-                tailoring_level=application.tailoring_level,
-                is_retry=True,
-            ).model_dump(),
-            meta={"user_id": application.user_id},
+        from app.modules.workflow.service import TaskService
+        from app.shared.enums import TaskType
+
+        await TaskService.submit_task(
+            db=db,
+            task_type=TaskType.APPLICATION_INITIALIZATION,
+            entity_type="application",
+            entity_id=application.id,
+            user_id=user.id,
+            input_data={
+                "application_id": application.id,
+                "job_id": application.job_id,
+                "resume_id": application.source_resume_id,
+                "tailoring_level": application.tailoring_level,
+                "is_retry": True
+            },
+            application_id=application.id,
+            job_id=application.job_id,
+            resume_id=application.source_resume_id,
+            tailoring_level=application.tailoring_level,
         )
 
         await db.commit()

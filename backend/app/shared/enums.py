@@ -90,6 +90,22 @@ class TaskType(Enum):
     )
 
     # Cover Letter workflow tasks
+    APPLICATION_INITIALIZATION = TaskTypeInfo(
+        value="application_initialization",
+        display_name="Application Initialization",
+        celery_task="app.modules.applications.tasks.application_initialization_task",
+        max_retries=3,
+        timeout_seconds=60,
+    )
+
+    RESUME_TAILORING = TaskTypeInfo(
+        value="resume_tailoring",
+        display_name="Resume Tailoring",
+        celery_task="app.modules.applications.tasks.resume_tailoring_task",
+        max_retries=2,
+        timeout_seconds=300,
+    )
+
     COVER_LETTER_JOB_ANALYSIS = TaskTypeInfo(
         value="cover_letter_job_analysis",
         display_name="Cover Letter - Job Analysis",
@@ -106,10 +122,10 @@ class TaskType(Enum):
         timeout_seconds=180,
     )
 
-    COVER_LETTER_DRAFT = TaskTypeInfo(
-        value="cover_letter_draft",
-        display_name="Cover Letter - Draft Generation",
-        celery_task="app.modules.applications.tasks.generate_cover_letter_task",
+    COVER_LETTER_GENERATION = TaskTypeInfo(
+        value="cover_letter_generation",
+        display_name="Cover Letter - Generation",
+        celery_task="app.modules.applications.tasks.cover_letter_generation_task",
         max_retries=2,
         timeout_seconds=600,
     )

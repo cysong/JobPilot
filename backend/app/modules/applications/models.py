@@ -78,6 +78,7 @@ class Application(Base, TimestampMixin):
         index=True,
     )
     tailoring_level: Mapped[str] = mapped_column(String(50), default="light")
+    tailoring_progress: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         Boolean, default=False, index=True)
