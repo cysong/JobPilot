@@ -125,7 +125,7 @@ async def application_initialization_task(
     if not job_analysis:
         logger.info(f"Job {job_id} analysis missing, adding analysis task.")
         tasks_to_submit.append(TaskSubmissionSpec(
-            task_type=TaskType.COVER_LETTER_JOB_ANALYSIS,
+            task_type=TaskType.JOB_ANALYSIS,
             input_data={"job_id": job_id},
         ))
     else:
@@ -138,11 +138,11 @@ async def application_initialization_task(
     resume = await ResumeRepository.get_with_document(db, resume_id)
     if not resume:
         raise ValueError(f"Source resume {resume_id} not found")
-        
+
     if not resume.analysis:
         logger.info(f"Resume {resume_id} analysis missing, adding analysis task.")
         tasks_to_submit.append(TaskSubmissionSpec(
-            task_type=TaskType.COVER_LETTER_RESUME_ANALYSIS,
+            task_type=TaskType.RESUME_ANALYSIS,
             input_data={"resume_id": resume_id},
         ))
     else:

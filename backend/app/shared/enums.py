@@ -106,36 +106,12 @@ class TaskType(Enum):
         timeout_seconds=300,
     )
 
-    COVER_LETTER_JOB_ANALYSIS = TaskTypeInfo(
-        value="cover_letter_job_analysis",
-        display_name="Cover Letter - Job Analysis",
-        celery_task="app.modules.jobs.tasks.analyze_job_async",
-        max_retries=3,
-        timeout_seconds=300,
-    )
-
-    COVER_LETTER_RESUME_ANALYSIS = TaskTypeInfo(
-        value="cover_letter_resume_analysis",
-        display_name="Cover Letter - Resume Analysis",
-        celery_task="app.modules.resumes.tasks.analyze_resume_async",
-        max_retries=3,
-        timeout_seconds=180,
-    )
-
     COVER_LETTER_GENERATION = TaskTypeInfo(
         value="cover_letter_generation",
         display_name="Cover Letter - Generation",
         celery_task="app.modules.applications.tasks.cover_letter_generation_task",
         max_retries=2,
         timeout_seconds=600,
-    )
-
-    COVER_LETTER_REVIEW = TaskTypeInfo(
-        value="cover_letter_review",
-        display_name="Cover Letter - Quality Review",
-        celery_task="app.modules.applications.tasks.review_cover_letter_task",
-        max_retries=1,
-        timeout_seconds=120,
     )
 
     # Generic tasks (reserved for future use)
