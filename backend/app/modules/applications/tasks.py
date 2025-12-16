@@ -167,7 +167,8 @@ async def application_initialization_task(
         task_type=TaskType.COVER_LETTER_GENERATION,
         input_data={
             "application_id": application_id,
-            "job_id": job_id
+            "job_id": job_id,
+            "is_retry": is_retry
         }
     ))
 
@@ -242,14 +243,21 @@ async def resume_tailoring_task(
 
 @celery_app.task(bind=True, base=DBTrackingTask)
 async def cover_letter_generation_task(
-    self, 
-    application_id: str, 
-    workflow_id: str, 
+    self,
+    application_id: str,
+    workflow_id: str,
     task_id: str,
+    job_id: int = None,
+    is_retry: bool = False,
     **kwargs
 ):
     """
     Generate cover letter using tailored resume and job analysis.
+
+    Always creates a new versioned document.
+
+    Args:
+        is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
     await update_tailoring_progress(
         self.db, application_id, "cover_letter_generation", "Drafting cover letter...", "in_progress"
@@ -259,12 +267,13 @@ async def cover_letter_generation_task(
     from app.modules.applications.repositories.application_repo import ApplicationRepository
 
     application = await ApplicationRepository.get_with_dependencies(self.db, application_id)
-    
+
     result = await run_cover_letter_task(
         db=self.db,
         application=application,
         workflow_id=workflow_id,
         task_id=task_id,
+        is_retry=is_retry,
     )
     
     await update_tailoring_progress(

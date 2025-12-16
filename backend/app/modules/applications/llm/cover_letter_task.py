@@ -1,6 +1,7 @@
 """Cover letter generation task logic using AgentGateway + YAML agents."""
 from __future__ import annotations
 
+import logging
 from typing import Optional
 from uuid import uuid4
 
@@ -19,7 +20,10 @@ from app.modules.applications.repositories.application_repo import ApplicationRe
 from app.modules.applications.repositories.outbox_repo import OutboxRepository
 from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Document, DocumentFormat
+from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
+
+logger = logging.getLogger(__name__)
 
 
 WORKFLOW_VERSION = "v1.0.0"
@@ -31,9 +35,17 @@ async def run_cover_letter_task(
     db: AsyncSession,
     application: Application,
     workflow_id: str,
-    task_id: str
+    task_id: str,
+    is_retry: bool = False
 ):
-    """Execute cover letter generation task via AgentGateway."""
+    """
+    Execute cover letter generation task via AgentGateway.
+
+    Always creates a new versioned document.
+
+    Args:
+        is_retry: If True, indicates retry attempt (creates new version chain from previous)
+    """
     ctx: GatewayContext = {
         "db": db,
         "workflow_id": workflow_id,
@@ -106,30 +118,80 @@ async def run_cover_letter_task(
         ctx=ctx,
     )
 
-    cover_doc_id = str(uuid4())
-    cover_document = Document(
-        id=cover_doc_id,
-        root_id=cover_doc_id,
-        parent_id=None,
-        format=DocumentFormat.MARKDOWN,
-        content=cover_letter_content,
-        content_hash=ResumeService._calculate_content_hash(
-            cover_letter_content),
-        change_comments="AI-generated cover letter",
-        extra_metadata={"application_id": application.id},
-        created_by=application.user_id,
-    )
-    db.add(cover_document)
+    if is_retry:
+        logger.info(f"Retry mode: Generating new cover letter version for application {application.id}")
+    else:
+        logger.info(f"Generating cover letter for application {application.id}")
+
+    # Determine parent document for versioning
+    # If application already has a cover letter, it becomes the parent (for retry)
+    # Otherwise, create a new root document (for initial creation)
+    if application.cover_letter_document_id:
+        parent_doc = await DocumentRepository.get_by_id(db, application.cover_letter_document_id)
+        if not parent_doc:
+            logger.warning(
+                f"Previous cover letter document {application.cover_letter_document_id} not found, creating new root")
+            parent_doc = None
+    else:
+        parent_doc = None
+
+    # Create versioned document
+    if parent_doc:
+        # Create new version with parent
+        change_comment = f"Retry: AI-generated cover letter for Job {application.job_id}" if is_retry else f"Updated: AI-generated cover letter for Job {application.job_id}"
+
+        cover_document = await DocumentRepository.create_new_version(
+            db=db,
+            parent_document=parent_doc,
+            content=cover_letter_content,
+            created_by=application.user_id,
+            change_comments=change_comment,
+            extra_metadata={
+                "application_id": application.id,
+                "job_id": application.job_id,
+                "is_retry": is_retry,
+                "task_id": task_id,
+                "review_score": review_result.overall_score if review_result else None,
+            }
+        )
+
+        logger.info(
+            f"Created new cover letter version {cover_document.id} "
+            f"(parent: {parent_doc.id}, root: {cover_document.root_id}, is_retry: {is_retry})"
+        )
+    else:
+        # Create new root document (first time)
+        cover_doc_id = str(uuid4())
+        cover_document = Document(
+            id=cover_doc_id,
+            root_id=cover_doc_id,
+            parent_id=None,
+            format=DocumentFormat.MARKDOWN,
+            content=cover_letter_content,
+            content_hash=ResumeService._calculate_content_hash(cover_letter_content),
+            change_comments="AI-generated cover letter",
+            extra_metadata={
+                "application_id": application.id,
+                "job_id": application.job_id,
+                "task_id": task_id,
+                "review_score": review_result.overall_score if review_result else None,
+            },
+            created_by=application.user_id,
+        )
+        db.add(cover_document)
+
+        logger.info(f"Created new cover letter root document {cover_document.id}")
 
     task_output_data = {
-        "cover_letter_document_id": cover_doc_id,
+        "cover_letter_document_id": cover_document.id,
         "review_result": review_result.model_dump() if review_result else None,
+        "is_retry": is_retry
     }
 
     await ApplicationRepository.mark_ready(
         db,
         application,
-        cover_letter_document_id=cover_doc_id,
+        cover_letter_document_id=cover_document.id,
     )
 
     return task_output_data

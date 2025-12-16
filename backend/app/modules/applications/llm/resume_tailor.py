@@ -75,14 +75,17 @@ async def run_resume_tailoring(
     # Always read from source resume (unified logic for both initial and retry)
     source_resume = await ResumeRepository.get_with_document(db, resume_id)
     if not source_resume or not source_resume.document:
-        raise ValueError(f"Source resume {resume_id} or its document not found")
+        raise ValueError(
+            f"Source resume {resume_id} or its document not found")
 
     source_content = source_resume.document.content
 
     if is_retry:
-        logger.info(f"Retry mode: Reading from source resume {resume_id} for application {application_id}")
+        logger.info(
+            f"Retry mode: Reading from source resume {resume_id} for application {application_id}")
     else:
-        logger.info(f"Reading from source resume {resume_id} for application {application_id}")
+        logger.info(
+            f"Reading from source resume {resume_id} for application {application_id}")
 
     # Determine parent document for versioning
     # If application already has a resume document, it becomes the parent (for retry)
@@ -90,7 +93,8 @@ async def run_resume_tailoring(
     if application.resume_document_id:
         parent_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
         if not parent_doc:
-            logger.warning(f"Previous resume document {application.resume_document_id} not found, using source as parent")
+            logger.warning(
+                f"Previous resume document {application.resume_document_id} not found, using source as parent")
             parent_doc = source_resume.document
     else:
         parent_doc = source_resume.document
@@ -130,9 +134,7 @@ async def run_resume_tailoring(
             "job_id": job_id,
             "tailoring_level": tailoring_level,
             "is_retry": is_retry,
-            "workflow_id": workflow_id,
-            "task_id": task_id,
-            "source_resume_id": resume_id,
+            "task_id": task_id
         }
     )
     doc_id = tailored_doc.id
@@ -150,9 +152,6 @@ async def run_resume_tailoring(
     return {
         "output_data": {
             "resume_document_id": doc_id,
-            "parent_document_id": parent_doc.id,
-            "root_document_id": tailored_doc.root_id,
-            "is_new_version": True,
             "is_retry": is_retry,
         }
     }
