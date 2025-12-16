@@ -2,17 +2,16 @@
 from __future__ import annotations
 
 import logging
-from uuid import uuid4
+import textwrap
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_configs.schemas import AnalyzedJob, TailoredResume
 from app.core.llm.gateway import AgentGateway
 from app.core.llm.types import GatewayContext
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.repository import JobAnalysisRepository
-from app.modules.resumes.models import Document, DocumentFormat
-from app.modules.resumes.repository import ResumeRepository, DocumentRepository
-from app.modules.resumes.service import ResumeService
+from app.modules.resumes.repository import DocumentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +38,31 @@ async def run_resume_tailoring(
         "workflow_id": workflow_id,
         "task_id": task_id,
         "operation": "resume_tailoring",
+        "user_id": None,
     }
     
     # 1. Gather Context
-    job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
-    if not job_analysis:
+    job_analysis_model = await JobAnalysisRepository.get_by_job_id(db, job_id)
+    if not job_analysis_model:
         raise ValueError(f"Job analysis not found for job {job_id}")
+    job_analysis = AnalyzedJob(
+        required_skills=job_analysis_model.required_skills or [],
+        preferred_skills=job_analysis_model.preferred_skills or [],
+        certifications=job_analysis_model.certifications or [],
+        tech_stack=job_analysis_model.tech_stack or [],
+        seniority=job_analysis_model.seniority,
+        key_responsibilities=job_analysis_model.key_responsibilities or [],
+        experience_years=job_analysis_model.experience_years,
+        education_requirement=job_analysis_model.education_requirement,
+        soft_skills=job_analysis_model.soft_skills or [],
+        company_culture_keywords=job_analysis_model.company_culture_keywords or [],
+        hiring_priorities=job_analysis_model.hiring_priorities or [],
+    )
 
     application = await ApplicationRepository.get_by_id(db, application_id)
     if not application:
          raise ValueError(f"Application {application_id} not found")
+    ctx["user_id"] = application.user_id
          
     # Use the working document (already copied) as the base for tailoring
     # If this is the first tailoring, it's the copy of the source resume.
@@ -79,7 +93,9 @@ async def run_resume_tailoring(
         context=ctx
     )
     
-    if isinstance(tailored_content, dict) and "content" in tailored_content:
+    if isinstance(tailored_content, TailoredResume):
+        final_content = tailored_content.content
+    elif isinstance(tailored_content, dict) and "content" in tailored_content:
         final_content = tailored_content["content"]
     else:
         final_content = str(tailored_content)
@@ -108,7 +124,7 @@ async def run_resume_tailoring(
 
 def _build_tailoring_prompt(
     source_content: str,
-    job_analysis: any, # AnalyzedJob model
+    job_analysis: AnalyzedJob,
     tailoring_level: str
 ) -> str:
     """Construct prompt for resume tailoring."""
@@ -117,15 +133,23 @@ def _build_tailoring_prompt(
     # Assuming they are JSON columns which SQLAlchemy maps to list/dict in Python.
     
     req_skills = ", ".join(job_analysis.required_skills or [])
+    preferred_skills = ", ".join(job_analysis.preferred_skills or [])
+    soft_skills = ", ".join(job_analysis.soft_skills or [])
+    culture_keywords = ", ".join(job_analysis.company_culture_keywords or [])
+    job_json = job_analysis.model_dump_json(indent=2)
+    resume_block = textwrap.indent(source_content[:6000] if source_content else "", "  ")
     
     return (
-        f"Tailoring Level: {tailoring_level}\n\n"
-        f"JOB REQUIREMENTS:\n"
-        f"Skills: {req_skills}\n"
-        f"Keywords: {', '.join(job_analysis.company_culture_keywords or [])}\n\n"
-        f"ORIGINAL RESUME:\n{source_content}\n\n"
+        f"tailoring_level: {tailoring_level}\n"
+        f"job_analysis: {job_json}\n"
+        f"source_resume_markdown: |\n{resume_block}\n\n"
+        f"Skill highlights (for quick reference):\n"
+        f"- Required: {req_skills}\n"
+        f"- Preferred: {preferred_skills}\n"
+        f"- Soft skills: {soft_skills}\n"
+        f"- Culture keywords: {culture_keywords}\n\n"
         f"INSTRUCTIONS:\n"
         f"Rewrite the resume content in Markdown to highlight experience relevant to the job requirements.\n"
         f"Do not invent facts. Emphasize matching skills and achievements.\n"
-        f"Maintain the same structure but optimize wording."
+        f"Maintain the same structure but optimize wording.\n"
     )

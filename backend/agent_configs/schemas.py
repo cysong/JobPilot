@@ -162,6 +162,18 @@ class ReviewResult(BaseModel):
     needs_revision: bool
 
 
+class TailoredResume(BaseModel):
+    """Tailored resume content container."""
+
+    __version__ = "v1.0.0"
+
+    content: str = Field(..., description="Tailored resume content in markdown")
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Optional bullet notes describing how the resume was tailored",
+    )
+
+
 class MatchAnalysis(BaseModel):
     """AI match analysis output."""
 
@@ -182,9 +194,12 @@ class MatchAnalysis(BaseModel):
 
 SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
     "AnalyzedJob": AnalyzedJob,
+    "Skill": Skill,
+    "WorkExperience": WorkExperience,
     "AnalyzedResume": AnalyzedResume,
     "CoverLetterDraft": CoverLetterDraft,
     "ReviewResult": ReviewResult,
+    "TailoredResume": TailoredResume,
     "MatchAnalysis": MatchAnalysis,
 }
 
@@ -196,6 +211,7 @@ __all__ = [
     "AnalyzedResume",
     "CoverLetterDraft",
     "ReviewResult",
+    "TailoredResume",
     "MatchAnalysis",
     "SCHEMA_REGISTRY",
 ]

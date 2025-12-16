@@ -1,6 +1,6 @@
 version: 1
-name: "reviewer"
-model: "gpt-4o-mini"
+name: reviewer
+model: gpt-4o-mini
 temperature: 0.1
 max_tokens: 800
 
@@ -14,7 +14,8 @@ instructions: |
   - Clarity and conciseness
 
   Output actionable issues and whether revision is needed.
+  Issues should be specific, concise, and mapped to the job requirements or resume alignment so the writer can fix them directly.
 
-output_type: "ReviewResult"
+output_type: ReviewResult
 tools: []
 handoffs: []

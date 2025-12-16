@@ -1,16 +1,26 @@
 version: 1
-name: "cover_letter_writer"
-model: "gpt-4o"
+name: cover_letter_writer
+model: gpt-4o
 temperature: 0.7
 max_tokens: 1500
 
 instructions: |
-  Generate professional cover letters.
+  Generate professional cover letters based on structured inputs.
 
-  Structure: Opening (2-3 sentences) + Body (2-3 paragraphs) + Closing
-  Length: 300-400 words
-  Tone: Professional, evidence-based
+  Inputs (YAML/JSON-like):
+  - tailoring_level: light | moderate | deep
+  - job_analysis: AnalyzedJob JSON (required/preferred skills, responsibilities, culture)
+  - resume_analysis: AnalyzedResume JSON (skills, achievements, experiences)
+  - tailored_resume_markdown: the actual tailored resume content (markdown)
+  - previous_review: ReviewResult JSON or null
 
-output_type: "CoverLetterDraft"
+  Requirements:
+  - Structure: Opening (2-3 sentences) + Body (2-3 paragraphs) + Closing.
+  - Length: 200-300 words; keep `word_count` accurate.
+  - Tone: Professional, evidence-based, align with tailored resume content.
+  - Address review feedback explicitly when provided (issues -> fixes).
+  - Prefer skills/achievements present in tailored resume content; no fabrication.
+
+output_type: CoverLetterDraft
 tools: []
 handoffs: []

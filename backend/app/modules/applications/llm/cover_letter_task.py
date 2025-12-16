@@ -1,9 +1,10 @@
 """Cover letter generation task logic using AgentGateway + YAML agents."""
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import uuid4
 
+import textwrap
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_configs.schemas import AnalyzedJob, AnalyzedResume, CoverLetterDraft, ReviewResult
@@ -70,7 +71,8 @@ async def run_cover_letter_task(
     resume_doc = application.resume_document
     if not resume_doc:
          raise ValueError(f"Resume document missing for application {application.id}")
-         
+    tailored_resume_content = resume_doc.content or ""
+
     # We treat the tailored resume content as the input for the writer.
     # We also fetch the STRUCTURAL analysis of the original resume for context (skills etc)
     # Wait, the writer prompt uses `resume_analysis.technical_skills`. 
@@ -100,6 +102,7 @@ async def run_cover_letter_task(
         application=application,
         job_analysis=job_analysis,
         resume_analysis=resume_analysis,
+        tailored_resume_content=tailored_resume_content,
         ctx=ctx,
     )
 
@@ -139,18 +142,19 @@ async def _generate_with_review(
     application: Application,
     job_analysis: AnalyzedJob,
     resume_analysis: AnalyzedResume,
+    tailored_resume_content: str,
     ctx: GatewayContext,
 ) -> tuple[str, Optional[ReviewResult]]:
     """Generate draft, review, and iterate up to MAX_REVIEW_ITERATIONS."""
-    feedback: str = ""
     last_review: Optional[ReviewResult] = None
 
     for attempt in range(MAX_REVIEW_ITERATIONS):
         writer_input = _build_writer_prompt(
             job_analysis=job_analysis,
             resume_analysis=resume_analysis,
+            tailored_resume_content=tailored_resume_content,
             tailoring_level=application.tailoring_level,
-            feedback=feedback,
+            previous_review=last_review,
         )
         draft_output = await AgentGateway.get().call(
             agent_id="cover_letter_writer",
@@ -179,8 +183,6 @@ async def _generate_with_review(
         if (not last_review.needs_revision) and (last_review.overall_score >= REVIEW_PASS_SCORE):
             return draft_text, last_review
 
-        feedback = _build_feedback(last_review)
-
     # Return last attempt even if review not passing
     return draft_text, last_review
 
@@ -194,28 +196,25 @@ def _render_cover_letter(draft: CoverLetterDraft) -> str:
 def _build_writer_prompt(
     job_analysis: AnalyzedJob,
     resume_analysis: AnalyzedResume,
+    tailored_resume_content: str,
     tailoring_level: str,
-    feedback: str,
+    previous_review: ReviewResult | None,
 ) -> str:
-    """Compose input text for cover_letter_writer agent."""
-    required_skills = ", ".join(job_analysis.required_skills or [])
-    optional_skills = ", ".join(job_analysis.optional_skills or [])
-    soft_skills = ", ".join(job_analysis.soft_skills or [])
-    tech_skills = ", ".join(
-        [skill.name for skill in (resume_analysis.technical_skills or [])]
+    """Compose structured input for cover_letter_writer agent."""
+    job_json = job_analysis.model_dump_json(indent=2)
+    resume_json = resume_analysis.model_dump_json(indent=2)
+    review_json = (
+        previous_review.model_dump_json(indent=2) if previous_review else "null"
     )
-    resume_soft_skills = ", ".join(resume_analysis.soft_skills or [])
-    achievements = "\n- ".join(resume_analysis.quantified_achievements or [])
+    resume_excerpt = tailored_resume_content[:4000] if tailored_resume_content else ""
+    resume_block = textwrap.indent(resume_excerpt, "  ") if resume_excerpt else "  "
 
     return (
-        f"Tailoring level: {tailoring_level or 'light'}\n"
-        f"Job required skills: {required_skills}\n"
-        f"Job preferred skills: {optional_skills}\n"
-        f"Job soft skills: {soft_skills}\n"
-        f"Resume technical skills: {tech_skills}\n"
-        f"Resume soft skills: {resume_soft_skills}\n"
-        f"Resume achievements:\n- {achievements if achievements else 'N/A'}\n"
-        f"Previous feedback:\n{feedback or 'N/A'}\n"
+        f"tailoring_level: {tailoring_level or 'light'}\n"
+        f"job_analysis: {job_json}\n"
+        f"resume_analysis: {resume_json}\n"
+        f"tailored_resume_markdown: |\n{resume_block}\n"
+        f"previous_review: {review_json}\n"
     )
 
 
@@ -226,24 +225,13 @@ def _build_reviewer_input(
 ) -> str:
     """Compose input text for reviewer agent."""
     required_skills = ", ".join(job_analysis.required_skills or [])
-    optional_skills = ", ".join(job_analysis.optional_skills or [])
+    preferred_skills = ", ".join(job_analysis.preferred_skills or [])
     soft_skills = ", ".join(job_analysis.soft_skills or [])
 
     return (
         f"Tailoring level: {tailoring_level or 'light'}\n"
         f"Job required skills: {required_skills}\n"
-        f"Job preferred skills: {optional_skills}\n"
+        f"Job preferred skills: {preferred_skills}\n"
         f"Job soft skills: {soft_skills}\n\n"
         f"Cover letter draft:\n{draft_text}"
-    )
-
-
-def _build_feedback(review: ReviewResult) -> str:
-    """Summarize reviewer feedback for the next iteration."""
-    issues = review.issues or []
-    issues_text = "\n- ".join(issues)
-    return (
-        f"Overall score: {review.overall_score}\n"
-        f"Needs revision: {review.needs_revision}\n"
-        f"Issues:\n- {issues_text if issues_text else 'No issues provided'}"
     )
