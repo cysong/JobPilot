@@ -4,6 +4,7 @@ Job API endpoints.
 from typing import Annotated
 from datetime import datetime
 
+from celery.app.task import TaskType
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +29,8 @@ from app.modules.jobs.schemas import (
 from app.modules.matching.repository import UserJobMatchRepository
 from app.modules.resumes.repository import ResumeRepository
 from app.shared.pagination import PaginationParams
+from app.modules.workflow import TaskService
+from app.shared.enums import EntityType
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -233,16 +236,19 @@ async def trigger_job_analysis(
     if not job:
         raise NotFoundError("Job not found")
 
-    task = analyze_job_task.delay(job_id)
+    task = await TaskService.submit_task(
+        db=db,
+        task_type=TaskType.JOB_ANALYSIS,
+        entity_type=EntityType.job.value,
+        entity_id=job_id,
+        user_id=current_user.id,
+        input_data={"job_id": job_id},
+    )
 
     return {
-        "code": 0,
-        "message": "ok",
-        "data": {
-            "message": "Analysis triggered",
-            "celery_task_id": task.id,
-            "job_id": job_id,
-        },
+        "message": "Analysis triggered",
+        "celery_task_id": task.id,
+        "job_id": job_id
     }
 
 
