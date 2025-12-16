@@ -90,6 +90,13 @@ class ApplicationService:
         return await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
 
     @staticmethod
+    async def get_application_by_job_id(
+        db: AsyncSession, user: User, job_id: int
+    ) -> Optional[Application]:
+        """Fetch application by job_id for current user."""
+        return await ApplicationRepository.get_by_user_and_job(db, user.id, job_id)
+
+    @staticmethod
     async def retry_application_tailor(
         db: AsyncSession, application_id: str, user: User
     ) -> Application:

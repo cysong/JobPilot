@@ -31,6 +31,8 @@ from app.modules.resumes.repository import ResumeRepository
 from app.shared.pagination import PaginationParams
 from app.modules.workflow import TaskService
 from app.shared.enums import EntityType
+from app.modules.applications.service import ApplicationService
+from app.modules.applications.schemas import ApplicationDetail
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -268,3 +270,16 @@ async def delete_job_analysis(
     return {
         "message": f"Analysis for job {job_id} deleted successfully",
     }
+
+
+@router.get("/{job_id}/application", response_model=ApplicationDetail)
+async def get_job_application(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get current user's application for this job."""
+    application = await ApplicationService.get_application_by_job_id(db, current_user, job_id)
+    if not application:
+        raise NotFoundError("Application not found for this job")
+    return application
