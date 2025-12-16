@@ -87,17 +87,21 @@ async def update_tailoring_progress(
 
 @celery_app.task(bind=True, base=DBTrackingTask)
 async def application_initialization_task(
-    self, 
-    application_id: str, 
-    job_id: int, 
-    resume_id: str, 
+    self,
+    application_id: str,
+    job_id: int,
+    resume_id: str,
     tailoring_level: str,
-    workflow_id: str, 
-    task_id: str
+    workflow_id: str,
+    task_id: str,
+    is_retry: bool = False
 ):
     """
     Orchestrator task: Builds the sequential task chain for application generation.
     Checks existence of JobAnalysis and ResumeAnalysis to decide if they need to be run.
+
+    Args:
+        is_retry: Reserved for future retry logic enhancement (currently unused)
     """
     db = self.db
     logger.info(f"Initializing application workflow for app_id={application_id}")

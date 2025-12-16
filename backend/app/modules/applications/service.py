@@ -138,10 +138,6 @@ class ApplicationService:
                 "tailoring_level": tailoring_level,
                 "is_retry": is_retry
             },
-            application_id=application.id,
-            job_id=application.job_id,
-            resume_id=application.source_resume_id,
-            tailoring_level=tailoring_level,
         )
 
     @staticmethod
@@ -159,7 +155,8 @@ class ApplicationService:
             parent_id=source_doc.id,
             format=source_doc.format,
             content=source_doc.content,
-            content_hash=ResumeService._calculate_content_hash(source_doc.content),
+            content_hash=DocumentRepository._calculate_content_hash(
+                source_doc.content),
             change_comments="Copied for application tailoring",
             extra_metadata=source_doc.extra_metadata or {},
             created_by=user_id,
