@@ -45,7 +45,7 @@ export const resumeApi = {
         const result = await client.post<Blob, Blob>(`/resumes/${id}/export`, {
             template: options?.template || 'modern',
             font_size: options?.font_size || 12,
-            include_metadata: options?.include_metadata ?? true
+            include_metadata: options?.include_metadata ?? false
         }, {
             responseType: 'blob'
         })
