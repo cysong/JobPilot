@@ -238,6 +238,9 @@ class JobAnalysis(Base, TimestampMixin):
     company_culture_keywords: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, comment="Company culture descriptors"
     )
+    cn_content: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Translated job description in Chinese"
+    )
 
     # ============================================
     # Agent Inference

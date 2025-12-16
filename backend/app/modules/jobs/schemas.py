@@ -175,6 +175,9 @@ class JobAnalysisBase(BaseModel):
     # Agent Inference
     hiring_priorities: list[str] = Field(default_factory=list, description="Agent's inference: top hiring priorities")
 
+    # Translations
+    cn_content: Optional[str] = Field(default=None, description="Job description translated to Chinese")
+
 
 class JobAnalysisResponse(JobAnalysisBase):
     """API response for job analysis"""

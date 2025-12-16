@@ -8,7 +8,7 @@ from app.modules.jobs.models import SeekJob
 from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.workflow import DBTrackingTask, AsyncBaseTask, TaskService
 from app.shared.enums import TaskType
-from agent_configs.schemas import AnalyzedJob
+from agent_configs.schemas import AnalyzedJob, TranslatedText
 
 
 @celery_app.task(base=DBTrackingTask, bind=True, max_retries=3)
@@ -27,6 +27,24 @@ async def analyze_job_async(
     if not content:
         raise ValueError(f"Job {job_id} has no content to analyze")
 
+    # Translate to Chinese (source assumed en, target zh) with strict formatting preservation
+    translation_input = {
+        "source_language": "en",
+        "target_language": "zh",
+        "content_format": "auto",
+        "content": content,
+        "keep_placeholders": True,
+        "style_hint": "formal",
+    }
+    translated = await AgentGateway.get().call(
+        agent_id="universal_translator",
+        input_data=translation_input,
+        context={"db": self.db, "operation": "job_translation", "job_id": job_id},
+    )
+    cn_content = (
+        translated.content if isinstance(translated, TranslatedText) else translated.get("content")
+    )
+
     result = await AgentGateway.get().call(
         agent_id="job_analyzer",
         input_data=content,
@@ -34,6 +52,7 @@ async def analyze_job_async(
     )
 
     analysis_data = result.model_dump() if isinstance(result, AnalyzedJob) else result
+    analysis_data["cn_content"] = cn_content
     analysis = await JobAnalysisRepository.upsert(
         db=self.db,
         job_id=job_id,

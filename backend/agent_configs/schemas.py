@@ -174,6 +174,15 @@ class TailoredResume(BaseModel):
     )
 
 
+class TranslatedText(BaseModel):
+    """Generic translation result with notes."""
+
+    __version__ = "v1.0.0"
+
+    content: str = Field(..., description="Translated content preserving original format")
+    notes: list[str] = Field(default_factory=list, description="Notes about untranslatable parts or placeholders kept as-is")
+
+
 class MatchAnalysis(BaseModel):
     """AI match analysis output."""
 
@@ -200,6 +209,7 @@ SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
     "CoverLetterDraft": CoverLetterDraft,
     "ReviewResult": ReviewResult,
     "TailoredResume": TailoredResume,
+    "TranslatedText": TranslatedText,
     "MatchAnalysis": MatchAnalysis,
 }
 

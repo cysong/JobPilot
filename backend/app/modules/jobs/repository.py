@@ -267,6 +267,7 @@ class JobAnalysisRepository:
                 "company_culture_keywords", [])
             existing.hiring_priorities = analysis_data.get(
                 "hiring_priorities", [])
+            existing.cn_content = analysis_data.get("cn_content")
             existing.analysis_version = analysis_version
             existing.needs_reanalysis = False  # Clear re-analysis flag
 
@@ -292,6 +293,7 @@ class JobAnalysisRepository:
                 company_culture_keywords=analysis_data.get(
                     "company_culture_keywords", []),
                 hiring_priorities=analysis_data.get("hiring_priorities", []),
+                cn_content=analysis_data.get("cn_content"),
                 analysis_version=analysis_version,
                 needs_reanalysis=False,
             )
