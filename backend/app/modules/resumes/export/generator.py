@@ -5,6 +5,23 @@ Supports multiple document types (resume, cover_letter, etc.)
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+import os
+
+if os.name == 'nt':
+    try:
+        # On Windows, we need to explicitly add the GTK3 bin directory to the DLL search path
+        # even if it's already in the PATH environment variable (for Python 3.8+).
+        path_env = os.environ.get('PATH', '')
+        for path in path_env.split(os.pathsep):
+            path = path.strip()
+            if path and os.path.isdir(path):
+                # Look for the specific DLL that causes the 0x7e error if missing
+                if any(f.lower() == 'libgobject-2.0-0.dll' for f in os.listdir(path)):
+                    os.add_dll_directory(path)
+                    break
+    except Exception:
+        # If something goes wrong (e.g. permission error), we continue and hope for the best
+        pass
 
 from weasyprint import HTML, CSS
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
