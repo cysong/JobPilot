@@ -9,7 +9,7 @@ from agent_configs.schemas import AnalyzedResume
 
 
 @celery_app.task(bind=True, base=DBTrackingTask, max_retries=3)
-async def analyze_resume_async(
+async def analyze_resume_task(
     self,
     resume_id: str,
     workflow_id: str,

@@ -12,7 +12,7 @@ from agent_configs.schemas import AnalyzedJob, TranslatedText
 
 
 @celery_app.task(base=DBTrackingTask, bind=True, max_retries=3)
-async def analyze_job_async(
+async def analyze_job_task(
     self,
     job_id: int,
     workflow_id: str,

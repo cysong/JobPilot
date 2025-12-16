@@ -30,7 +30,7 @@ async def pull_unmatched_jobs(self) -> dict:
         workflow_id = str(uuid4())
         await TaskService.submit_task(
             db=self.db,
-            task_type=TaskType.JOB_USER_MATCHES,
+            task_type=TaskType.JOB_USER_MATCHING,
             entity_type="job",
             entity_id=str(analysis.job_id),
             user_id=None,

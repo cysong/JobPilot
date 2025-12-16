@@ -227,13 +227,13 @@ async def trigger_job_analysis(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Manually trigger job analysis (test/debug only)."""
-    from app.modules.jobs.tasks import analyze_job_async
+    from app.modules.jobs.tasks import analyze_job_task
 
     job = await JobRepository.get_by_id(db, job_id)
     if not job:
         raise NotFoundError("Job not found")
 
-    task = analyze_job_async.delay(job_id)
+    task = analyze_job_task.delay(job_id)
 
     return {
         "code": 0,

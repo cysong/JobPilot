@@ -262,7 +262,7 @@ class ResumeService:
                     input_data={"resume_id": resume.id},
                 ),
                 TaskSubmissionSpec(
-                    task_type=TaskType.MATCH_USER_JOBS,
+                    task_type=TaskType.USER_JOB_MATCHING,
                     input_data={"resume_id": resume.id, "user_id": user_id, "days": 30},
                 ),
             ],
@@ -303,7 +303,7 @@ class ResumeService:
                 input_data={"resume_id": resume_id, "manual_trigger": manual_trigger},
             ),
             TaskSubmissionSpec(
-                task_type=TaskType.MATCH_USER_JOBS,
+                task_type=TaskType.USER_JOB_MATCHING,
                 input_data={"resume_id": resume_id, "user_id": user_id, "days": 30},
             ),
         ]

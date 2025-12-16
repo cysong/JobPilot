@@ -33,6 +33,7 @@ class TaskTypeInfo(NamedTuple):
     value: str                          # Task type identifier (stored in DB)
     display_name: str                   # Human-readable name
     celery_task: str                    # Celery task function path
+    entity: "EntityType"                # Entity type for this task
     max_retries: int = 3                # Default retry count
     timeout_seconds: Optional[int] = None  # Task timeout
 
@@ -59,7 +60,8 @@ class TaskType(Enum):
     JOB_ANALYSIS = TaskTypeInfo(
         value="job_analysis",
         display_name="Job Analysis",
-        celery_task="app.modules.jobs.tasks.analyze_job_async",
+        celery_task="app.modules.jobs.tasks.analyze_job_task",
+        entity="job",
         max_retries=3,
         timeout_seconds=300,
     )
@@ -68,23 +70,26 @@ class TaskType(Enum):
     RESUME_ANALYSIS = TaskTypeInfo(
         value="resume_analysis",
         display_name="Resume Analysis",
-        celery_task="app.modules.resumes.tasks.analyze_resume_async",
+        celery_task="app.modules.resumes.tasks.analyze_resume_task",
+        entity="resume",
         max_retries=3,
         timeout_seconds=180,
     )
 
-    MATCH_USER_JOBS = TaskTypeInfo(
-        value="match_user_jobs",
-        display_name="Match User to Jobs",
+    USER_JOB_MATCHING = TaskTypeInfo(
+        value="user_job_matching",
+        display_name="User-Job Matching",
         celery_task="app.modules.matching.tasks.match_user_recent_jobs_task",
+        entity="job",
         max_retries=2,
         timeout_seconds=300,
     )
 
-    JOB_USER_MATCHES = TaskTypeInfo(
-        value="job_user_matches",
-        display_name="Job User Matches",
+    JOB_USER_MATCHING = TaskTypeInfo(
+        value="job_user_matching",
+        display_name="Job-User Matching",
         celery_task="app.modules.matching.tasks.calculate_job_user_matches_task",
+        entity="job",
         max_retries=3,
         timeout_seconds=600,
     )
@@ -94,6 +99,7 @@ class TaskType(Enum):
         value="application_initialization",
         display_name="Application Initialization",
         celery_task="app.modules.applications.tasks.application_initialization_task",
+        entity="application",
         max_retries=3,
         timeout_seconds=60,
     )
@@ -102,6 +108,7 @@ class TaskType(Enum):
         value="resume_tailoring",
         display_name="Resume Tailoring",
         celery_task="app.modules.applications.tasks.resume_tailoring_task",
+        entity="application",
         max_retries=2,
         timeout_seconds=300,
     )
@@ -110,6 +117,7 @@ class TaskType(Enum):
         value="cover_letter_generation",
         display_name="Cover Letter - Generation",
         celery_task="app.modules.applications.tasks.cover_letter_generation_task",
+        entity="application",
         max_retries=2,
         timeout_seconds=600,
     )
@@ -119,13 +127,15 @@ class TaskType(Enum):
         value="document_generation",
         display_name="Document Generation",
         celery_task="app.modules.documents.tasks.generate_document_task",
+        entity="application",
         max_retries=2,
     )
 
-    QUALITY_CHECK = TaskTypeInfo(
-        value="quality_check",
-        display_name="Quality Check",
+    DOCUMENT_QUALITY_CHECK = TaskTypeInfo(
+        value="document_quality_check",
+        display_name="Document Quality Check",
         celery_task="app.modules.quality.tasks.check_quality_task",
+        entity="application",
         max_retries=1,
         timeout_seconds=60,
     )
