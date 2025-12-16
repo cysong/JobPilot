@@ -11,9 +11,9 @@ import {
 } from 'lucide-react'
 
 import { useApplications, useApplicationMutations } from '@/features/applications/hooks/useApplications'
+import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge'
 import { resumeApi } from '@/api/resumes'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
@@ -40,32 +40,6 @@ export default function ApplicationListingPage() {
                 description: 'Failed to download PDF',
                 variant: 'destructive'
             })
-        }
-    }
-
-    const getStatusBadge = (status: string) => {
-        const normalized = status?.toLowerCase?.() || ''
-        switch (normalized) {
-            case 'pending':
-                return <Badge variant="secondary">Pending</Badge>
-            case 'tailoring':
-                return <Badge variant="secondary" className="animate-pulse">Tailoring</Badge>
-            case 'ready':
-                return <Badge className="bg-green-500 hover:bg-green-600">Ready</Badge>
-            case 'applied':
-                return <Badge variant="outline">Applied</Badge>
-            case 'phonescreen':
-                return <Badge variant="outline">Phone Screen</Badge>
-            case 'interviewing':
-                return <Badge variant="outline">Interviewing</Badge>
-            case 'offer':
-                return <Badge className="bg-amber-400 text-slate-900 hover:bg-amber-500">Offer</Badge>
-            case 'rejected':
-                return <Badge variant="secondary">Rejected</Badge>
-            case 'failed':
-                return <Badge className="bg-red-500 text-white hover:bg-red-600">Failed</Badge>
-            default:
-                return <Badge variant="secondary">{status || 'Unknown'}</Badge>
         }
     }
 
@@ -108,7 +82,6 @@ export default function ApplicationListingPage() {
             ) : (
                 <div className="grid gap-4">
                     {data?.items.map((app) => {
-                        const status = app.status?.toLowerCase?.() || app.status
                         const company = app.job?.company_name || app.job?.advertiser_name || 'Unknown Company'
                         return (
                             <Card key={app.id} className="overflow-hidden">
@@ -123,7 +96,7 @@ export default function ApplicationListingPage() {
                                                 <span>{company}</span>
                                             </div>
                                         </div>
-                                        {getStatusBadge(status)}
+                                        <ApplicationStatusBadge status={app.status} />
                                     </div>
                                 </CardHeader>
                                 <CardContent className="py-4">
@@ -147,10 +120,10 @@ export default function ApplicationListingPage() {
                                         </Link>
                                     </Button>
 
-                                    {status === 'ready' && (
+                                    {app.status === 'Ready' && app.resume_document_id && (
                                         <>
                                             <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/resumes/${app.resume_id}`}>
+                                                <Link to={`/resumes/${app.resume_document_id}`}>
                                                     <FileText className="h-3.5 w-3.5 mr-2" />
                                                     Edit Resume
                                                 </Link>
@@ -158,7 +131,7 @@ export default function ApplicationListingPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleDownloadPdf(app.resume_id, app.job?.title || 'Resume')}
+                                                onClick={() => handleDownloadPdf(app.resume_document_id!, app.job?.title || 'Resume')}
                                             >
                                                 <Download className="h-3.5 w-3.5 mr-2" />
                                                 PDF
@@ -166,7 +139,7 @@ export default function ApplicationListingPage() {
                                         </>
                                     )}
 
-                                    {status === 'failed' && (
+                                    {app.status === 'Failed' && (
                                         <Button
                                             variant="outline"
                                             size="sm"

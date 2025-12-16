@@ -1,13 +1,22 @@
-export type ApplicationStatus = 'tailoring' | 'ready' | 'failed';
+export type ApplicationStatus =
+    | 'Pending'
+    | 'Tailoring'
+    | 'Ready'
+    | 'Applied'
+    | 'PhoneScreen'
+    | 'Interviewing'
+    | 'Offer'
+    | 'Rejected'
+    | 'Failed';
 
 export interface Application {
     id: string;
     user_id: string;
     job_id: number;
     status: ApplicationStatus;
-    resume_template_id: string;
-    resume_id: string; // Working copy
-    cover_letter_id?: string;
+    source_resume_id: string;
+    resume_document_id?: string;
+    cover_letter_document_id?: string;
     tailoring_level: string;
     last_error?: string;
     created_at: string;

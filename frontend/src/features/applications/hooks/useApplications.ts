@@ -28,10 +28,11 @@ export const useApplicationMutations = () => {
     const createApplication = useMutation({
         mutationFn: (data: CreateApplicationRequest) => applicationApi.create(data),
         onSuccess: (data) => {
+            // Invalidate all application-related queries for immediate UI update
             queryClient.invalidateQueries({ queryKey: ['applications'] })
+            // Also invalidate the by-job query to update JobDetailPage
+            queryClient.invalidateQueries({ queryKey: ['application', 'by-job', data.job_id] })
             toast({ title: 'Success', description: 'Application started successfully' })
-            // We might want to navigate to the application list or detail, or just close the dialog
-            // For now, let's let the component handle navigation if needed, or just invalidate
         },
         onError: (error: any) => {
             const message = error instanceof ApiError

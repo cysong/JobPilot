@@ -12,6 +12,19 @@ export const applicationApi = {
         return result;
     },
 
+    getByJobId: async (jobId: number) => {
+        try {
+            const result = await client.get<Application, Application>(`/jobs/${jobId}/application`);
+            return result;
+        } catch (error: any) {
+            // Return null if application not found (404)
+            if (error.response?.status === 404) {
+                return null;
+            }
+            throw error;
+        }
+    },
+
     list: async (page = 1, size = 20) => {
         const result = await client.get<ApplicationListResponse, ApplicationListResponse>('/applications', {
             params: { page, size }
@@ -20,7 +33,7 @@ export const applicationApi = {
     },
 
     retryCoverLetter: async (id: string) => {
-        const result = await client.post<Application, Application>(`/applications/${id}/retry-coverletter`);
+        const result = await client.post<Application, Application>(`/applications/${id}/retry`);
         return result;
     }
 };

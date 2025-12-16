@@ -9,26 +9,42 @@ import {
   Share2,
   ExternalLink,
   Plus,
+  Eye,
 } from "lucide-react";
 
 import { useJobDetail } from "@/features/jobs/hooks/useJobs";
+import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
+import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const [searchParams] = useSearchParams();
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
+  const jobIdNum = parseInt(jobId || "0");
   const {
     data: job,
     isLoading,
     isError,
-  } = useJobDetail(parseInt(jobId || "0"));
+  } = useJobDetail(jobIdNum);
+
+  // Query for existing application
+  const {
+    data: application,
+    isLoading: isApplicationLoading,
+  } = useApplicationByJob(jobIdNum);
 
   // Restore search params when going back to listing page
   const backUrl = `/jobs?${searchParams.toString()}`;
@@ -99,14 +115,67 @@ export default function JobDetailPage() {
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
-              <Button
-                size="sm"
-                onClick={() => setIsApplicationDialogOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add to Applications
-              </Button>
+
+              {/* Application Button Logic */}
+              {!isApplicationLoading && !application && (
+                <Button
+                  size="sm"
+                  onClick={() => setIsApplicationDialogOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Applications
+                </Button>
+              )}
+
+              {!isApplicationLoading && application && (
+                <TooltipProvider>
+                  <div className="flex gap-2 items-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <ApplicationStatusBadge status={application.status} />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {application.status === "Failed" && application.last_error && (
+                          <div className="max-w-xs">
+                            <p className="font-semibold text-red-500">Error:</p>
+                            <p className="text-sm">{application.last_error}</p>
+                          </div>
+                        )}
+                        {application.status === "Tailoring" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">Customizing your resume and generating cover letter...</p>
+                          </div>
+                        )}
+                        {application.status === "Pending" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">Waiting to start processing...</p>
+                          </div>
+                        )}
+                        {application.status === "Ready" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">Application materials are ready!</p>
+                          </div>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                      asChild
+                    >
+                      <Link to={`/applications/${application.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Application
+                      </Link>
+                    </Button>
+                  </div>
+                </TooltipProvider>
+              )}
+
               {job.share_link && (
                 <Button
                   size="sm"
