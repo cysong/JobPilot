@@ -101,13 +101,20 @@ async def application_initialization_task(
     Checks existence of JobAnalysis and ResumeAnalysis to decide if they need to be run.
 
     Args:
-        is_retry: Reserved for future retry logic enhancement (currently unused)
+        is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
     db = self.db
-    logger.info(f"Initializing application workflow for app_id={application_id}")
-    
+
+    # Adjust logging and progress message based on retry status
+    if is_retry:
+        logger.info(f"Retrying application workflow for app_id={application_id}")
+        progress_msg = "Retrying workflow from source resume..."
+    else:
+        logger.info(f"Initializing application workflow for app_id={application_id}")
+        progress_msg = "Planning workflow steps..."
+
     await update_tailoring_progress(
-        db, application_id, "initialization", "Planning workflow steps...", "in_progress"
+        db, application_id, "initialization", progress_msg, "in_progress"
     )
 
     tasks_to_submit: list[TaskSubmissionSpec] = []
@@ -147,10 +154,11 @@ async def application_initialization_task(
     tasks_to_submit.append(TaskSubmissionSpec(
         task_type=TaskType.RESUME_TAILORING,
         input_data={
-            "application_id": application_id, 
+            "application_id": application_id,
             "resume_id": resume_id,
             "job_id": job_id,
-            "tailoring_level": tailoring_level
+            "tailoring_level": tailoring_level,
+            "is_retry": is_retry
         }
     ))
 
@@ -191,25 +199,30 @@ async def application_initialization_task(
 
 @celery_app.task(bind=True, base=DBTrackingTask)
 async def resume_tailoring_task(
-    self, 
-    application_id: str, 
-    resume_id: str, 
-    job_id: int, 
+    self,
+    application_id: str,
+    resume_id: str,
+    job_id: int,
     tailoring_level: str,
-    workflow_id: str, 
-    task_id: str
+    workflow_id: str,
+    task_id: str,
+    is_retry: bool = False
 ):
     """
     Generate tailored resume content based on job and resume analysis.
+
+    Always reads from source resume and creates a new versioned document.
+
+    Args:
+        resume_id: Source resume ID (not working document ID)
+        is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
-    # Placeholder for actual LLM implementation in next step
-    # We will implement the actual logic in llm/resume_tailor.py and call it here
     await update_tailoring_progress(
         self.db, application_id, "resume_tailoring", "Tailoring resume...", "in_progress"
     )
-    
+
     from app.modules.applications.llm.resume_tailor import run_resume_tailoring
-    
+
     result = await run_resume_tailoring(
         db=self.db,
         application_id=application_id,
@@ -217,7 +230,8 @@ async def resume_tailoring_task(
         job_id=job_id,
         tailoring_level=tailoring_level,
         workflow_id=workflow_id,
-        task_id=task_id
+        task_id=task_id,
+        is_retry=is_retry
     )
     
     await update_tailoring_progress(

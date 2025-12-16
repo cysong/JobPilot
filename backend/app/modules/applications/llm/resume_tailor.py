@@ -11,7 +11,7 @@ from app.core.llm.gateway import AgentGateway
 from app.core.llm.types import GatewayContext
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.repository import JobAnalysisRepository
-from app.modules.resumes.repository import DocumentRepository
+from app.modules.resumes.repository import DocumentRepository, ResumeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +23,23 @@ async def run_resume_tailoring(
     job_id: int,
     tailoring_level: str,
     workflow_id: str,
-    task_id: str
+    task_id: str,
+    is_retry: bool = False
 ) -> dict:
     """
     Execute resume tailoring task.
-    
+
+    Always reads from source resume and creates a new versioned document.
+
+    Args:
+        resume_id: Source resume ID (not working document ID)
+        is_retry: If True, indicates retry attempt (creates new version chain from previous)
+
+    Process:
     1. Fetch Job Analysis and Source Resume.
     2. Call LLM to tailor resume content.
-    3. Save tailored resume as new Document.
-    4. Link to Application.
+    3. Save tailored resume as new versioned Document.
+    4. Update Application to point to new version.
     """
     ctx: GatewayContext = {
         "db": db,
@@ -61,24 +69,31 @@ async def run_resume_tailoring(
 
     application = await ApplicationRepository.get_by_id(db, application_id)
     if not application:
-         raise ValueError(f"Application {application_id} not found")
+        raise ValueError(f"Application {application_id} not found")
     ctx["user_id"] = application.user_id
-         
-    # Use the working document (already copied) as the base for tailoring
-    # If this is the first tailoring, it's the copy of the source resume.
-    # If it's a re-tailoring, it might be the previous tailored version (which is fine, or we could go back to source?)
-    # User requirement: "resume content 应该读取的是application.resume_document_id指定的简历内容，因为一开始就已经复制了source_resume"
-    
-    # We need to load the document content. Application repository might not have eagerly loaded it unless we used get_with_dependencies
-    # Let's fetch the document directly using DocumentRepository
-    if not application.resume_document_id:
-        raise ValueError(f"Application {application_id} has no resume document linked")
 
-    source_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
-    if not source_doc:
-        raise ValueError(f"Resume document {application.resume_document_id} not found")
+    # Always read from source resume (unified logic for both initial and retry)
+    source_resume = await ResumeRepository.get_with_document(db, resume_id)
+    if not source_resume or not source_resume.document:
+        raise ValueError(f"Source resume {resume_id} or its document not found")
 
-    source_content = source_doc.content
+    source_content = source_resume.document.content
+
+    if is_retry:
+        logger.info(f"Retry mode: Reading from source resume {resume_id} for application {application_id}")
+    else:
+        logger.info(f"Reading from source resume {resume_id} for application {application_id}")
+
+    # Determine parent document for versioning
+    # If application already has a resume document, it becomes the parent (for retry)
+    # Otherwise, the source resume document is the parent (for initial creation)
+    if application.resume_document_id:
+        parent_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
+        if not parent_doc:
+            logger.warning(f"Previous resume document {application.resume_document_id} not found, using source as parent")
+            parent_doc = source_resume.document
+    else:
+        parent_doc = source_resume.document
     
     # 2. Call LLM
     prompt_input = _build_tailoring_prompt(
@@ -100,26 +115,47 @@ async def run_resume_tailoring(
     else:
         final_content = str(tailored_content)
 
-    # 3. Create Document
-    # New document is a version of the current working document
-    # 3. Create Document
-    # New document is a version of the current working document
+    # 3. Create new versioned Document
+    # parent_doc is either the previous tailored version (retry) or source document (initial)
+    change_comment = f"Retry: Tailored from source for Job {job_id} ({tailoring_level})" if is_retry else f"Tailored for Job {job_id} ({tailoring_level})"
+
     tailored_doc = await DocumentRepository.create_new_version(
         db=db,
-        parent_document=source_doc,
+        parent_document=parent_doc,
         content=final_content,
         created_by=application.user_id,
-        change_comments=f"Tailored for Job {job_id} ({tailoring_level})",
-        extra_metadata={"application_id": application_id, "job_id": job_id}
+        change_comments=change_comment,
+        extra_metadata={
+            "application_id": application_id,
+            "job_id": job_id,
+            "tailoring_level": tailoring_level,
+            "is_retry": is_retry,
+            "workflow_id": workflow_id,
+            "task_id": task_id,
+            "source_resume_id": resume_id,
+        }
     )
     doc_id = tailored_doc.id
+
+    logger.info(
+        f"Created new resume document version {doc_id} "
+        f"(parent: {parent_doc.id}, root: {tailored_doc.root_id}, is_retry: {is_retry})"
+    )
     
-    # 4. Update Application
+    # 4. Update Application to point to new version
     application.resume_document_id = doc_id
-    
+
     await db.commit()
-    
-    return {"tailored_resume_document_id": doc_id}
+
+    return {
+        "output_data": {
+            "resume_document_id": doc_id,
+            "parent_document_id": parent_doc.id,
+            "root_document_id": tailored_doc.root_id,
+            "is_new_version": True,
+            "is_retry": is_retry,
+        }
+    }
 
 
 def _build_tailoring_prompt(
