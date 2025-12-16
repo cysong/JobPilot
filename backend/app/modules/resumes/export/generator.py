@@ -95,7 +95,8 @@ class PDFGenerator:
         self,
         markdown_content: str,
         title: str,
-        output_path: Optional[Path] = None
+        output_path: Optional[Path] = None,
+        language: str = "en"
     ) -> bytes:
         """
         Generate PDF from Markdown content.
@@ -104,6 +105,7 @@ class PDFGenerator:
             markdown_content: Document content in Markdown
             title: Document title
             output_path: Optional file path to save PDF (if None, returns bytes)
+            language: Language code for the document (default: "en")
 
         Returns:
             PDF bytes (if output_path is None) or writes to file
@@ -133,6 +135,7 @@ class PDFGenerator:
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "include_metadata": self.include_metadata,
             "font_size": self.font_size,
+            "language": language,
         }
         final_html = template.render(**context)
 
