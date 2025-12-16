@@ -14,6 +14,7 @@ from sqlalchemy import (
     Enum as SQLEnum,
     Integer,
     Float,
+    Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,8 +35,8 @@ class TaskExecution(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(
         String(255), primary_key=True, default=_uuid)
     workflow_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    entity_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    entity_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(255), nullable=False)
     user_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
@@ -46,6 +47,7 @@ class TaskExecution(Base, TimestampMixin):
         SQLEnum(TaskStatus, native_enum=False),
         nullable=False,
         default=TaskStatus.PENDING,
+        index=True,
     )
     celery_task_id: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True)
@@ -62,6 +64,10 @@ class TaskExecution(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index('ix_task_executions_entity', 'entity_type', 'entity_id'),
+    )
 
 
 class AICall(Base, TimestampMixin):
