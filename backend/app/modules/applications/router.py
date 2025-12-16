@@ -53,12 +53,15 @@ async def get_application(
     return application
 
 
-@router.post("/{application_id}/retry-coverletter", response_model=ApplicationDetail)
-async def retry_cover_letter(
+@router.post("/{application_id}/retry", response_model=ApplicationDetail)
+async def retry_application_tailor(
     application_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Retry cover letter generation when previous attempt failed."""
-    application = await ApplicationService.retry_cover_letter(db, application_id, current_user)
+    """
+    Retry cover letter generation for a failed/stuck application.
+    Restart the entire workflow.
+    """
+    application = await ApplicationService.retry_application_tailor(db, application_id, current_user)
     return application

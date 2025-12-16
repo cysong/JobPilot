@@ -58,26 +58,11 @@ class ApplicationService:
         )
         await ApplicationRepository.create(db, application=application)
         
-        # Trigger Workflow directly via Orchestrator Task
-        from app.modules.workflow.service import TaskService
-        from app.shared.enums import TaskType
-        
-        await TaskService.submit_task(
+        await ApplicationService._submit_initialization_task(
             db=db,
-            task_type=TaskType.APPLICATION_INITIALIZATION,
-            entity_type="application",
-            entity_id=application.id,
+            application=application,
             user_id=user.id,
-            input_data={
-                "application_id": application.id,
-                "job_id": payload.job_id,
-                "resume_id": payload.resume_template_id,
-                "tailoring_level": payload.tailoring_level or "light",
-            },
-            application_id=application.id,
-            job_id=payload.job_id,
-            resume_id=payload.resume_template_id,
-            tailoring_level=payload.tailoring_level or "light",
+            tailoring_level=payload.tailoring_level or "light"
         )
 
         await db.commit()
@@ -103,7 +88,7 @@ class ApplicationService:
         return await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
 
     @staticmethod
-    async def retry_cover_letter(
+    async def retry_application_tailor(
         db: AsyncSession, application_id: str, user: User
     ) -> Application:
         """Retry application workflow."""
@@ -111,45 +96,61 @@ class ApplicationService:
         if not application:
             raise NotFoundError("Application not found")
 
-        # Allow retry if Failed OR Stuck in Tailoring (handled by caller logic usually, but here strict check removed)
-        # Assuming UI only calls this on explicit retry action.
-        
         await ApplicationRepository.mark_pending(db, application)
         
         # Reset progress
         application.tailoring_progress = {"steps": {}, "current_step": "retrying", "message": "Restarting workflow"}
 
-        from app.modules.workflow.service import TaskService
-        from app.shared.enums import TaskType
-
-        await TaskService.submit_task(
+        await ApplicationService._submit_initialization_task(
             db=db,
-            task_type=TaskType.APPLICATION_INITIALIZATION,
-            entity_type="application",
-            entity_id=application.id,
+            application=application,
             user_id=user.id,
-            input_data={
-                "application_id": application.id,
-                "job_id": application.job_id,
-                "resume_id": application.source_resume_id,
-                "tailoring_level": application.tailoring_level,
-                "is_retry": True
-            },
-            application_id=application.id,
-            job_id=application.job_id,
-            resume_id=application.source_resume_id,
             tailoring_level=application.tailoring_level,
+            is_retry=True
         )
 
         await db.commit()
         await db.refresh(application)
         return application
+        
+    @staticmethod
+    async def _submit_initialization_task(
+        db: AsyncSession, 
+        application: Application, 
+        user_id: int, 
+        tailoring_level: str,
+        is_retry: bool = False
+    ) -> None:
+        """Helper to submit the initialization orchestrator task."""
+        from app.modules.workflow.service import TaskService
+        from app.shared.enums import TaskType, EntityType
+
+        await TaskService.submit_task(
+            db=db,
+            task_type=TaskType.APPLICATION_INITIALIZATION,
+            entity_type=EntityType.APPLICATION.value,
+            entity_id=application.id,
+            user_id=user_id,
+            input_data={
+                "application_id": application.id,
+                "job_id": application.job_id,
+                "resume_id": application.source_resume_id,
+                "tailoring_level": tailoring_level,
+                "is_retry": is_retry
+            },
+            application_id=application.id,
+            job_id=application.job_id,
+            resume_id=application.source_resume_id,
+            tailoring_level=tailoring_level,
+        )
 
     @staticmethod
     async def _copy_resume_for_application(
         db: AsyncSession, template_resume: Resume, user_id: int
     ) -> Document:
         """Copy resume template into a new working document for application tailoring."""
+        from app.modules.resumes.repository import DocumentRepository
+        
         source_doc = template_resume.document
         new_doc_id = str(uuid4())
         new_document = Document(
@@ -163,7 +164,7 @@ class ApplicationService:
             extra_metadata=source_doc.extra_metadata or {},
             created_by=user_id,
         )
-        db.add(new_document)
+        await DocumentRepository.create(db, new_document)
         await db.flush()
         return new_document
 
@@ -173,3 +174,4 @@ class ApplicationService:
     ) -> Optional[Application]:
         """Load application with dependencies needed for processing."""
         return await ApplicationRepository.get_with_dependencies(db, application_id)
+

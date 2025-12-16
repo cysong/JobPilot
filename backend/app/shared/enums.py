@@ -184,3 +184,11 @@ class ProficiencyLevel(str, Enum):
     INTERMEDIATE = "Intermediate"
     ADVANCED = "Advanced"
     EXPERT = "Expert"
+
+
+class EntityType(str, Enum):
+    """Entity types for task executions."""
+    JOB = "job"
+    RESUME = "resume"
+    APPLICATION = "application"
+

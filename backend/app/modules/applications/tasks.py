@@ -160,9 +160,11 @@ async def application_initialization_task(
     ))
 
     # Submit the chain
+    from app.shared.enums import EntityType
+    
     created_tasks = await TaskService.submit_sequential_tasks(
         db=db,
-        entity_type="application",
+        entity_type=EntityType.APPLICATION.value,
         entity_id=application_id,
         user_id=resume.user_id,
         tasks=tasks_to_submit,

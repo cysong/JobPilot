@@ -18,7 +18,7 @@ from app.core.exceptions import (
 )
 from app.core.response_codes import ResponseCode
 from app.modules.resumes.models import Document, DocumentFormat, Resume
-from app.modules.resumes.repository import ResumeRepository
+from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType
@@ -32,17 +32,12 @@ class ResumeService:
     """Service class for Resume-related operations."""
 
     @staticmethod
-    def _calculate_content_hash(content: str) -> str:
-        """Calculate SHA-256 hash of content for deduplication."""
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-    @staticmethod
     async def create_resume(
         db: AsyncSession, user_id: int, resume_data: ResumeCreate
     ) -> Resume:
         """Create a new draft resume with initial document."""
         document_id = str(uuid4())
-        content_hash = ResumeService._calculate_content_hash(resume_data.content)
+        content_hash = DocumentRepository._calculate_content_hash(resume_data.content)
 
         document = Document(
             id=document_id,
@@ -55,7 +50,7 @@ class ResumeService:
             extra_metadata={},
             created_by=user_id,
         )
-        db.add(document)
+        await DocumentRepository.create(db, document)
 
         resume = Resume(
             id=str(uuid4()),
@@ -124,23 +119,17 @@ class ResumeService:
         current_doc = resume.document
         previous_hash = current_doc.content_hash if current_doc else None
 
-        new_doc_id = str(uuid4())
-        content_hash = ResumeService._calculate_content_hash(update_data.content)
-
-        new_document = Document(
-            id=new_doc_id,
-            root_id=current_doc.root_id,
-            parent_id=current_doc.id,
-            format=current_doc.format,
+        new_document = await DocumentRepository.create_new_version(
+            db=db,
+            parent_document=current_doc,
             content=update_data.content,
-            content_hash=content_hash,
-            change_comments=update_data.change_comments or "Content updated",
-            extra_metadata=current_doc.extra_metadata or {},
             created_by=user_id,
+            change_comments=update_data.change_comments or "Content updated",
         )
-        db.add(new_document)
+        # Hash availability for changed check
+        content_hash = new_document.content_hash
 
-        resume.document_id = new_doc_id
+        resume.document_id = new_document.id
         db.add(resume)
 
         await ResumeService._trigger_analysis_if_needed(

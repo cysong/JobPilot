@@ -11,7 +11,7 @@ from app.core.llm.types import GatewayContext
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.repository import JobAnalysisRepository
 from app.modules.resumes.models import Document, DocumentFormat
-from app.modules.resumes.repository import ResumeRepository
+from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.service import ResumeService
 
 logger = logging.getLogger(__name__)
@@ -46,57 +46,60 @@ async def run_resume_tailoring(
     if not job_analysis:
         raise ValueError(f"Job analysis not found for job {job_id}")
 
-    # Helper to convert SQL model to Pydantic if needed, or just use properties
-    # Assuming job_analysis is the SQL model, accessing fields directly works.
-
-    source_resume = await ResumeRepository.get_with_document(db, resume_id)
-    if not source_resume or not source_resume.document:
-        raise ValueError(f"Source resume document not found for {resume_id}")
-
-    source_content = source_resume.document.content
+    application = await ApplicationRepository.get_by_id(db, application_id)
+    if not application:
+         raise ValueError(f"Application {application_id} not found")
+         
+    # Use the working document (already copied) as the base for tailoring
+    # If this is the first tailoring, it's the copy of the source resume.
+    # If it's a re-tailoring, it might be the previous tailored version (which is fine, or we could go back to source?)
+    # User requirement: "resume content 应该读取的是application.resume_document_id指定的简历内容，因为一开始就已经复制了source_resume"
     
-    # 2. Call LLM (using a generic 'resume_tailor' agent or 'content_writer')
-    # We construct a prompt manually if no specific schema is enforced yet.
+    # We need to load the document content. Application repository might not have eagerly loaded it unless we used get_with_dependencies
+    # Let's fetch the document directly using DocumentRepository
+    if not application.resume_document_id:
+        raise ValueError(f"Application {application_id} has no resume document linked")
+
+    source_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
+    if not source_doc:
+        raise ValueError(f"Resume document {application.resume_document_id} not found")
+
+    source_content = source_doc.content
     
+    # 2. Call LLM
     prompt_input = _build_tailoring_prompt(
         source_content=source_content,
         job_analysis=job_analysis,
         tailoring_level=tailoring_level
     )
 
-    # Use 'resume_writer' or similar if available, otherwise 'gpt-4o'
-    # Assuming 'resume_tailor' is a configured agent.
     tailored_content = await AgentGateway.get().call(
-        agent_id="resume_tailor", # Monitor if this agent exists, otherwise might fail
+        agent_id="resume_tailor",
         input_data=prompt_input,
         context=ctx
     )
     
-    # Handle response: explicit content or dict
     if isinstance(tailored_content, dict) and "content" in tailored_content:
         final_content = tailored_content["content"]
     else:
         final_content = str(tailored_content)
 
     # 3. Create Document
-    doc_id = str(uuid4())
-    tailored_doc = Document(
-        id=doc_id,
-        root_id=source_resume.document.root_id or source_resume.document.id,
-        parent_id=source_resume.document.id,
-        format=DocumentFormat.MARKDOWN,
+    # New document is a version of the current working document
+    # 3. Create Document
+    # New document is a version of the current working document
+    tailored_doc = await DocumentRepository.create_new_version(
+        db=db,
+        parent_document=source_doc,
         content=final_content,
-        content_hash=ResumeService._calculate_content_hash(final_content),
+        created_by=application.user_id,
         change_comments=f"Tailored for Job {job_id} ({tailoring_level})",
-        extra_metadata={"application_id": application_id, "job_id": job_id},
-        created_by=source_resume.user_id
+        extra_metadata={"application_id": application_id, "job_id": job_id}
     )
-    db.add(tailored_doc)
+    doc_id = tailored_doc.id
     
     # 4. Update Application
-    application = await ApplicationRepository.get_by_id(db, application_id)
-    if application:
-        application.resume_document_id = doc_id
+    application.resume_document_id = doc_id
     
     await db.commit()
     
