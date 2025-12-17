@@ -106,6 +106,9 @@ export interface JobDetail extends Job {
   // Timestamps
   created_at: string | null
   updated_at: string | null
+
+  // Analysis
+  analysis?: JobAnalysis | null
 }
 
 export interface JobListResponse {
@@ -142,4 +145,34 @@ export interface JobFiltersOptions {
   location_cities: string[]
   work_types: string[]
   companies: string[]
+}
+
+export interface JobAnalysis {
+  id: string
+  job_id: number
+
+  // Skills
+  required_skills: string[]
+  preferred_skills: string[]
+  certifications: string[]
+  tech_stack: string[]
+
+  // Responsibilities
+  seniority: string | null
+  key_responsibilities: string[]
+  experience_years: string | null
+  education_requirement: string | null
+
+  // Soft Skills
+  soft_skills: string[]
+  company_culture_keywords: string[]
+
+  // Insights
+  hiring_priorities: string[]
+  cn_content: string | null
+
+  // Metadata
+  analysis_version: string
+  created_at: string
+  updated_at: string
 }
