@@ -20,18 +20,18 @@ from app.modules.matching.service import (
 )
 from app.modules.resumes.repository import ResumeRepository
 from app.modules.users.repository import UserSkillRepository
-from app.modules.workflow import AsyncBaseTask
+from app.modules.workflow import AsyncBaseTask, DBTrackingTask
 from agent_configs.schemas import MatchAnalysis
 from app.core.llm.gateway import AgentGateway
 
 
-@celery_app.task(base=DbTrackingTask, bind=True)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def calculate_job_user_matches_task(self, workflow_id: str, task_id: str, job_analysis_id: int) -> dict:
     """Match users for a single job analysis."""
     return await _calculate(db=self.db, job_analysis_id=job_analysis_id)
 
 
-@celery_app.task(base=DbTrackingTask, bind=True)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def match_user_recent_jobs_task(self, workflow_id: str, task_id: str, user_id: int, days: int = 30) -> dict:
     """Match a single user against recent jobs (listed within days) that already have analyses."""
     return await _match_user(db=self.db, user_id=user_id, days=days)
