@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2, AlertCircle } from 'lucide-react'
 
 interface ApplicationDialogProps {
     open: boolean
@@ -52,6 +53,24 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
 
     const resumes = resumesData?.items || []
 
+    // Check if selected resume is a draft
+    const selectedResume = resumes.find(r => r.id === selectedResumeId)
+    const isDraftSelected = selectedResume?.is_draft ?? false
+
+    // Check if all resumes are drafts
+    const allAreDrafts = resumes.length > 0 && resumes.every(r => r.is_draft)
+
+    // Determine if submit button should be disabled
+    const shouldDisableSubmit = !selectedResumeId || isDraftSelected || allAreDrafts || createApplication.isPending
+
+    // Determine warning message
+    const showWarning = isDraftSelected || allAreDrafts
+    const warningMessage = isDraftSelected
+        ? 'This is a draft resume. Please finalize it before applying.'
+        : allAreDrafts
+        ? 'Only finalized resumes can be used for applications. Please finalize a resume first.'
+        : ''
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
@@ -79,14 +98,35 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                                     </div>
                                 ) : (
                                     resumes.map((resume) => (
-                                        <SelectItem key={resume.id} value={resume.id}>
-                                            {resume.title}
+                                        <SelectItem
+                                            key={resume.id}
+                                            value={resume.id}
+                                            className={resume.is_draft ? 'text-slate-400 opacity-60' : ''}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {resume.title}
+                                                {resume.is_draft && (
+                                                    <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                                                        Draft
+                                                    </span>
+                                                )}
+                                            </span>
                                         </SelectItem>
                                     ))
                                 )}
                             </SelectContent>
                         </Select>
                     </div>
+
+                    {/* Warning message for draft resumes */}
+                    {showWarning && (
+                        <Alert variant="destructive" className="mt-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                {warningMessage}
+                            </AlertDescription>
+                        </Alert>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -94,7 +134,7 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        disabled={!selectedResumeId || createApplication.isPending}
+                        disabled={shouldDisableSubmit}
                     >
                         {createApplication.isPending && (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
