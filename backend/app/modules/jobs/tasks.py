@@ -28,14 +28,15 @@ async def analyze_job_task(
         raise ValueError(f"Job {job_id} has no content to analyze")
 
     # Translate to Chinese (source assumed en, target zh) with strict formatting preservation
-    translation_input = {
-        "source_language": "en",
-        "target_language": "zh",
-        "content_format": "auto",
-        "content": content,
-        "keep_placeholders": True,
-        "style_hint": "formal",
-    }
+    # Build YAML-formatted string as agent expects
+    translation_input = f"""source_language: en
+            target_language: zh
+            content_format: auto
+            keep_placeholders: true
+            style_hint: formal
+            content: |
+            {content}
+        """
     translated = await AgentGateway.get().call(
         agent_id="universal_translator",
         input_data=translation_input,

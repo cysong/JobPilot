@@ -42,7 +42,7 @@ class AgentGateway:
     async def call(
         self,
         agent_id: str,
-        input_data: Any,
+        input_data: str,
         context: GatewayContext | None = None,
     ) -> Any:
         """
@@ -50,7 +50,7 @@ class AgentGateway:
 
         Args:
             agent_id: Agent identifier (YAML filename)
-            input_data: Input prompt or payload
+            input_data: Input string for the agent (plain text or YAML-formatted)
             context: Additional metadata for logging
 
         Returns:
@@ -95,14 +95,14 @@ class AgentGateway:
             raise
 
     async def _execute_agent(
-        self, agent: Agent, input_data: Any
+        self, agent: Agent, input_data: str
     ) -> tuple[Any, Optional[Usage]]:
         """
         Execute Agent and extract result and usage.
 
         Args:
             agent: Agent instance
-            input_data: Input data
+            input_data: Input string (plain text or YAML-formatted)
 
         Returns:
             Tuple of (final_output, usage)

@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.modules.jobs.repository import JobAnalysisRepository, JobRepository
