@@ -4,6 +4,7 @@ import Login from '@/features/auth/Login'
 import Register from '@/features/auth/Register'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import MainLayout from '@/components/layout/MainLayout'
+import AdminLayout from '@/components/layout/AdminLayout'
 import LandingPage from '@/features/landing/LandingPage'
 import PlaceholderPage from '@/features/common/PlaceholderPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
@@ -12,6 +13,9 @@ import ApplicationListingPage from '@/features/applications/ApplicationListingPa
 import ApplicationDetailPage from '@/features/applications/ApplicationDetailPage'
 import ResumeListingPage from '@/features/resumes/ResumeListingPage'
 import ResumeEditPage from '@/features/resumes/ResumeEditPage'
+import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
+import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
+import { Role } from '@/types/auth'
 import { Toaster } from '@/components/ui/toaster'
 
 const queryClient = new QueryClient({
@@ -36,6 +40,7 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<Login redirectPath="/admin/dashboard" />} />
           <Route path="/register" element={<Register />} />
 
           {/* Protected routes */}
@@ -50,6 +55,12 @@ function App() {
             <Route path="/resumes/:id" element={<ResumeEditPage />} />
             <Route path="/profile" element={<PlaceholderPage />} />
             <Route path="/settings" element={<PlaceholderPage />} />
+          </Route>
+
+          {/* Admin protected routes */}
+          <Route element={<ProtectedRoute requiredRole={Role.ADMIN}><AdminLayout /></ProtectedRoute>}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/tasks" element={<TaskMonitorPage />} />
           </Route>
 
           {/* Catch-all redirect */}

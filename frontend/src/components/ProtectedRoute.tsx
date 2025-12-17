@@ -5,14 +5,16 @@
 import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
+import type { Role } from '@/types/auth'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  requiredRole?: Role
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const location = useLocation()
-  const { isAuthenticated, isLoading, initialize } = useAuthStore()
+  const { isAuthenticated, isLoading, initialize, user } = useAuthStore()
 
   useEffect(() => {
     initialize()
@@ -33,6 +35,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Role guard (optional)
+  if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />
   }
 
   // Render protected content

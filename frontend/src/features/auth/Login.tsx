@@ -2,7 +2,7 @@
  * Login page component
  */
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -40,8 +40,13 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
-export default function Login() {
+interface LoginProps {
+  redirectPath?: string
+}
+
+export default function Login({ redirectPath = '/dashboard' }: LoginProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuthStore()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
@@ -78,8 +83,9 @@ export default function Login() {
         description: 'You have successfully logged in.',
       })
 
-      // Redirect to jobs page
-      navigate('/jobs')
+      // Redirect to target path (state or prop)
+      const fromState = (location.state as any)?.from?.pathname
+      navigate(fromState || redirectPath)
     } catch (err: any) {
       const message =
         err instanceof ApiError
@@ -172,7 +178,7 @@ export default function Login() {
                           <div className="relative">
                             <Input
                               type={showPassword ? 'text' : 'password'}
-                              placeholder="••••••••"
+                              placeholder="********"
                               {...field}
                             />
                             <Button
