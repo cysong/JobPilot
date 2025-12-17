@@ -25,14 +25,14 @@ from agent_configs.schemas import MatchAnalysis
 from app.core.llm.gateway import AgentGateway
 
 
-@celery_app.task(base=AsyncBaseTask, bind=True, name="matching.calculate_job_user_matches")
-async def calculate_job_user_matches_task(self, job_analysis_id: int) -> dict:
+@celery_app.task(base=DbTrackingTask, bind=True)
+async def calculate_job_user_matches_task(self, workflow_id: str, task_id: str, job_analysis_id: int) -> dict:
     """Match users for a single job analysis."""
     return await _calculate(db=self.db, job_analysis_id=job_analysis_id)
 
 
-@celery_app.task(base=AsyncBaseTask, bind=True, name="app.modules.matching.tasks.match_user_recent_jobs_task")
-async def match_user_recent_jobs_task(self, user_id: int, days: int = 30) -> dict:
+@celery_app.task(base=DbTrackingTask, bind=True)
+async def match_user_recent_jobs_task(self, workflow_id: str, task_id: str, user_id: int, days: int = 30) -> dict:
     """Match a single user against recent jobs (listed within days) that already have analyses."""
     return await _match_user(db=self.db, user_id=user_id, days=days)
 
@@ -113,10 +113,7 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
 
 @celery_app.task(
     base=AsyncBaseTask,
-    name="matching.analyze_match_with_ai",
-    bind=True,
-    max_retries=2,
-    retry_backoff=True,
+    bind=True
 )
 async def analyze_match_with_ai_task(
     self,
@@ -147,7 +144,7 @@ async def analyze_match_with_ai_task(
         }
         result = await AgentGateway.get().call(
             agent_id="match_analyzer",
-            input_data=payload,
+            input_data=json.dumps(payload),
         )
         ai_result = result.model_dump() if isinstance(result, MatchAnalysis) else result
 

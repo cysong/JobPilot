@@ -47,7 +47,7 @@ celery_app.conf.beat_schedule = {
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
     },
     'pull-unmatched-jobs': {
-        'task': 'matching.pull_unmatched_jobs',
+        'task': 'app.modules.matching.pull.pull_unmatched_jobs',
         'schedule': crontab(minute='*/5'),
     },
 }

@@ -15,7 +15,7 @@ from app.shared.enums import TaskType
 from app.modules.workflow import AsyncBaseTask
 
 
-@celery_app.task(name="matching.pull_unmatched_jobs", base=AsyncBaseTask, bind=True)
+@celery_app.task(base=AsyncBaseTask, bind=True)
 async def pull_unmatched_jobs(self) -> dict:
     """Every 5 minutes: find new job analyses since last run and enqueue matching."""
     last_exec = await _get_last_execution_time(self.db)
@@ -46,7 +46,7 @@ async def pull_unmatched_jobs(self) -> dict:
 async def _get_last_execution_time(db: AsyncSession):
     stmt = (
         select(func.max(TaskExecution.created_at))
-        .where(TaskExecution.task_type == "job_user_matches")
+        .where(TaskExecution.task_type == "job_user_matching")
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
