@@ -47,14 +47,17 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
     total_after_skill = 0
     ai_submitted = 0
 
+    job = await JobRepository.get_by_id(db, job_analysis.job_id)
+
     for job_analysis in analyses:
-        if not job_analysis.normalized_job_title:
+        job_title = job_analysis.normalized_job_title or job.normalised_role_title
+        if not job_title:
             continue
 
         # Phase 0: title prefilter
         candidates = await prefilter_candidates_by_title(
             db,
-            normalized_job_title=job_analysis.normalized_job_title.lower(),
+            normalized_job_title=job_title.lower(),
             max_candidates=settings.MAX_CANDIDATES_PER_JOB,
         )
         total_candidates += len(candidates)
