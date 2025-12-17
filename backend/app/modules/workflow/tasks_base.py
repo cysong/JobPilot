@@ -30,10 +30,24 @@ class AsyncBaseTask(Task):
             return self._run_async_task(*args, **kwargs)
 
         # Fallback: Celery may wrap run so iscoroutinefunction can return False.
-        # If the parent __call__ yields a coroutine, run it on the worker loop.
+        # If the parent __call__ yields a coroutine, run it with a managed session.
         result = super().__call__(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            return get_worker_loop().run_until_complete(result)
+            async def _execute():
+                async with async_session_factory() as session:
+                    self._db_session = session
+                    try:
+                        retval = await result
+                        if self.auto_commit:
+                            await session.commit()
+                        return retval
+                    except Exception:
+                        await session.rollback()
+                        raise
+                    finally:
+                        self._db_session = None
+
+            return get_worker_loop().run_until_complete(_execute())
         return result
 
     def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
