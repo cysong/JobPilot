@@ -1,5 +1,6 @@
 import { MapPin, Building2, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+
 import { Link, useSearchParams } from 'react-router-dom'
 
 import type { Job } from '@/types/job'
@@ -56,9 +57,9 @@ export function JobCard({ job }: JobCardProps) {
                         <span>{job.work_types_label}</span>
                     </div>
                     {job.salary_label && (
-                    <div className="flex items-center gap-1">
-                        <span>{job.salary_label}</span>
-                    </div>
+                        <div className="flex items-center gap-1">
+                            <span>{job.salary_label}</span>
+                        </div>
                     )}
                 </div>
 
@@ -81,7 +82,7 @@ export function JobCard({ job }: JobCardProps) {
             </CardContent>
             <CardFooter className="p-4 pt-0 text-xs text-slate-400">
                 <span>
-                    Listed {job.listed_at ? formatDistanceToNow(new Date(job.listed_at), { addSuffix: true }) : 'recently'}
+                    {job.listed_at ? formatDistanceToNow(new Date(job.listed_at), { addSuffix: true }) : 'recently'}
                 </span>
             </CardFooter>
         </Card>
