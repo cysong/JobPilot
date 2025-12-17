@@ -186,6 +186,39 @@ class TaskService:
 
         return created
 
+    @staticmethod
+    def get_celery_worker_status() -> dict:
+        """
+        Get real-time status of Celery workers using Control API.
+        
+        Returns:
+            Dict containing worker status, active tasks, and stats.
+        """
+        from app.core.celery_app import celery_app
+        inspector = celery_app.control.inspect()
+        
+        # Check if workers are online
+        ping_result = inspector.ping()
+        if not ping_result:
+            return {"status": "error", "message": "No celery workers found"}
 
-# Backward alias for callers still importing WorkflowService
-WorkflowService = TaskService
+        # Fetch details
+        stats = inspector.stats() or {}
+        active = inspector.active() or {}
+        reserved = inspector.reserved() or {}
+        scheduled = inspector.scheduled() or {}
+        
+        workers_data = {}
+        for worker_name, response in ping_result.items():
+            workers_data[worker_name] = {
+                "status": "online",
+                "ping": response,
+                "stats": stats.get(worker_name),
+                "active_tasks_count": len(active.get(worker_name, [])),
+                "active_tasks": active.get(worker_name, []),
+                "reserved_tasks_count": len(reserved.get(worker_name, [])),
+                "scheduled_tasks_count": len(scheduled.get(worker_name, [])),
+            }
+            
+        return workers_data
+
