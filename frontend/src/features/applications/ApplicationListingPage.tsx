@@ -5,7 +5,6 @@ import {
     ExternalLink,
     Download,
     RefreshCw,
-    Eye,
     Building2,
     Calendar
 } from 'lucide-react'
@@ -88,9 +87,11 @@ export default function ApplicationListingPage() {
                                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
-                                            <CardTitle className="text-lg font-semibold text-slate-900">
-                                                {app.job?.title || 'Unknown Job'}
-                                            </CardTitle>
+                                            <Link to={`/applications/${app.id}`}>
+                                                <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
+                                                    {app.job?.title || 'Unknown Job'}
+                                                </CardTitle>
+                                            </Link>
                                             <div className="flex items-center text-sm text-slate-500 gap-2">
                                                 <Building2 className="h-4 w-4" />
                                                 <span>{company}</span>
