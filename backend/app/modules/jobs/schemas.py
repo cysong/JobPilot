@@ -118,6 +118,9 @@ class JobDetail(JobBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    # Analysis
+    analysis: Optional["JobAnalysisResponse"] = None
+
 
 class JobListResponse(PaginatedResponse[JobBase]):
     """Paginated job list response"""

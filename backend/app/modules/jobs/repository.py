@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import and_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.jobs.models import SeekJob, JobAnalysis
 from app.modules.workflow.models import TaskExecution
@@ -26,7 +27,9 @@ class JobRepository:
             SeekJob instance or None if not found
         """
         result = await db.execute(
-            select(SeekJob).where(SeekJob.id == job_id)
+            select(SeekJob)
+            .options(selectinload(SeekJob.analysis))
+            .where(SeekJob.id == job_id)
         )
         return result.scalar_one_or_none()
 

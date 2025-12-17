@@ -7,7 +7,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from app.shared.base_model import Base, TimestampMixin
 
@@ -268,4 +268,4 @@ class JobAnalysis(Base, TimestampMixin):
     # ============================================
     # Relationships
     # ============================================
-    job: Mapped["SeekJob"] = relationship("SeekJob", backref="analysis")
+    job: Mapped["SeekJob"] = relationship("SeekJob", backref=backref("analysis", uselist=False))

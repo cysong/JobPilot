@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import select, func, or_, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.jobs.models import SeekJob
 from app.modules.jobs.schemas import JobFiltersRequest, JobFiltersOptions
@@ -116,7 +117,11 @@ class JobService:
         Returns:
             SeekJob instance or None
         """
-        query = select(SeekJob).where(SeekJob.id == job_id)
+        query = (
+            select(SeekJob)
+            .options(selectinload(SeekJob.analysis))
+            .where(SeekJob.id == job_id)
+        )
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
