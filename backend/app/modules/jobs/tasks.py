@@ -65,7 +65,7 @@ async def analyze_job_task(
     return {"output_data": {"analysis_id": analysis.id, "status": "completed", "job_id": job_id}}
 
 
-@celery_app.task(base=AsyncBaseTask, bind=True)
+@celery_app.task(base=AsyncBaseTask, bind=True, ignore_result=True)
 async def poll_unanalyzed_jobs(self) -> dict:
     """
     Periodic task: find jobs needing analysis and create tasks.

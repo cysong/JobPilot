@@ -28,7 +28,13 @@ class AsyncBaseTask(Task):
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         if asyncio.iscoroutinefunction(self.run):
             return self._run_async_task(*args, **kwargs)
-        return super().__call__(*args, **kwargs)
+
+        # Fallback: Celery may wrap run so iscoroutinefunction can return False.
+        # If the parent __call__ yields a coroutine, run it on the worker loop.
+        result = super().__call__(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            return get_worker_loop().run_until_complete(result)
+        return result
 
     def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
         async def _execute():

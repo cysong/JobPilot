@@ -116,7 +116,8 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
 
 @celery_app.task(
     base=AsyncBaseTask,
-    bind=True
+    bind=True,
+    ignore_result=True
 )
 async def analyze_match_with_ai_task(
     self,

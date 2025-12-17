@@ -15,7 +15,7 @@ from app.shared.enums import TaskType
 from app.modules.workflow import AsyncBaseTask
 
 
-@celery_app.task(base=AsyncBaseTask, bind=True)
+@celery_app.task(base=AsyncBaseTask, bind=True, ignore_result=True)
 async def pull_unmatched_jobs(self) -> dict:
     """Every 5 minutes: find new job analyses since last run and enqueue matching."""
     last_exec = await _get_last_execution_time(self.db)
