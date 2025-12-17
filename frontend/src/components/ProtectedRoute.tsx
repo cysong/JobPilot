@@ -32,9 +32,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     )
   }
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (admin routes go to /admin/login)
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    const redirectTo = requiredRole === 'ADMIN' ? '/admin/login' : '/login'
+    return <Navigate to={redirectTo} state={{ from: location }} replace />
   }
 
   // Role guard (optional)
