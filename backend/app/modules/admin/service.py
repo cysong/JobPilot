@@ -1,0 +1,477 @@
+"""Business logic for admin dashboard/monitoring endpoints."""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.admin.schemas import (
+    BatchRetryResult,
+    DashboardStats,
+    MetricCount,
+    TaskMetric,
+    TaskDetailResponse,
+    TaskListResponse,
+    TaskListStats,
+    TaskListItem,
+    TaskStatisticsResponse,
+    TaskTypeStats,
+    WorkerMonitorResponse,
+    WorkerStatus,
+    TaskRetryResponse,
+    BatchRetryResponse,
+)
+from app.modules.applications.models import Application
+from app.modules.auth.models import User
+from app.modules.jobs.models import SeekJob
+from app.modules.matching.models import UserJobMatch
+from app.modules.workflow.models import TaskExecution, AICall
+from app.shared.enums import TaskStatus, TaskType
+from app.core.celery_app import celery_app
+from app.modules.workflow.service import TaskService
+
+
+class AdminService:
+    """Service methods for admin dashboard/monitoring."""
+
+    @staticmethod
+    async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
+        """Aggregate high-level metrics for dashboard."""
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        users_total = await db.scalar(select(func.count(User.id)))
+        users_today = await db.scalar(select(func.count(User.id)).where(User.created_at >= today_start))
+
+        jobs_total = await db.scalar(select(func.count(SeekJob.id)))
+        jobs_today = await db.scalar(
+            select(func.count(SeekJob.id)).where(SeekJob.created_at.isnot(None)).where(SeekJob.created_at >= today_start)
+        )
+
+        matches_total = await db.scalar(select(func.count(UserJobMatch.id)))
+        matches_today = await db.scalar(select(func.count(UserJobMatch.id)).where(UserJobMatch.created_at >= today_start))
+
+        applications_total = await db.scalar(
+            select(func.count(Application.id)).where(Application.is_deleted.is_(False))
+        )
+        applications_today = await db.scalar(
+            select(func.count(Application.id)).where(Application.is_deleted.is_(False)).where(
+                Application.created_at >= today_start
+            )
+        )
+
+        tasks_total = await db.scalar(select(func.count(TaskExecution.id)))
+        tasks_today = await db.scalar(select(func.count(TaskExecution.id)).where(TaskExecution.created_at >= today_start))
+        tasks_running = await db.scalar(
+            select(func.count(TaskExecution.id)).where(TaskExecution.status == TaskStatus.RUNNING)
+        )
+        tasks_failed = await db.scalar(
+            select(func.count(TaskExecution.id)).where(TaskExecution.status == TaskStatus.FAILED)
+        )
+
+        return DashboardStats(
+            users=MetricCount(total=users_total or 0, today_new=users_today or 0),
+            jobs=MetricCount(total=jobs_total or 0, today_new=jobs_today or 0),
+            matches=MetricCount(total=matches_total or 0, today_new=matches_today or 0),
+            applications=MetricCount(total=applications_total or 0, today_new=applications_today or 0),
+            tasks=TaskMetric(
+                total=tasks_total or 0,
+                today_new=tasks_today or 0,
+                running=tasks_running or 0,
+                failed=tasks_failed or 0,
+            ),
+        )
+
+    @staticmethod
+    def get_worker_status() -> WorkerMonitorResponse:
+        """Return worker status and queue stats via Celery inspect."""
+        inspector = celery_app.control.inspect()
+
+        ping = inspector.ping() or {}
+        stats = inspector.stats() or {}
+        active = inspector.active() or {}
+        reserved = inspector.reserved() or {}
+        scheduled = inspector.scheduled() or {}
+
+        if not ping and not stats and not active and not reserved and not scheduled:
+            return WorkerMonitorResponse(active_count=0, queued_tasks=0, running_tasks=0, workers=[])
+
+        worker_names = set()
+        worker_names.update(ping.keys())
+        worker_names.update(stats.keys())
+        worker_names.update(active.keys())
+        worker_names.update(reserved.keys())
+        worker_names.update(scheduled.keys())
+
+        workers: list[WorkerStatus] = []
+        active_count = 0
+        queued_tasks = 0
+        running_tasks = 0
+
+        for worker_name in worker_names:
+            stats_data = stats.get(worker_name) or {}
+            is_online = worker_name in ping or bool(stats_data)
+            if is_online:
+                active_count += 1
+
+            current = len(active.get(worker_name, []))
+            queued = len(reserved.get(worker_name, [])) + len(scheduled.get(worker_name, []))
+            running_tasks += current
+            queued_tasks += queued
+
+            last_hb_raw = stats_data.get("heartbeat")
+            last_heartbeat_dt = None
+            if isinstance(last_hb_raw, (int, float)):
+                last_heartbeat_dt = datetime.fromtimestamp(last_hb_raw, timezone.utc)
+
+            workers.append(
+                WorkerStatus(
+                    id=worker_name,
+                    hostname=stats_data.get("hostname") or worker_name,
+                    status="active" if is_online else "offline",
+                    current_tasks=current,
+                    last_heartbeat=last_heartbeat_dt,
+                )
+            )
+
+        return WorkerMonitorResponse(
+            active_count=active_count,
+            queued_tasks=queued_tasks,
+            running_tasks=running_tasks,
+            workers=workers,
+        )
+
+    @staticmethod
+    async def get_tasks(
+        db: AsyncSession,
+        *,
+        status_filter: Optional[list[str]] = None,
+        task_type: Optional[str] = None,
+        worker_id: Optional[str] = None,
+        keyword: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> TaskListResponse:
+        """List tasks with filters and pagination."""
+        filters = []
+        if status_filter:
+            filters.append(TaskExecution.status.in_(status_filter))
+        if task_type:
+            filters.append(TaskExecution.task_type == task_type)
+        if worker_id:
+            filters.append(TaskExecution.worker_id == worker_id)
+        if keyword:
+            like = f"%{keyword}%"
+            filters.append(TaskExecution.task_name.ilike(like))
+        if start_time:
+            filters.append(TaskExecution.created_at >= start_time)
+        if end_time:
+            filters.append(TaskExecution.created_at <= end_time)
+
+        base_query = select(TaskExecution).where(and_(*filters)) if filters else select(TaskExecution)
+        total = await db.scalar(select(func.count()).select_from(base_query.subquery()))
+
+        stmt = base_query.order_by(TaskExecution.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+        rows = (await db.execute(stmt)).scalars().all()
+        task_ids = [t.id for t in rows]
+
+        ai_cost_map = {}
+        if task_ids:
+            cost_rows = await db.execute(
+                select(AICall.task_id, func.coalesce(func.sum(AICall.estimated_cost), 0))
+                .where(AICall.task_id.in_(task_ids))
+                .group_by(AICall.task_id)
+            )
+            ai_cost_map = {task_id: cost for task_id, cost in cost_rows.all()}
+
+        now = datetime.now(timezone.utc)
+        timeout_threshold = now - timedelta(minutes=10)
+
+        def is_timeout(task: TaskExecution) -> bool:
+            return (
+                task.status == TaskStatus.RUNNING
+                and task.started_at
+                and task.started_at < timeout_threshold
+            )
+
+        items = []
+        for task in rows:
+            items.append(
+                TaskListItem(
+                    id=task.id,
+                    task_name=task.task_name,
+                    task_type=task.task_type,
+                    status=task.status,
+                    worker_id=task.worker_id,
+                    celery_task_id=task.celery_task_id,
+                    retry_count=task.retry_count,
+                    max_retries=task.max_retries,
+                    execution_time_ms=task.execution_time_ms,
+                    error_message=task.error_message,
+                    ai_cost=float(ai_cost_map.get(task.id, 0) or 0),
+                    entity_type=task.entity_type,
+                    entity_id=task.entity_id,
+                    user_id=task.user_id,
+                    workflow_id=task.workflow_id,
+                    created_at=task.created_at,
+                    started_at=task.started_at,
+                    completed_at=task.completed_at,
+                )
+            )
+
+        # Stats
+        filtered_sub = base_query.subquery()
+        status_counts = await db.execute(
+            select(filtered_sub.c.status, func.count().label("cnt")).group_by(filtered_sub.c.status)
+        )
+        status_map = {row[0]: row[1] for row in status_counts.all()}
+
+        task_type_counts = await db.execute(
+            select(filtered_sub.c.task_type, func.count()).group_by(filtered_sub.c.task_type)
+        )
+        type_map = {row[0]: row[1] for row in task_type_counts.all() if row[0]}
+
+        timeout_count = await db.scalar(
+            select(func.count()).select_from(filtered_sub).where(
+                filtered_sub.c.status == TaskStatus.RUNNING,
+                filtered_sub.c.started_at.isnot(None),
+                filtered_sub.c.started_at < timeout_threshold,
+            )
+        ) or 0
+
+        stats = TaskListStats(
+            failed=int(status_map.get(TaskStatus.FAILED, 0)),
+            timeout=int(timeout_count),
+            success=int(status_map.get(TaskStatus.SUCCESS, 0)),
+            running=int(status_map.get(TaskStatus.RUNNING, 0)),
+            task_type_distribution=type_map,
+        )
+
+        total_pages = (total + page_size - 1) // page_size if total else 0
+
+        return TaskListResponse(
+            items=items,
+            total=int(total or 0),
+            page=page,
+            page_size=page_size,
+            total_pages=int(total_pages),
+            stats=stats,
+        )
+
+    @staticmethod
+    async def get_task_detail(db: AsyncSession, task_id: str) -> TaskDetailResponse:
+        """Get single task detail including AI calls."""
+        task = await db.get(TaskExecution, task_id)
+        if not task:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+        ai_calls = await db.execute(
+            select(AICall).where(AICall.task_id == task_id).order_by(AICall.created_at.desc())
+        )
+        ai_call_items = [
+            {
+                "id": ac.id,
+                "model": ac.model,
+                "agent_id": ac.agent_id,
+                "input_tokens": ac.input_tokens,
+                "output_tokens": ac.output_tokens,
+                "total_tokens": ac.total_tokens,
+                "estimated_cost": ac.estimated_cost,
+                "latency_ms": ac.latency_ms,
+                "status": ac.status,
+                "error_message": ac.error_message,
+                "created_at": ac.created_at,
+            }
+            for ac in ai_calls.scalars().all()
+        ]
+
+        return TaskDetailResponse(
+            id=task.id,
+            task_name=task.task_name,
+            task_type=task.task_type,
+            status=task.status,
+            worker_id=task.worker_id,
+            celery_task_id=task.celery_task_id,
+            retry_count=task.retry_count,
+            max_retries=task.max_retries,
+            execution_time_ms=task.execution_time_ms,
+            error_message=task.error_message,
+            input_data=task.input_data,
+            output_data=task.output_data,
+            entity_type=task.entity_type,
+            entity_id=task.entity_id,
+            user_id=task.user_id,
+            workflow_id=task.workflow_id,
+            created_at=task.created_at,
+            started_at=task.started_at,
+            completed_at=task.completed_at,
+            ai_calls=ai_call_items,
+        )
+
+    @staticmethod
+    async def retry_task(db: AsyncSession, task_id: str) -> TaskRetryResponse:
+        """Create a new task execution using the original payload."""
+        original = await db.get(TaskExecution, task_id)
+        if not original:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+        if original.status not in {TaskStatus.FAILED, TaskStatus.RUNNING, TaskStatus.PENDING, TaskStatus.RETRY}:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Task status not eligible for retry")
+
+        task_type = AdminService._resolve_task_type(original.task_type)
+        new_task = await TaskService.submit_task(
+            db=db,
+            task_type=task_type,
+            entity_type=original.entity_type,
+            entity_id=original.entity_id,
+            user_id=original.user_id,
+            input_data=original.input_data,
+            workflow_id=original.workflow_id,
+            depends_on=original.depends_on,
+        )
+
+        return TaskRetryResponse(
+            message="Task retry submitted",
+            original_task_id=task_id,
+            new_task_id=new_task.id,
+            status="PENDING",
+        )
+
+    @staticmethod
+    async def batch_retry_tasks(db: AsyncSession, task_ids: Iterable[str]) -> BatchRetryResponse:
+        results: list[BatchRetryResult] = []
+        success = 0
+        failed = 0
+
+        for tid in task_ids:
+            try:
+                retry_resp = await AdminService.retry_task(db, tid)
+                results.append(
+                    BatchRetryResult(
+                        original_task_id=tid,
+                        new_task_id=retry_resp.new_task_id,
+                        status="success",
+                    )
+                )
+                success += 1
+            except HTTPException as exc:
+                results.append(
+                    BatchRetryResult(
+                        original_task_id=tid,
+                        new_task_id=None,
+                        status="failed",
+                        error=exc.detail,
+                    )
+                )
+                failed += 1
+
+        return BatchRetryResponse(
+            message="Batch retry completed",
+            success_count=success,
+            failed_count=failed,
+            results=results,
+        )
+
+    @staticmethod
+    async def get_task_statistics(
+        db: AsyncSession,
+        *,
+        status_filter: Optional[list[str]] = None,
+        task_type: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> TaskStatisticsResponse:
+        """Aggregate stats by task type."""
+        filters = []
+        if status_filter:
+            filters.append(TaskExecution.status.in_(status_filter))
+        if task_type:
+            filters.append(TaskExecution.task_type == task_type)
+        if start_time:
+            filters.append(TaskExecution.created_at >= start_time)
+        if end_time:
+            filters.append(TaskExecution.created_at <= end_time)
+
+        base = select(
+            TaskExecution.task_type.label("task_type"),
+            func.count().label("total"),
+            func.avg(TaskExecution.execution_time_ms).label("avg_duration"),
+            func.sum(
+                case((TaskExecution.status == TaskStatus.FAILED, 1), else_=0)
+            ).label("failed_count"),
+        )
+        if filters:
+            base = base.where(and_(*filters))
+        base = base.group_by(TaskExecution.task_type)
+
+        stats_rows = (await db.execute(base)).all()
+
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_filter = [TaskExecution.created_at >= today_start]
+        if task_type:
+            today_filter.append(TaskExecution.task_type == task_type)
+        today_failed = await db.execute(
+            select(
+                TaskExecution.task_type,
+                func.sum(case((TaskExecution.status == TaskStatus.FAILED, 1), else_=0)).label("failed"),
+                func.count().label("total"),
+            )
+            .where(and_(*today_filter))
+            .group_by(TaskExecution.task_type)
+        )
+        today_map = {row[0]: (row[1], row[2]) for row in today_failed.all()}
+
+        # Daily cost (today)
+        cost_stmt = select(
+            TaskExecution.task_type,
+            func.coalesce(func.sum(AICall.estimated_cost), 0).label("cost"),
+        ).join(AICall, TaskExecution.id == AICall.task_id)
+        cost_stmt = cost_stmt.where(TaskExecution.created_at >= today_start)
+        if task_type:
+            cost_stmt = cost_stmt.where(TaskExecution.task_type == task_type)
+        cost_stmt = cost_stmt.group_by(TaskExecution.task_type)
+        cost_rows = (await db.execute(cost_stmt)).all()
+        cost_map = {row[0]: float(row[1] or 0) for row in cost_rows}
+
+        items = []
+        for row in stats_rows:
+            task_type_key = row.task_type or "unknown"
+            total_count = row.total or 0
+            failed_count = row.failed_count or 0
+            failure_rate = (failed_count / total_count * 100) if total_count else 0.0
+
+            today_failed_count, today_total_count = today_map.get(task_type_key, (0, 0)) if today_map else (0, 0)
+            today_failure_rate = (today_failed_count / today_total_count * 100) if today_total_count else 0.0
+
+            trend = "stable"
+            if today_failure_rate > failure_rate + 2:
+                trend = "up"
+            elif today_failure_rate < failure_rate - 2:
+                trend = "down"
+
+            items.append(
+                TaskTypeStats(
+                    task_type=task_type_key,
+                    avg_duration_ms=row.avg_duration,
+                    failure_rate_pct=failure_rate,
+                    today_failure_rate_pct=today_failure_rate,
+                    trend=trend,
+                    daily_cost=cost_map.get(task_type_key, 0.0),
+                    total_count=total_count,
+                )
+            )
+
+        return TaskStatisticsResponse(task_type_stats=items)
+
+    # Internal helpers
+    @staticmethod
+    def _resolve_task_type(task_type_value: Optional[str]):
+        for t in TaskType:
+            if t.value.value == task_type_value:
+                return t
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Unsupported task type for retry")
