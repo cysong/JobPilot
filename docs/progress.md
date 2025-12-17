@@ -5,10 +5,23 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
+**Last Updated:** 2025-12-17
+
 ---
 
 ## Work Log
 
+
+### 2025-12-17 - Admin Dashboard Backend Foundations
+**Completed Tasks:**
+- Created admin module scaffolding (`backend/app/modules/admin/{__init__,dependencies,schemas,service,router}.py`) with router-level `require_admin`.
+- Implemented worker监控、Dashboard统计、任务列表/详情/统计、单个/批量重试等接口并注册到 API v1。
+- Worker监控改为直接使用 Celery inspect 聚合 active/queued/running 状态与 worker 列表。
+- 补全 admin Pydantic schemas（DashboardStats、WorkerMonitorResponse、TaskList/Detail/Retry/Statistics）。
+
+**Pending:**
+- 为 admin 接口补充权限与集成测试；前端 hooks/UI 对接 `/admin/*`。
+- 校验 Celery stats 里的心跳字段可用性，必要时调整心跳/队列指标来源。
 
 ### 2025-12-15 - Unified API Response Format (Backend & Frontend)
 **Completed Tasks:**
@@ -454,6 +467,3 @@ None at this stage.
 - JWT tokens stored in localStorage with automatic axios interceptor injection
 - Celery workers will be configured in later stages
 
----
-
-**Last Updated:** 2025-01-24
