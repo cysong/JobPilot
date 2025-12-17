@@ -100,6 +100,17 @@ class JobAnalysisRepository:
     """Repository for JobAnalysis queries."""
 
     @staticmethod
+    async def get_by_id(
+        db: AsyncSession,
+        job_analysis_id: int,
+    ) -> Optional[JobAnalysis]:
+        """Get JobAnalysis by its primary key."""
+        result = await db.execute(
+            select(JobAnalysis).where(JobAnalysis.id == job_analysis_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_job_id(
         db: AsyncSession,
         job_id: int
