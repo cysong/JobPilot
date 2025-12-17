@@ -36,7 +36,6 @@ async def pull_unmatched_jobs(self) -> dict:
             user_id=None,
             workflow_id=workflow_id,
             input_data={"job_analysis_id": analysis.id},
-            job_analysis_id=analysis.id,
         )
         dispatched_ids.append(analysis.id)
     await self.db.commit()

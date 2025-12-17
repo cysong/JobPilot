@@ -88,7 +88,6 @@ async def poll_unanalyzed_jobs(self) -> dict:
             user_id=1,
             input_data={"job_id": analysis.job_id},
             workflow_id=str(uuid4()),
-            job_id=analysis.job_id,
         )
         reanalysis_created += 1
 
@@ -110,7 +109,6 @@ async def poll_unanalyzed_jobs(self) -> dict:
                 user_id=1,
                 input_data={"job_id": job.id},
                 workflow_id=workflow_id,
-                job_id=job.id,
             )
             total_created += 1
 

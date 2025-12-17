@@ -45,10 +45,6 @@ class ApplicationWorkflowHelper:
                 "tailoring_level": payload.tailoring_level,
                 "is_retry": payload.is_retry,
             },
-            application_id=payload.application_id,
-            job_id=payload.job_id,
-            resume_document_id=payload.resume_document_id,
-            tailoring_level=payload.tailoring_level,
         )
         await db.commit()
         return workflow_id, task
