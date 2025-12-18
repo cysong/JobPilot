@@ -64,24 +64,6 @@ async def list_tasks(
     )
 
 
-@router.get("/tasks/{task_id}", response_model=TaskDetailResponse)
-async def get_task_detail(task_id: str, db: AsyncSession = Depends(get_db)):
-    """Get task details (with AI calls)."""
-    return await AdminService.get_task_detail(db, task_id)
-
-
-@router.post("/tasks/{task_id}/retry", response_model=TaskRetryResponse)
-async def retry_task(task_id: str, db: AsyncSession = Depends(get_db)):
-    """Retry a single task."""
-    return await AdminService.retry_task(db, task_id)
-
-
-@router.post("/tasks/batch-retry", response_model=BatchRetryResponse)
-async def batch_retry(payload: BatchRetryRequest, db: AsyncSession = Depends(get_db)):
-    """Batch retry tasks."""
-    return await AdminService.batch_retry_tasks(db, payload.task_ids)
-
-
 @router.get("/tasks/statistics", response_model=TaskStatisticsResponse)
 async def task_statistics(
     status: Optional[str] = Query(None, description="Comma-separated statuses"),
@@ -98,3 +80,20 @@ async def task_statistics(
         start_time=startTime,
         end_time=endTime,
     )
+
+@router.post("/tasks/batch-retry", response_model=BatchRetryResponse)
+async def batch_retry(payload: BatchRetryRequest, db: AsyncSession = Depends(get_db)):
+    """Batch retry tasks."""
+    return await AdminService.batch_retry_tasks(db, payload.task_ids)
+
+@router.get("/tasks/{task_id}", response_model=TaskDetailResponse)
+async def get_task_detail(task_id: str, db: AsyncSession = Depends(get_db)):
+    """Get task details (with AI calls)."""
+    return await AdminService.get_task_detail(db, task_id)
+
+
+@router.post("/tasks/{task_id}/retry", response_model=TaskRetryResponse)
+async def retry_task(task_id: str, db: AsyncSession = Depends(get_db)):
+    """Retry a single task."""
+    return await AdminService.retry_task(db, task_id)
+
