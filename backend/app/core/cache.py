@@ -17,7 +17,7 @@ from fastapi_cache import FastAPICache
 def jcache(
     key_template: str,
     *,
-    ttl: int = 60,
+    ttl: int = 3600,
     namespace: str = "",
 ):
     """
@@ -38,8 +38,7 @@ def jcache(
             bound.apply_defaults()
 
             key = key_template.format(**bound.arguments)
-            if namespace:
-                key = f"{namespace}:{key}"
+            key = build_cache_key(key, namespace)
 
             backend = FastAPICache.get_backend()
 
@@ -94,8 +93,7 @@ def jcache_evict(
 
             for template in key_templates:
                 key = template.format(**bound.arguments)
-                if namespace:
-                    key = f"{namespace}:{key}"
+                key = build_cache_key(key, namespace)
                 await backend.delete(key)
 
             return result
@@ -104,6 +102,15 @@ def jcache_evict(
 
     return decorator
 
+
+def build_cache_key(raw_key: str, namespace: str = "") -> str:
+    key = raw_key
+    if namespace:
+        key = f"{namespace}:{key}"
+    prefix = FastAPICache.get_prefix()
+    if prefix:
+        key = f"{prefix}:{key}"
+    return key
 
 class RedisBackend(Backend):
     """Redis backend using redis.asyncio (compatible with Python 3.11+)"""
