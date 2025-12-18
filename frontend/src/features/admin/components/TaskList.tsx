@@ -35,8 +35,8 @@ export function TaskList({ items, isLoading, onRetry, page, pageSize, total, onP
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{t.id}</Badge>
                   <span className="font-semibold text-slate-900">{t.taskName}</span>
-                  <Badge variant="secondary">{t.taskType || 'n/a'}</Badge>
                   <Badge variant={t.status === 'Failed' ? 'destructive' : 'outline'}>{t.status}</Badge>
                 </div>
                 <div className="text-xs text-slate-600">
@@ -47,11 +47,13 @@ export function TaskList({ items, isLoading, onRetry, page, pageSize, total, onP
                 </div>
                 {t.errorMessage && <div className="text-xs text-red-600 line-clamp-1">{t.errorMessage}</div>}
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => onRetry(t.id)}>
-                  Retry
-                </Button>
-              </div>
+              {t.status !== 'Success' && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onRetry(t.id)}>
+                    Retry
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         <div className="flex items-center justify-between pt-2 text-sm text-slate-600">
