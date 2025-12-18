@@ -29,7 +29,6 @@ from app.modules.admin.schemas import (
 from app.modules.workflow.models import TaskExecution, AICall
 from app.modules.workflow.repositories import TaskRepository
 from app.shared.enums import TaskStatus, TaskType, TaskTypeInfo
-from app.core.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +169,8 @@ class TaskService:
             task_kwargs = {"workflow_id": workflow_id, "task_id": task_id}
             task_kwargs.update(spec.input_data or {})
 
-            sig = celery_task.s(**task_kwargs)
+            # Use immutable signature to avoid previous result being injected as first arg in chain
+            sig = celery_task.si(**task_kwargs)
             if info.max_retries is not None:
                 sig.set(max_retries=info.max_retries)
             if info.timeout_seconds is not None:
@@ -207,6 +207,7 @@ class TaskService:
     @staticmethod
     def get_worker_status() -> WorkerMonitorResponse:
         """Return worker status and queue stats via Celery inspect."""
+        from app.core.celery_app import celery_app  # local import to avoid circular import during app bootstrap
         inspector = celery_app.control.inspect()
 
         ping = inspector.ping() or {}
@@ -426,31 +427,90 @@ class TaskService:
 
     @staticmethod
     async def retry_task(db: AsyncSession, task_id: str) -> TaskRetryResponse:
-        """Create a new task execution using the original payload."""
+        """
+        Retry starting from the first non-success task in the workflow.
+
+        Resets retry_count to 0 and resubmits the remaining tasks in order via Celery chain.
+        """
         original = await db.get(TaskExecution, task_id)
         if not original:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-        if original.status not in {TaskStatus.FAILED, TaskStatus.RUNNING, TaskStatus.PENDING, TaskStatus.RETRY}:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Task status not eligible for retry")
+        # Fetch workflow tasks in order
+        workflow_tasks = (
+            await db.execute(
+                select(TaskExecution)
+                .where(TaskExecution.workflow_id == original.workflow_id)
+                .order_by(TaskExecution.created_at.asc())
+            )
+        ).scalars().all()
+        if not workflow_tasks:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No tasks found for workflow")
 
-        task_type = TaskService._resolve_task_type(original.task_type)
-        new_task = await TaskService.submit_task(
-            db=db,
-            task_type=task_type,
-            entity_type=original.entity_type,
-            entity_id=original.entity_id,
-            user_id=original.user_id,
-            input_data=original.input_data,
-            workflow_id=original.workflow_id,
-            depends_on=original.depends_on,
-        )
+        # Find first non-success task and retry everything from there
+        start_idx = next((idx for idx, t in enumerate(workflow_tasks) if t.status != TaskStatus.SUCCESS), None)
+        if start_idx is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="All tasks already succeeded")
+
+        to_retry = workflow_tasks[start_idx:]
+        signatures = []
+        for t in to_retry:
+            task_type_enum = TaskService._resolve_task_type(t.task_type)
+            if not task_type_enum:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Unsupported task type {t.task_type} for retry")
+            info: TaskTypeInfo = task_type_enum.value
+
+            # Reset state for retry
+            t.status = TaskStatus.PENDING
+            t.retry_count = 0
+            t.started_at = None
+            t.completed_at = None
+            t.error_message = None
+            t.output_data = None
+            t.worker_id = None
+            t.execution_time_ms = None
+            t.celery_task_id = None
+
+            module_path, func_name = info.celery_task.rsplit(".", 1)
+            module = import_module(module_path)
+            celery_task = getattr(module, func_name)
+
+            task_kwargs = {"workflow_id": t.workflow_id, "task_id": t.id}
+            task_kwargs.update(t.input_data or {})
+
+            # Use immutable signature so prior task result isn't injected into args
+            sig = celery_task.si(**task_kwargs)
+            if info.max_retries is not None:
+                sig.set(max_retries=info.max_retries)
+            if info.timeout_seconds is not None:
+                sig.set(time_limit=info.timeout_seconds)
+            signatures.append(sig)
+
+        await db.flush()
+        await db.commit()
+
+        # Submit chain and backfill celery ids
+        if not signatures:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="No tasks to retry")
+
+        if len(signatures) == 1:
+            result = signatures[0].apply_async()
+            to_retry[0].celery_task_id = getattr(result, "id", None)
+        else:
+            chain_result = chain(*signatures).apply_async()
+            current_result = chain_result
+            for task in reversed(to_retry):
+                task.celery_task_id = getattr(current_result, "id", None)
+                current_result = getattr(current_result, "parent", None)
+
+        await db.commit()
 
         return TaskRetryResponse(
             message="Task retry submitted",
             original_task_id=task_id,
-            new_task_id=new_task.id,
+            new_task_id=to_retry[0].id,
             status="PENDING",
+            retried_task_ids=[t.id for t in to_retry],
         )
 
     @staticmethod

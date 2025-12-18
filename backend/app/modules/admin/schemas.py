@@ -129,6 +129,7 @@ class TaskRetryResponse(AdminBase):
     original_task_id: str = Field(..., alias="originalTaskId")
     new_task_id: str = Field(..., alias="newTaskId")
     status: str
+    retried_task_ids: List[str] = Field(default_factory=list, alias="retriedTaskIds")
 
 
 class BatchRetryRequest(AdminBase):
