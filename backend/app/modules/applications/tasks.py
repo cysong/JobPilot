@@ -139,7 +139,7 @@ async def application_initialization_task(
     if not resume:
         raise ValueError(f"Source resume {resume_id} not found")
 
-    if not resume.analysis:
+    if not resume.analysis_result:
         logger.info(f"Resume {resume_id} analysis missing, adding analysis task.")
         tasks_to_submit.append(TaskSubmissionSpec(
             task_type=TaskType.RESUME_ANALYSIS,

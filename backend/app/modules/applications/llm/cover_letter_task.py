@@ -88,7 +88,7 @@ async def run_cover_letter_task(
         # Fallback query if relationship triggers lazy loading issue or similar, though joined load expected
         source_resume = await ResumeRepository.get_with_document(db, application.source_resume_id)
         
-    analysis_data = source_resume.analysis
+    analysis_data = source_resume.analysis_result
     if not analysis_data:
         raise ValueError(f"Resume analysis missing for resume {application.source_resume_id}")
 
