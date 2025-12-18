@@ -180,8 +180,7 @@ async def application_initialization_task(
         entity_type=EntityType.APPLICATION.value,
         entity_id=application_id,
         user_id=resume.user_id,
-        tasks=tasks_to_submit,
-        workflow_id=workflow_id
+        tasks=tasks_to_submit
     )
     
     task_ids = [t.id for t in created_tasks]
@@ -191,7 +190,7 @@ async def application_initialization_task(
     
     return {
         "output_data": {
-            "workflow_id": workflow_id,
+            "workflow_id": created_tasks[0].workflow_id,
             "task_chain": task_ids,
             "tasks_count": len(created_tasks)
         }
