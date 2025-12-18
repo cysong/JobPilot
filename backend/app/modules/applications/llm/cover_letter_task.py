@@ -22,7 +22,7 @@ from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Document, DocumentFormat
 from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
-from backend.app.modules.applications.config import app_module_settings
+from app.modules.applications.config import app_module_settings
 
 logger = logging.getLogger(__name__)
 
