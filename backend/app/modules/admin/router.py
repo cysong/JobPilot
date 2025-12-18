@@ -18,6 +18,7 @@ from app.modules.admin.schemas import (
     WorkerMonitorResponse,
 )
 from app.modules.admin.service import AdminService
+from app.modules.workflow.service import TaskService
 
 router = APIRouter(
     prefix="/admin",
@@ -35,7 +36,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 @router.get("/workers", response_model=WorkerMonitorResponse)
 async def get_worker_status():
     """Get real-time status of Celery workers (admin only)."""
-    return AdminService.get_worker_status()
+    return TaskService.get_worker_status()
 
 
 @router.get("/tasks", response_model=TaskListResponse)
@@ -51,7 +52,7 @@ async def list_tasks(
     db: AsyncSession = Depends(get_db),
 ):
     status_filter = status.split(",") if status else None
-    return await AdminService.get_tasks(
+    return await TaskService.get_tasks(
         db,
         status_filter=status_filter,
         task_type=taskType,
@@ -73,7 +74,7 @@ async def task_statistics(
     db: AsyncSession = Depends(get_db),
 ):
     status_filter = status.split(",") if status else None
-    return await AdminService.get_task_statistics(
+    return await TaskService.get_task_statistics(
         db,
         status_filter=status_filter,
         task_type=taskType,
@@ -84,16 +85,15 @@ async def task_statistics(
 @router.post("/tasks/batch-retry", response_model=BatchRetryResponse)
 async def batch_retry(payload: BatchRetryRequest, db: AsyncSession = Depends(get_db)):
     """Batch retry tasks."""
-    return await AdminService.batch_retry_tasks(db, payload.task_ids)
+    return await TaskService.batch_retry_tasks(db, payload.task_ids)
 
 @router.get("/tasks/{task_id}", response_model=TaskDetailResponse)
 async def get_task_detail(task_id: str, db: AsyncSession = Depends(get_db)):
     """Get task details (with AI calls)."""
-    return await AdminService.get_task_detail(db, task_id)
+    return await TaskService.get_task_detail(db, task_id)
 
 
 @router.post("/tasks/{task_id}/retry", response_model=TaskRetryResponse)
 async def retry_task(task_id: str, db: AsyncSession = Depends(get_db)):
     """Retry a single task."""
-    return await AdminService.retry_task(db, task_id)
-
+    return await TaskService.retry_task(db, task_id)
