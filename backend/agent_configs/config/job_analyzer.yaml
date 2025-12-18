@@ -22,18 +22,18 @@ instructions: |
 
   **Field Extraction Guidelines:**
 
-  - **normalized_job_title**: Standardized title stripped of seniority/location/technology modifiers (e.g., "Senior Backend Engineer (Python/FastAPI)" -> "Backend Developer")
-  - **required_skills**: Hard skills marked as "required", "must-have", or essential
-  - **preferred_skills**: Skills marked as "preferred", "nice to have", or "plus"
-  - **certifications**: Certifications like AWS, Azure, PMP, CISSP, etc.
-  - **tech_stack**: Technologies/tools mentioned (e.g., React, Docker, PostgreSQL, Kubernetes)
-  - **seniority**: Extract level like "Intern", "Junior", "Intermediate", "Senior", "Lead", "Principal"
-  - **key_responsibilities**: Extract 3-5 main job duties (be concise, one line each)
-  - **experience_years**: Extract as string (e.g., "2-4 years", "5+ years")
-  - **education_requirement**: Extract degree requirement (e.g., "Bachelor's in Computer Science", "Master's preferred")
-  - **soft_skills**: Extract soft skills like "communication", "teamwork", "leadership", "problem-solving"
-  - **company_culture_keywords**: Extract culture descriptors (e.g., "fast-paced", "collaborative", "innovative", "agile")
-  - **hiring_priorities**: YOUR INFERENCE - Based on job description emphasis, what does the company value most? (list top 3 priorities)
+  - **normalized_job_title**: Standardized title stripped of seniority/location/tech modifiers (e.g., "Senior Backend Engineer (Python/FastAPI)" -> "Backend Developer"); if no clear role, leave empty.
+  - **required_skills**: Explicitly marked required/must-have hard skills.
+  - **preferred_skills**: Only items labeled preferred/nice-to-have/plus; do not include required items or unlabelled tech_stack.
+  - **certifications**: Explicit certifications (e.g., AWS/Azure certs, CCNA, PMP, CISSP). If none, return [].
+  - **tech_stack**: Core language/framework families and major platforms/tools (e.g., Java, Python, C#, JavaScript, React, Vue, Angular, .NET, Spring, Docker, Kubernetes). Keep concise names; no marketing phrases.
+  - **seniority**: Choose from {Intern, Junior, Mid-level, Intermediate, Senior, Lead, Principal, Manager, Director, Level x}; if unclear, leave empty.
+  - **key_responsibilities**: 3-5 concise duties, one line each; if fewer are explicit, return only those.
+  - **experience_years**: ONLY if short form like "2-4 years", "3-5 years", "5+ years", "at least 2 years"; otherwise empty string.
+  - **education_requirement**: Short degree requirement (e.g., "Bachelor in CS", "Master preferred"); if vague ("relevant degree"), leave empty.
+  - **soft_skills**: Explicit soft skills (communication, teamwork, leadership, problem-solving, adaptability, etc.); no inference.
+  - **company_culture_keywords**: Only culture words explicitly stated (e.g., fast-paced, collaborative, innovative, agile); else [].
+  - **hiring_priorities**: Based only on repeated/explicit emphasis; list up to 3. If no clear signals, return [].
 
   **Examples for hiring_priorities:**
   - If job heavily emphasizes collaboration and mentoring: ["Team collaboration", "Mentorship ability", "Communication"]
