@@ -117,7 +117,7 @@ async def prefilter_candidates_by_title(
           AND r.analysis_result IS NOT NULL
           AND LOWER(:title) = ANY (
               SELECT LOWER(elem::text)::text
-              FROM jsonb_array_elements_text(r.analysis_result->'target_job_titles') AS elem
+              FROM jsonb_array_elements_text((r.analysis_result)::jsonb->'target_job_titles') AS elem
           )
         LIMIT :max_candidates
         """
@@ -194,7 +194,7 @@ async def user_has_title_target(db: AsyncSession, *, user_id: int, normalized_jo
           AND r.analysis_result IS NOT NULL
           AND LOWER(:title) = ANY (
               SELECT LOWER(elem::text)::text
-              FROM jsonb_array_elements_text(r.analysis_result->'target_job_titles') AS elem
+              FROM jsonb_array_elements_text((r.analysis_result)::jsonb->'target_job_titles') AS elem
           )
         LIMIT 1
         """
