@@ -2,11 +2,17 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class AdminBase(BaseModel):
+    """Base model enabling population by field name for alias support."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ===== Dashboard Stats =====
-class MetricCount(BaseModel):
+class MetricCount(AdminBase):
     total: int
     today_new: int = Field(..., alias="todayNew")
 
@@ -16,7 +22,7 @@ class TaskMetric(MetricCount):
     failed: int
 
 
-class DashboardStats(BaseModel):
+class DashboardStats(AdminBase):
     users: MetricCount
     jobs: MetricCount
     matches: MetricCount
@@ -25,7 +31,7 @@ class DashboardStats(BaseModel):
 
 
 # ===== Worker Monitor =====
-class WorkerStatus(BaseModel):
+class WorkerStatus(AdminBase):
     id: str
     hostname: str
     status: str  # "active" | "offline"
@@ -33,7 +39,7 @@ class WorkerStatus(BaseModel):
     last_heartbeat: Optional[datetime] = Field(None, alias="lastHeartbeat")
 
 
-class WorkerMonitorResponse(BaseModel):
+class WorkerMonitorResponse(AdminBase):
     active_count: int = Field(..., alias="activeCount")
     queued_tasks: int = Field(..., alias="queuedTasks")
     running_tasks: int = Field(..., alias="runningTasks")
@@ -41,7 +47,7 @@ class WorkerMonitorResponse(BaseModel):
 
 
 # ===== Task List =====
-class TaskListItem(BaseModel):
+class TaskListItem(AdminBase):
     id: str
     task_name: str = Field(..., alias="taskName")
     task_type: Optional[str] = Field(None, alias="taskType")
@@ -62,7 +68,7 @@ class TaskListItem(BaseModel):
     completed_at: Optional[datetime] = Field(None, alias="completedAt")
 
 
-class TaskListStats(BaseModel):
+class TaskListStats(AdminBase):
     failed: int
     timeout: int
     success: int
@@ -70,7 +76,7 @@ class TaskListStats(BaseModel):
     task_type_distribution: Dict[str, int] = Field(..., alias="taskTypeDistribution")
 
 
-class TaskListResponse(BaseModel):
+class TaskListResponse(AdminBase):
     items: List[TaskListItem]
     total: int
     page: int
@@ -80,7 +86,7 @@ class TaskListResponse(BaseModel):
 
 
 # ===== Task Details =====
-class AICallDetail(BaseModel):
+class AICallDetail(AdminBase):
     id: str
     model: str
     agent_id: Optional[str] = Field(None, alias="agentId")
@@ -94,7 +100,7 @@ class AICallDetail(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
 
 
-class TaskDetailResponse(BaseModel):
+class TaskDetailResponse(AdminBase):
     id: str
     task_name: str = Field(..., alias="taskName")
     task_type: Optional[str] = Field(None, alias="taskType")
@@ -118,25 +124,25 @@ class TaskDetailResponse(BaseModel):
 
 
 # ===== Task Retry =====
-class TaskRetryResponse(BaseModel):
+class TaskRetryResponse(AdminBase):
     message: str
     original_task_id: str = Field(..., alias="originalTaskId")
     new_task_id: str = Field(..., alias="newTaskId")
     status: str
 
 
-class BatchRetryRequest(BaseModel):
+class BatchRetryRequest(AdminBase):
     task_ids: List[str] = Field(..., alias="taskIds")
 
 
-class BatchRetryResult(BaseModel):
+class BatchRetryResult(AdminBase):
     original_task_id: str = Field(..., alias="originalTaskId")
     new_task_id: Optional[str] = Field(None, alias="newTaskId")
     status: str  # "success" | "failed"
     error: Optional[str] = None
 
 
-class BatchRetryResponse(BaseModel):
+class BatchRetryResponse(AdminBase):
     message: str
     success_count: int = Field(..., alias="successCount")
     failed_count: int = Field(..., alias="failedCount")
@@ -144,7 +150,7 @@ class BatchRetryResponse(BaseModel):
 
 
 # ===== Task Statistics =====
-class TaskTypeStats(BaseModel):
+class TaskTypeStats(AdminBase):
     task_type: str = Field(..., alias="taskType")
     avg_duration_ms: Optional[float] = Field(None, alias="avgDurationMs")
     failure_rate_pct: Optional[float] = Field(None, alias="failureRatePct")
@@ -154,5 +160,5 @@ class TaskTypeStats(BaseModel):
     total_count: int = Field(..., alias="totalCount")
 
 
-class TaskStatisticsResponse(BaseModel):
+class TaskStatisticsResponse(AdminBase):
     task_type_stats: List[TaskTypeStats] = Field(..., alias="taskTypeStats")
