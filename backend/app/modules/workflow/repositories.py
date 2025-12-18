@@ -28,6 +28,8 @@ class TaskRepository:
         priority: str = "normal",
         input_data: Optional[dict] = None,
         depends_on: Optional[list[str]] = None,
+        step: int,
+        total_steps: int,
     ) -> TaskExecution:
         task = TaskExecution(
             id=id,
@@ -41,6 +43,8 @@ class TaskRepository:
             status=TaskStatus.PENDING,
             input_data=input_data,
             depends_on=depends_on,
+            step=step,
+            total_steps=total_steps,
         )
         db.add(task)
         await db.flush()

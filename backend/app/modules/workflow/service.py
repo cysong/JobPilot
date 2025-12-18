@@ -77,6 +77,8 @@ class TaskService:
             task_type=info.value,
             task_name=info.display_name,
             input_data=input_data or {},
+            step=1,
+            total_steps=1,
             depends_on=depends_on,
         )
         await db.flush()
@@ -143,8 +145,9 @@ class TaskService:
         created: list[TaskExecution] = []
         signatures = []
         prev_task_id: str | None = None
+        total_steps = len(tasks)
 
-        for spec in tasks:
+        for idx, spec in enumerate(tasks, start=1):
             info: TaskTypeInfo = spec.task_type.value
             task_id = str(uuid4())
             task = await TaskRepository.create(
@@ -157,6 +160,8 @@ class TaskService:
                 task_type=info.value,
                 task_name=info.display_name,
                 input_data=spec.input_data or {},
+                step=idx,
+                total_steps=total_steps,
                 depends_on=[prev_task_id] if prev_task_id else None,
             )
             await db.flush()
@@ -441,7 +446,7 @@ class TaskService:
             await db.execute(
                 select(TaskExecution)
                 .where(TaskExecution.workflow_id == original.workflow_id)
-                .order_by(TaskExecution.created_at.asc())
+                .order_by(TaskExecution.step.asc())
             )
         ).scalars().all()
         if not workflow_tasks:

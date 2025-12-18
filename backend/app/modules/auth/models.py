@@ -22,8 +22,8 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
-        nullable=False,
         index=True,
+        nullable=False,
         comment="User email address (unique identifier)"
     )
     hashed_password: Mapped[str] = mapped_column(
@@ -61,7 +61,6 @@ class User(Base, TimestampMixin):
 
     # Indexes
     __table_args__ = (
-        Index("ix_users_email", "email"),
         Index("ix_users_role", "role"),
     )
 
