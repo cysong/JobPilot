@@ -94,6 +94,7 @@ class ApplicationRepository:
             .options(
                 selectinload(Application.job),
                 selectinload(Application.resume_document),
+                selectinload(Application.source_resume).selectinload(Resume.document),
             )
         )
         result = await db.execute(query)
