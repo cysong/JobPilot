@@ -45,7 +45,7 @@ async def pull_unmatched_jobs(self) -> dict:
 async def _get_last_execution_time(db: AsyncSession):
     stmt = (
         select(func.max(TaskExecution.created_at))
-        .where(TaskExecution.task_type == "job_user_matching")
+        .where(TaskExecution.task_type == TaskType.JOB_USER_MATCHING.value.value)
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()

@@ -22,13 +22,9 @@ from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Document, DocumentFormat
 from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
+from backend.app.modules.applications.config import app_module_settings
 
 logger = logging.getLogger(__name__)
-
-
-WORKFLOW_VERSION = "v1.0.0"
-MAX_REVIEW_ITERATIONS = 2
-REVIEW_PASS_SCORE = 8.0
 
 
 async def run_cover_letter_task(
@@ -208,7 +204,7 @@ async def _generate_with_review(
     """Generate draft, review, and iterate up to MAX_REVIEW_ITERATIONS."""
     last_review: Optional[ReviewResult] = None
 
-    for attempt in range(MAX_REVIEW_ITERATIONS):
+    for attempt in range(app_module_settings.MAX_REVIEW_ITERATIONS):
         writer_input = _build_writer_prompt(
             job_analysis=job_analysis,
             resume_analysis=resume_analysis,
@@ -238,7 +234,7 @@ async def _generate_with_review(
         last_review = review_output if isinstance(
             review_output, ReviewResult) else ReviewResult(**review_output)
 
-        if (not last_review.needs_revision) and (last_review.overall_score >= REVIEW_PASS_SCORE):
+        if (not last_review.needs_revision) and (last_review.overall_score >= app_module_settings.REVIEW_PASS_SCORE):
             return draft_text, last_review
 
     # Return last attempt even if review not passing

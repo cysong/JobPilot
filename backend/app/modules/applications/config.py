@@ -11,10 +11,9 @@ class ApplicationModuleSettings(BaseSettings):
     OUTBOX_MAX_CONCURRENT: int = 5  # Maximum concurrent event processing
     OUTBOX_CONSUMER_INTERVAL_SECONDS: float = 5.0  # How often to poll for events
 
-    # Workflow settings
-    WORKFLOW_VERSION: str = "v1.0.0"
-    COVER_LETTER_PROMPT_ID: str = "cover_letter_v1"
-    COVER_LETTER_MODEL: str = "deepseek-chat"
+    # Cover letter generation settings
+    MAX_REVIEW_ITERATIONS: int = 2
+    REVIEW_PASS_SCORE: float = 8.0
 
     class Config:
         env_prefix = "APP_MODULE_"
