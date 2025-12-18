@@ -5,12 +5,87 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2025-12-17
+**Last Updated:** 2025-12-18
 
 ---
 
 ## Work Log
 
+
+### 2025-12-18 - User Skills Management System Implemented
+
+**Completed Tasks:**
+
+**Backend Implementation:**
+- ✅ **Data Models**: Created dual-table architecture for skill management
+  - `ResumeSkill`: Stores raw skills extracted from resume analysis (UUID primary key)
+  - `UserSkill`: Stores aggregated and deduplicated user skills (UUID primary key)
+  - Added `ProficiencyLevel` enum (beginner, intermediate, advanced, expert)
+  - Updated User model to include skills relationship
+- ✅ **Task System**: Implemented `SKILL_AGGREGATION` task type based on `DBTrackingTask`
+  - `aggregate_user_skills_task`: Async Celery task for skill aggregation
+  - Automatically triggered after resume analysis (for formal resumes only)
+  - Automatically triggered when formal resumes are deleted
+- ✅ **Service Layer**: Created comprehensive skill management service ([app/modules/users/service.py](../backend/app/modules/users/service.py))
+  - `aggregate_user_skills()`: Deduplication and merging logic with priority rules
+  - `get_user_skills()`: Retrieve all user skills with sorting
+  - `create_user_skill()`: Manually add skills
+  - `update_user_skill()`: Update proficiency (marks as manual)
+  - `delete_user_skill()`: Delete skills
+  - `save_resume_skills()`: Save skills from resume analysis
+- ✅ **API Endpoints**: Created skill management REST API ([app/modules/users/router.py](../backend/app/modules/users/router.py))
+  - `GET /api/v1/skills` - List all user skills with statistics
+  - `POST /api/v1/skills` - Manually add a skill
+  - `PUT /api/v1/skills/{skill_id}` - Update skill proficiency
+  - `DELETE /api/v1/skills/{skill_id}` - Delete a skill
+  - `POST /api/v1/skills/sync` - Manually trigger skill aggregation
+- ✅ **Workflow Integration**:
+  - Resume analysis flow: Extracts skills → saves to resume_skills → triggers aggregation
+  - Resume deletion flow: Soft delete → triggers skill re-aggregation (for formal resumes)
+- ✅ **Dependency Injection**: Updated router to use `Annotated` format with `get_current_user`
+
+**Frontend Implementation:**
+- ✅ Created TypeScript types ([frontend/src/types/skill.ts](../frontend/src/types/skill.ts))
+  - ProficiencyLevel enum
+  - UserSkill, UserSkillCreate, UserSkillUpdate interfaces
+  - UserSkillListResponse, SkillSyncResponse
+- ✅ Built Skills API client ([frontend/src/api/skills.ts](../frontend/src/api/skills.ts))
+  - getSkills(), createSkill(), updateSkill(), deleteSkill(), syncSkills()
+- ✅ Implemented React Query hooks ([frontend/src/features/skills/hooks/useSkills.ts](../frontend/src/features/skills/hooks/useSkills.ts))
+  - useSkills() for data fetching
+  - useSkillMutations() for CRUD operations
+- ✅ Built comprehensive UI components:
+  - `SkillsManagement`: Main management component with statistics and skill lists
+  - `AddSkillDialog`: Modal for manually adding skills
+  - `EditSkillDialog`: Modal for updating skill proficiency
+- ✅ Created Skills page ([frontend/src/features/skills/SkillsPage.tsx](../frontend/src/features/skills/SkillsPage.tsx))
+- ✅ **Navigation Integration**:
+  - Added `/skills` route to App.tsx
+  - Added "Skills" menu item to desktop navigation (Navigation.tsx)
+  - Added "Skills" menu item to mobile navigation (MobileNav.tsx) with Award icon
+
+**Key Features Implemented:**
+- Dual-table design: resume_skills (raw) + user_skills (aggregated)
+- Automatic skill extraction from resume analysis
+- Manual skill management (add/edit/delete)
+- Skill deduplication across multiple resumes
+- Priority-based merging: manual skills > high proficiency skills
+- Cascade deletion: resume_skills auto-deleted when resume is deleted
+- Real-time skill aggregation via Celery tasks
+- Comprehensive UI with statistics and categorization (manual vs auto-extracted)
+- Mobile-responsive design using shadcn/ui components
+
+**Database Migration:**
+- Migration file created: `20251218_2247_b6a3d58b1436_refactor_user_skills.py`
+- User needs to execute: `uv run alembic upgrade head`
+
+**Pending:**
+- Execute database migration manually
+- Test skill extraction from resume analysis
+- Test skill aggregation after resume deletion
+- Verify UI functionality in browser
+
+---
 
 ### 2025-12-17 - Admin Dashboard Backend Foundations
 **Completed Tasks:**
