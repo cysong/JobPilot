@@ -22,7 +22,9 @@ export default function AdminDashboardPage() {
           <p className="text-sm text-slate-600">Monitor system health and worker status.</p>
         </div>
         <Button variant="outline" size="sm" onClick={refresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${statsQuery.isFetching || workerQuery.isFetching ? 'animate-spin' : ''}`}
+          />
           Refresh
         </Button>
       </div>

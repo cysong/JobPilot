@@ -33,4 +33,5 @@ export const adminApi = {
     startTime?: string
     endTime?: string
   }) => apiClient.get<TaskStatisticsResponse>('/admin/tasks/statistics', { params }),
+  getTaskTypes: () => apiClient.get<Array<{ value: string; displayName: string }>>('/tasks/types'),
 }

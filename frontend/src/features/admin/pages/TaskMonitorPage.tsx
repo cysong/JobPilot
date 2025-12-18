@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
 import { TaskFilters } from '../components/TaskFilters'
@@ -7,18 +8,35 @@ import { TaskStatistics } from '../components/TaskStatistics'
 import { useTasks } from '../hooks/useTasks'
 import { useTaskStatistics } from '../hooks/useTaskStatistics'
 import { useRetryTask } from '../hooks/useRetryTask'
+import { useTaskTypes } from '../hooks/useTaskTypes'
 
 export default function TaskMonitorPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState<{
     status?: string
     taskType?: string
     workerId?: string
     keyword?: string
-  }>({})
+  }>({
+    status: searchParams.get('status') || undefined,
+    taskType: searchParams.get('taskType') || undefined,
+    workerId: searchParams.get('workerId') || undefined,
+    keyword: searchParams.get('keyword') || undefined,
+  })
 
   const tasksQuery = useTasks({ ...filters, page: 1, pageSize: 20, status: filters.status })
   const statsQuery = useTaskStatistics({ status: filters.status, taskType: filters.taskType })
   const retryMutation = useRetryTask()
+  const taskTypesQuery = useTaskTypes()
+
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (filters.status) next.set('status', filters.status)
+    if (filters.taskType) next.set('taskType', filters.taskType)
+    if (filters.workerId) next.set('workerId', filters.workerId)
+    if (filters.keyword) next.set('keyword', filters.keyword)
+    setSearchParams(next, { replace: true })
+  }, [filters, setSearchParams])
 
   const refresh = () => {
     tasksQuery.refetch()
@@ -37,12 +55,19 @@ export default function TaskMonitorPage() {
           <p className="text-sm text-slate-600">Filter, inspect, and retry Celery tasks.</p>
         </div>
         <Button variant="outline" size="sm" onClick={refresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw className={`h-4 w-4 mr-2 ${tasksQuery.isFetching || statsQuery.isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
 
-      <TaskFilters onChange={setFilters} />
+      <TaskFilters
+        status={filters.status}
+        taskType={filters.taskType}
+        workerId={filters.workerId}
+        keyword={filters.keyword}
+        taskTypesOptions={taskTypesQuery.data || []}
+        onChange={setFilters}
+      />
 
       <TaskList
         items={tasksQuery.data?.items || []}
