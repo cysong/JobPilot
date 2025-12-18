@@ -88,7 +88,12 @@ class WorkExperience(BaseModel):
 
     company: str = Field(..., description="Company name")
     role: str = Field(..., description="Job title/role")
-    duration: tuple[str, str] = Field(..., description="Start and end date [from, to]")
+    duration: list[str] = Field(
+        ...,
+        description="Start and end date [from, to]",
+        min_length=2,
+        max_length=2,
+    )
     key_achievements: list[str] = Field(default_factory=list, description="Key achievements")
     technologies_used: list[str] = Field(default_factory=list, description="Technologies used")
 
