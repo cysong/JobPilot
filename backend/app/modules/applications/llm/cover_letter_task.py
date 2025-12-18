@@ -46,13 +46,6 @@ async def run_cover_letter_task(
     Args:
         is_retry: If True, indicates retry attempt (creates new version chain from previous)
     """
-    ctx: GatewayContext = {
-        "db": db,
-        "workflow_id": workflow_id,
-        "task_id": task_id,
-        "user_id": application.user_id,
-        "operation": "cover_letter",
-    }
 
     # Fetch pre-calculated analysis
     from app.modules.jobs.repository import JobAnalysisRepository
@@ -115,7 +108,11 @@ async def run_cover_letter_task(
         job_analysis=job_analysis,
         resume_analysis=resume_analysis,
         tailored_resume_content=tailored_resume_content,
-        ctx=ctx,
+        context={
+            "db": db,
+            "task_id": task_id,
+            "user_id": application.user_id,
+        },
     )
 
     if is_retry:
@@ -221,8 +218,7 @@ async def _generate_with_review(
         draft_output = await AgentGateway.get().call(
             agent_id="cover_letter_writer",
             input_data=writer_input,
-            context={
-                **ctx, "operation": f"cover_letter_generate_attempt_{attempt+1}"},
+            context=ctx,
         )
         draft = draft_output if isinstance(
             draft_output, CoverLetterDraft) else CoverLetterDraft(**draft_output)
@@ -236,8 +232,7 @@ async def _generate_with_review(
         review_output = await AgentGateway.get().call(
             agent_id="reviewer",
             input_data=review_input,
-            context={
-                **ctx, "operation": f"cover_letter_review_attempt_{attempt+1}"},
+            context=ctx,
         )
         last_review = review_output if isinstance(
             review_output, ReviewResult) else ReviewResult(**review_output)

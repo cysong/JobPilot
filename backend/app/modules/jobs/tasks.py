@@ -40,7 +40,7 @@ async def analyze_job_task(
     translated = await AgentGateway.get().call(
         agent_id="universal_translator",
         input_data=translation_input,
-        context={"db": self.db, "operation": "job_translation", "job_id": job_id},
+        context={"db": self.db, "task_id": task_id},
     )
     cn_content = (
         translated.content if isinstance(translated, TranslatedText) else translated.get("content")
@@ -49,7 +49,7 @@ async def analyze_job_task(
     result = await AgentGateway.get().call(
         agent_id="job_analyzer",
         input_data=content,
-        context={"db": self.db, "operation": "job_analysis", "job_id": job_id},
+        context={"db": self.db, "task_id": task_id},
     )
 
     analysis_data = result.model_dump() if isinstance(result, AnalyzedJob) else result

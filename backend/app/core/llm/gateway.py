@@ -120,8 +120,8 @@ class AgentGateway:
         logger.info(
             "agent_call_started",
             agent_id=agent_id,
+            task_id=context.get("task_id"),
             model=getattr(agent, "model", None),
-            workflow_id=context.get("workflow_id"),
             operation=context.get("operation"),
         )
 
@@ -143,6 +143,7 @@ class AgentGateway:
         logger.info(
             "agent_call_completed",
             agent_id=agent_id,
+            task_id=context.get("task_id"),
             model=getattr(agent, "model", None),
             status="success",
             latency_ms=latency_ms,
@@ -151,7 +152,6 @@ class AgentGateway:
             total_tokens=getattr(usage, "total_tokens", None),
             requests=getattr(usage, "requests", None),
             estimated_cost=estimated_cost,
-            workflow_id=context.get("workflow_id"),
             operation=context.get("operation"),
         )
 
@@ -168,11 +168,11 @@ class AgentGateway:
         logger.error(
             "agent_call_failed",
             agent_id=agent_id,
+            task_id=context.get("task_id"),
             model=getattr(agent, "model", None),
             status=error_type,
             error=str(error),
             latency_ms=latency_ms,
-            workflow_id=context.get("workflow_id"),
             operation=context.get("operation"),
         )
 

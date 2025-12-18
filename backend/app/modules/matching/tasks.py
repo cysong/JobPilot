@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -149,6 +150,7 @@ async def analyze_match_with_ai_task(
         result = await AgentGateway.get().call(
             agent_id="match_analyzer",
             input_data=json.dumps(payload),
+            context={"db": self.db, "user_id": user_id},
         )
         ai_result = result.model_dump() if isinstance(result, MatchAnalysis) else result
 

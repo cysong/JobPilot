@@ -41,14 +41,6 @@ async def run_resume_tailoring(
     3. Save tailored resume as new versioned Document.
     4. Update Application to point to new version.
     """
-    ctx: GatewayContext = {
-        "db": db,
-        "workflow_id": workflow_id,
-        "task_id": task_id,
-        "operation": "resume_tailoring",
-        "user_id": None,
-    }
-    
     # 1. Gather Context
     job_analysis_model = await JobAnalysisRepository.get_by_job_id(db, job_id)
     if not job_analysis_model:
@@ -70,7 +62,6 @@ async def run_resume_tailoring(
     application = await ApplicationRepository.get_by_id(db, application_id)
     if not application:
         raise ValueError(f"Application {application_id} not found")
-    ctx["user_id"] = application.user_id
 
     # Always read from source resume (unified logic for both initial and retry)
     source_resume = await ResumeRepository.get_with_document(db, resume_id)
@@ -109,7 +100,11 @@ async def run_resume_tailoring(
     tailored_content = await AgentGateway.get().call(
         agent_id="resume_tailor",
         input_data=prompt_input,
-        context=ctx
+        context={
+            "db": db,
+            "task_id": task_id,
+            "user_id": application.user_id
+        },
     )
     
     if isinstance(tailored_content, TailoredResume):

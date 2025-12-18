@@ -29,10 +29,7 @@ async def analyze_resume_task(
         input_data=content,
         context={
             "db": self.db,
-            "operation": "resume_analysis",
-            "workflow_id": workflow_id,
             "task_id": task_id,
-            "resume_id": resume_id,
             "user_id": resume.user_id,
         },
     )
