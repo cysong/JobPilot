@@ -111,7 +111,7 @@ async def run_cover_letter_task(
         context={
             "db": db,
             "task_id": task_id,
-            "user_id": application.user_id,
+            "user_id": application.user_id
         },
     )
 
@@ -165,7 +165,8 @@ async def run_cover_letter_task(
             parent_id=None,
             format=DocumentFormat.MARKDOWN,
             content=cover_letter_content,
-            content_hash=ResumeService._calculate_content_hash(cover_letter_content),
+            content_hash=DocumentRepository._calculate_content_hash(
+                cover_letter_content),
             change_comments="AI-generated cover letter",
             extra_metadata={
                 "application_id": application.id,
@@ -202,7 +203,7 @@ async def _generate_with_review(
     job_analysis: AnalyzedJob,
     resume_analysis: AnalyzedResume,
     tailored_resume_content: str,
-    ctx: GatewayContext,
+    context: GatewayContext,
 ) -> tuple[str, Optional[ReviewResult]]:
     """Generate draft, review, and iterate up to MAX_REVIEW_ITERATIONS."""
     last_review: Optional[ReviewResult] = None
@@ -218,7 +219,7 @@ async def _generate_with_review(
         draft_output = await AgentGateway.get().call(
             agent_id="cover_letter_writer",
             input_data=writer_input,
-            context=ctx,
+            context=context,
         )
         draft = draft_output if isinstance(
             draft_output, CoverLetterDraft) else CoverLetterDraft(**draft_output)
@@ -232,7 +233,7 @@ async def _generate_with_review(
         review_output = await AgentGateway.get().call(
             agent_id="reviewer",
             input_data=review_input,
-            context=ctx,
+            context=context,
         )
         last_review = review_output if isinstance(
             review_output, ReviewResult) else ReviewResult(**review_output)
