@@ -8,9 +8,17 @@ interface Props {
   items: TaskListItem[]
   isLoading: boolean
   onRetry: (taskId: string) => void
+  page: number
+  pageSize: number
+  total: number
+  onPageChange: (page: number) => void
 }
 
-export function TaskList({ items, isLoading, onRetry }: Props) {
+export function TaskList({ items, isLoading, onRetry, page, pageSize, total, onPageChange }: Props) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const hasPrev = page > 1
+  const hasNext = page < totalPages
+
   return (
     <Card className="shadow-sm border-slate-200">
       <CardHeader>
@@ -32,8 +40,7 @@ export function TaskList({ items, isLoading, onRetry }: Props) {
                   <Badge variant={t.status === 'Failed' ? 'destructive' : 'outline'}>{t.status}</Badge>
                 </div>
                 <div className="text-xs text-slate-600">
-                  Worker: {t.workerId || '—'} · Retry: {t.retryCount}/{t.maxRetries} · AI Cost: $
-                  {t.aiCost.toFixed(2)}
+                  Worker: {t.workerId || 'n/a'} | Retry: {t.retryCount}/{t.maxRetries} | AI Cost: ${t.aiCost.toFixed(2)}
                 </div>
                 <div className="text-xs text-slate-500">
                   Created {formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })}
@@ -47,6 +54,19 @@ export function TaskList({ items, isLoading, onRetry }: Props) {
               </div>
             </div>
           ))}
+        <div className="flex items-center justify-between pt-2 text-sm text-slate-600">
+          <span>
+            Page {page} / {totalPages} | Total {total}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={!hasPrev} onClick={() => hasPrev && onPageChange(page - 1)}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={!hasNext} onClick={() => hasNext && onPageChange(page + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

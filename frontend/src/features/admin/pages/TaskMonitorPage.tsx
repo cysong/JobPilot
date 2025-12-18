@@ -23,8 +23,10 @@ export default function TaskMonitorPage() {
     workerId: searchParams.get('workerId') || undefined,
     keyword: searchParams.get('keyword') || undefined,
   })
+  const [page, setPage] = useState(() => Number(searchParams.get('page')) || 1)
+  const pageSize = 20
 
-  const tasksQuery = useTasks({ ...filters, page: 1, pageSize: 20, status: filters.status })
+  const tasksQuery = useTasks({ ...filters, page, pageSize, status: filters.status })
   const statsQuery = useTaskStatistics({ status: filters.status, taskType: filters.taskType })
   const retryMutation = useRetryTask()
   const taskTypesQuery = useTaskTypes()
@@ -35,8 +37,9 @@ export default function TaskMonitorPage() {
     if (filters.taskType) next.set('taskType', filters.taskType)
     if (filters.workerId) next.set('workerId', filters.workerId)
     if (filters.keyword) next.set('keyword', filters.keyword)
+    if (page > 1) next.set('page', String(page))
     setSearchParams(next, { replace: true })
-  }, [filters, setSearchParams])
+  }, [filters, page, setSearchParams])
 
   const refresh = () => {
     tasksQuery.refetch()
@@ -66,13 +69,20 @@ export default function TaskMonitorPage() {
         workerId={filters.workerId}
         keyword={filters.keyword}
         taskTypesOptions={taskTypesQuery.data || []}
-        onChange={setFilters}
+        onChange={(next) => {
+          setFilters(next)
+          setPage(1)
+        }}
       />
 
       <TaskList
         items={tasksQuery.data?.items || []}
         isLoading={tasksQuery.isLoading}
         onRetry={handleRetry}
+        page={page}
+        pageSize={pageSize}
+        total={tasksQuery.data?.total || 0}
+        onPageChange={setPage}
       />
 
       <TaskStatistics items={statsQuery.data?.taskTypeStats || []} isLoading={statsQuery.isLoading} />
