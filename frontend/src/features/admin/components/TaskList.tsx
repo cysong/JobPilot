@@ -1,3 +1,4 @@
+import { formatDistanceToNow } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,9 @@ export function TaskList({ items, isLoading, onRetry }: Props) {
                 <div className="text-xs text-slate-600">
                   Worker: {t.workerId || '—'} · Retry: {t.retryCount}/{t.maxRetries} · AI Cost: $
                   {t.aiCost.toFixed(2)}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Created {formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })}
                 </div>
                 {t.errorMessage && <div className="text-xs text-red-600 line-clamp-1">{t.errorMessage}</div>}
               </div>
