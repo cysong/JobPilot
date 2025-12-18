@@ -108,9 +108,9 @@ export interface TaskDetailResponse {
 
 export interface TaskRetryResponse {
   message: string
-  originalTaskId: string
-  newTaskId: string
+  taskId: string
   status: string
+  retriedTaskIds: string[]
 }
 
 export interface BatchRetryRequest {

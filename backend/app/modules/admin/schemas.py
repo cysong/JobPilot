@@ -126,8 +126,7 @@ class TaskDetailResponse(AdminBase):
 # ===== Task Retry =====
 class TaskRetryResponse(AdminBase):
     message: str
-    original_task_id: str = Field(..., alias="originalTaskId")
-    new_task_id: str = Field(..., alias="newTaskId")
+    task_id: str = Field(..., alias="taskId")
     status: str
     retried_task_ids: List[str] = Field(default_factory=list, alias="retriedTaskIds")
 

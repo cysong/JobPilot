@@ -507,8 +507,7 @@ class TaskService:
 
         return TaskRetryResponse(
             message="Task retry submitted",
-            original_task_id=task_id,
-            new_task_id=to_retry[0].id,
+            task_id=task_id,
             status="PENDING",
             retried_task_ids=[t.id for t in to_retry],
         )
