@@ -8,6 +8,7 @@ from app.shared.enums import Role
 
 if TYPE_CHECKING:
     from app.modules.resumes.models import Resume, Document
+    from app.modules.users.models import UserSkill
 
 
 class User(Base, TimestampMixin):

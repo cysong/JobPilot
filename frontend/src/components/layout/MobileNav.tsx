@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, Briefcase, LayoutDashboard, FileText, Send } from 'lucide-react'
+import { Menu, Briefcase, LayoutDashboard, FileText, Send, Award } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +38,11 @@ const navItems: NavItem[] = [
         title: 'Resumes',
         href: '/resumes',
         icon: FileText,
+    },
+    {
+        title: 'Skills',
+        href: '/skills',
+        icon: Award,
     },
 ]
 

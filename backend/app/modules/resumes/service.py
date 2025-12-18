@@ -17,11 +17,11 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.response_codes import ResponseCode
-from app.modules.resumes.models import Document, DocumentFormat, Resume
+from app.modules.resumes.models import Document, DocumentFormat, Resume, ResumeSkill
 from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
-from app.shared.enums import TaskType
+from app.shared.enums import TaskType, ProficiencyLevel
 
 
 # Global configuration for formal resume limit (can be moved to config later)
@@ -193,11 +193,31 @@ class ResumeService:
         if not resume:
             raise NotFoundError("Resume not found")
 
+        # Remember if this is a formal resume before deletion
+        was_formal = not resume.is_draft
+
         resume.is_deleted = True
         resume.deleted_at = datetime.utcnow()
         db.add(resume)
         await db.commit()
         await db.refresh(resume)
+
+        # Trigger skill aggregation if this was a formal resume
+        # (CASCADE will auto-delete resume_skills, aggregation will recalculate user skills)
+        if was_formal:
+            await TaskService.submit_task(
+                db=db,
+                spec=TaskSubmissionSpec(
+                    task_type=TaskType.SKILL_AGGREGATION,
+                    entity_id=resume_id,
+                    user_id=user_id,
+                    input_data={
+                        "user_id": user_id,
+                        "resume_id": resume_id,
+                    },
+                ),
+            )
+            await db.commit()
 
         return resume
 
@@ -365,3 +385,92 @@ class ResumeService:
             raise BadRequestError(str(exc))
         except Exception as exc:  # pragma: no cover - defensive
             raise JobPilotException(str(exc))
+
+    @staticmethod
+    async def save_resume_skills(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        skills: list[dict]
+    ) -> int:
+        """
+        Save or update skills for a resume.
+
+        This function:
+        1. For each skill in the list, INSERT or UPDATE resume_skills
+        2. Delete skills that no longer exist in the new list
+        3. Does NOT commit - caller should commit
+
+        Args:
+            db: Database session
+            resume_id: Resume ID
+            user_id: User ID
+            skills: List of skills [{"name": "Python", "proficiency": "expert"}, ...]
+
+        Returns:
+            Number of skills saved
+        """
+        if not skills:
+            # Delete all skills for this resume
+            from sqlalchemy import delete
+            stmt = delete(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
+            await db.execute(stmt)
+            return 0
+
+        # Step 1 & 2: Insert or update each skill
+        skill_names_in_list = set()
+        for skill_data in skills:
+            skill_name = skill_data.get("name", "").strip()
+            proficiency_str = skill_data.get("proficiency", "").lower()
+
+            if not skill_name or not proficiency_str:
+                continue  # Skip invalid skills
+
+            skill_names_in_list.add(skill_name)
+
+            # Map proficiency string to enum
+            try:
+                proficiency = ProficiencyLevel(proficiency_str)
+            except ValueError:
+                # Invalid proficiency level, skip
+                continue
+
+            # Check if skill already exists
+            stmt = select(ResumeSkill).where(
+                ResumeSkill.resume_id == resume_id,
+                ResumeSkill.skill_name == skill_name
+            )
+            existing_skill = (await db.execute(stmt)).scalar_one_or_none()
+
+            if existing_skill:
+                # Update existing skill
+                existing_skill.proficiency_level = proficiency
+                existing_skill.updated_at = datetime.now()
+            else:
+                # Insert new skill
+                new_skill = ResumeSkill(
+                    id=str(uuid4()),
+                    user_id=user_id,
+                    resume_id=resume_id,
+                    skill_name=skill_name,
+                    proficiency_level=proficiency,
+                    extracted_from=skill_data.get("extracted_from")
+                )
+                db.add(new_skill)
+
+        # Step 3: Delete skills that no longer exist in the new list
+        if skill_names_in_list:
+            from sqlalchemy import delete
+            stmt = delete(ResumeSkill).where(
+                ResumeSkill.resume_id == resume_id,
+                ResumeSkill.skill_name.notin_(skill_names_in_list)
+            )
+            await db.execute(stmt)
+        else:
+            # All skills removed, delete all
+            from sqlalchemy import delete
+            stmt = delete(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
+            await db.execute(stmt)
+
+        # Note: Caller should commit the transaction
+        return len(skill_names_in_list)

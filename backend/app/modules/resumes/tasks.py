@@ -3,8 +3,10 @@
 from app.core.celery_app import celery_app
 from app.core.llm.gateway import AgentGateway
 from app.modules.resumes.repository import ResumeRepository
-from app.modules.users.repository import UserSkillRepository
+from app.modules.resumes.service import ResumeService
 from app.modules.workflow import DBTrackingTask
+from app.modules.workflow.service import TaskService, TaskSubmissionSpec
+from app.shared.enums import TaskType
 from agent_configs.schemas import AnalyzedResume
 
 
@@ -43,21 +45,41 @@ async def analyze_resume_task(
         analysis_version=AnalyzedResume.__version__,
     )
 
+    # Extract and save skills
     technical_skills = analysis_data.get("technical_skills", [])
+    skills_saved = 0
+
     if technical_skills:
-        await UserSkillRepository.upsert_from_resume_analysis(
+        # Save skills to resume_skills table
+        skills_saved = await ResumeService.save_resume_skills(
             db=self.db,
-            user_id=resume.user_id,
-            skills=technical_skills,
             resume_id=resume_id,
+            user_id=resume.user_id,
+            skills=technical_skills
         )
 
     await self.db.commit()
+
+    # Trigger skill aggregation task (only for formal resumes)
+    if not resume.is_draft and skills_saved > 0:
+        await TaskService.submit_task(
+            db=self.db,
+            spec=TaskSubmissionSpec(
+                task_type=TaskType.SKILL_AGGREGATION,
+                entity_id=resume_id,
+                user_id=resume.user_id,
+                input_data={
+                    "user_id": resume.user_id,
+                    "resume_id": resume_id,
+                },
+            ),
+        )
+        await self.db.commit()
 
     return {
         "output_data": {
             "status": "completed",
             "resume_id": resume_id,
-            "skills_extracted": len(technical_skills),
+            "skills_extracted": skills_saved,
         }
     }

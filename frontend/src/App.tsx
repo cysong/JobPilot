@@ -13,6 +13,7 @@ import ApplicationListingPage from '@/features/applications/ApplicationListingPa
 import ApplicationDetailPage from '@/features/applications/ApplicationDetailPage'
 import ResumeListingPage from '@/features/resumes/ResumeListingPage'
 import ResumeEditPage from '@/features/resumes/ResumeEditPage'
+import { SkillsPage } from '@/features/skills/SkillsPage'
 import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
 import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
 import { Role } from '@/types/auth'
@@ -53,6 +54,7 @@ function App() {
             <Route path="/resumes" element={<ResumeListingPage />} />
             <Route path="/resumes/new" element={<ResumeEditPage />} />
             <Route path="/resumes/:id" element={<ResumeEditPage />} />
+            <Route path="/skills" element={<SkillsPage />} />
             <Route path="/profile" element={<PlaceholderPage />} />
             <Route path="/settings" element={<PlaceholderPage />} />
           </Route>

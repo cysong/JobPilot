@@ -10,6 +10,7 @@ from app.modules.jobs.router import router as jobs_router
 from app.modules.resumes.router import router as resumes_router
 from app.modules.applications.router import router as applications_router
 from app.modules.workflow.router import router as workflow_router
+from app.modules.users.router import router as users_router
 
 # Create main API router with custom route class
 api_router = APIRouter(route_class=CustomAPIRoute)
@@ -21,3 +22,4 @@ api_router.include_router(jobs_router)
 api_router.include_router(resumes_router)
 api_router.include_router(applications_router)
 api_router.include_router(workflow_router)
+api_router.include_router(users_router)

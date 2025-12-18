@@ -9,14 +9,12 @@ Document uses chained version model:
 from datetime import datetime
 from typing import Optional
 from enum import Enum
-from datetime import datetime
-from typing import Optional
-from enum import Enum
 
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, Integer, BigInteger, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
+from app.shared.enums import ProficiencyLevel
 
 
 class DocumentFormat(str, Enum):
@@ -112,3 +110,41 @@ class Resume(Base, TimestampMixin):
 
     def __repr__(self):
         return f"<Resume(id={self.id}, title={self.title}, is_draft={self.is_draft})>"
+
+
+class ResumeSkill(Base, TimestampMixin):
+    """
+    Resume skill model.
+
+    Stores skills extracted from resume analysis.
+    Automatically deleted when resume is deleted (CASCADE).
+    """
+    __tablename__ = "resume_skills"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+
+    # Foreign keys
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    resume_id: Mapped[str] = mapped_column(String(255), ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Skill data
+    skill_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    proficiency_level: Mapped[ProficiencyLevel] = mapped_column(SQLEnum(ProficiencyLevel, native_enum=False), nullable=False)
+
+    # Optional metadata (JSON field for storing extraction context)
+    extracted_from: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="Optional: which section this skill was extracted from")
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    resume: Mapped["Resume"] = relationship("Resume", foreign_keys=[resume_id])
+
+    # Table constraints
+    __table_args__ = (
+        UniqueConstraint("resume_id", "skill_name", name="uk_resume_skill"),
+        Index("idx_resume_skills_user", "user_id", "skill_name"),
+        Index("idx_resume_skills_resume", "resume_id"),
+    )
+
+    def __repr__(self):
+        return f"<ResumeSkill(id={self.id}, resume_id={self.resume_id}, skill={self.skill_name}, level={self.proficiency_level})>"

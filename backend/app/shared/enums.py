@@ -122,6 +122,16 @@ class TaskType(Enum):
         timeout_seconds=600,
     )
 
+    # User skill aggregation task
+    SKILL_AGGREGATION = TaskTypeInfo(
+        value="skill_aggregation",
+        display_name="Skill Aggregation",
+        celery_task="app.modules.users.tasks.aggregate_user_skills_task",
+        entity="resume",
+        max_retries=2,
+        timeout_seconds=180,
+    )
+
     # Generic tasks (reserved for future use)
     DOCUMENT_GENERATION = TaskTypeInfo(
         value="document_generation",
@@ -166,10 +176,10 @@ class DocumentFormat(str, Enum):
 
 class ProficiencyLevel(str, Enum):
     """Skill proficiency level enumeration"""
-    BEGINNER = "Beginner"
-    INTERMEDIATE = "Intermediate"
-    ADVANCED = "Advanced"
-    EXPERT = "Expert"
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+    EXPERT = "expert"
 
 
 class EntityType(str, Enum):

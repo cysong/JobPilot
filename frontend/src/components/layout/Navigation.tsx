@@ -11,6 +11,7 @@ export function Navigation() {
         { href: '/jobs', label: 'Jobs' },
         { href: '/applications', label: 'Applications' },
         { href: '/resumes', label: 'Resumes' },
+        { href: '/skills', label: 'Skills' },
     ]
 
     return (
