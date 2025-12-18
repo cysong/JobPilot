@@ -13,7 +13,7 @@ from app.shared.enums import Role
 from app.core.cache import jcache
 
 
-@jcache("user:{email}")
+# @jcache("user:{email}")
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """Get user by email address."""
     result = await db.execute(select(User).where(User.email == email))
