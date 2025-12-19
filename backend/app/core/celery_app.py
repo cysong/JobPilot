@@ -38,6 +38,7 @@ celery_app.autodiscover_tasks([
     "app.modules.jobs",  # Add jobs module for job analysis tasks
     "app.modules.resumes",  # Resume analysis tasks
     "app.modules.matching",  # Matching tasks
+    "app.modules.users",  # User skill aggregation tasks
 ])
 
 # Configure Celery Beat periodic tasks
