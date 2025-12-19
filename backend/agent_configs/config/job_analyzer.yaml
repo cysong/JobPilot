@@ -29,7 +29,12 @@ instructions: |
   - **tech_stack**: Core language/framework families and major platforms/tools (e.g., Java, Python, C#, JavaScript, React, Vue, Angular, .NET, Spring, Docker, Kubernetes). Keep concise names; no marketing phrases.
   - **seniority**: Choose from {Intern, Junior, Mid-level, Intermediate, Senior, Lead, Principal, Manager, Director, Level x}; if unclear, leave empty.
   - **key_responsibilities**: 3-5 concise duties, one line each; if fewer are explicit, return only those.
-  - **experience_years**: ONLY if short form like "2-4 years", "3-5 years", "5+ years", "at least 2 years"; otherwise empty string.
+  - **experience_years**: CRITICAL - STRICT FORMAT REQUIRED (MAX 50 chars):
+    * ONLY extract if job explicitly states years in numeric format
+    * MUST use short form: "2-4 years", "3-5 years", "5+ years", "2+ years"
+    * DO NOT return full sentences or descriptions
+    * Examples - CORRECT: "3-5 years", "5+ years" | WRONG: "Relevant experience in a Systems Engineer role", "Experience in IT infrastructure"
+    * If no clear numeric years stated, return empty string ""
   - **education_requirement**: Short degree requirement (e.g., "Bachelor in CS", "Master preferred"); if vague ("relevant degree"), leave empty.
   - **soft_skills**: Explicit soft skills (communication, teamwork, leadership, problem-solving, adaptability, etc.); no inference.
   - **company_culture_keywords**: Only culture words explicitly stated (e.g., fast-paced, collaborative, innovative, agile); else [].
