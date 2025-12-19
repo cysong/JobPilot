@@ -80,7 +80,7 @@ class TaskType(Enum):
         value="user_job_matching",
         display_name="User-Job Matching",
         celery_task="app.modules.matching.tasks.match_user_recent_jobs_task",
-        entity="job",
+        entity="user",
         max_retries=2,
         timeout_seconds=300,
     )
