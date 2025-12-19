@@ -26,7 +26,7 @@ from app.modules.resumes.schemas import (
     ResumeUpdate,
     WorkflowResponse,
 )
-from app.core.config import Settings
+from app.core.config import settings
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -89,10 +89,10 @@ async def check_formal_resume_limit(
     )
 
     return FormalResumeLimit(
-        limit=Settings.USER_FORMAL_RESUME_LIMIT,
+        limit=settings.USER_FORMAL_RESUME_LIMIT,
         current_count=current_count,
         can_create_more=can_create,
-        remaining=max(0, Settings.USER_FORMAL_RESUME_LIMIT - current_count),
+        remaining=max(0, settings.USER_FORMAL_RESUME_LIMIT - current_count),
     )
 
 
