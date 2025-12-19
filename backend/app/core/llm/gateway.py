@@ -193,12 +193,11 @@ class AgentGateway:
         Creates an ai_call record for tracking and analytics.
         """
         db = context.get("db")
-        workflow_id = context.get("workflow_id")
         task_id = context.get("task_id")
         user_id = context.get("user_id")
 
         # Skip recording if missing required context
-        if not db or not workflow_id or not task_id or not user_id:
+        if not db or not task_id:
             return
 
         # Map status string to AICallStatus enum
@@ -222,7 +221,6 @@ class AgentGateway:
 
         await AICallRepository.create(
             db,
-            workflow_id=workflow_id,
             task_id=task_id,
             user_id=user_id,
             agent_id=agent_id,

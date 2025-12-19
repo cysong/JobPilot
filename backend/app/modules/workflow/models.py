@@ -85,12 +85,12 @@ class AICall(Base, TimestampMixin):
     task_id: Mapped[Optional[str]] = mapped_column(ForeignKey(
         "task_executions.id", ondelete="SET NULL"), nullable=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False, index=True)
+        "users.id", ondelete="SET NULL"), nullable=True, index=True)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
     agent_id: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True)
+        String(100), nullable=False)
     agent_version: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True)
+        String(50), nullable=False)
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[Optional[int]] = mapped_column(

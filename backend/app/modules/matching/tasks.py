@@ -29,16 +29,16 @@ from app.core.llm.gateway import AgentGateway
 @celery_app.task(base=DBTrackingTask, bind=True)
 async def calculate_job_user_matches_task(self, task_id: str, job_analysis_id: int) -> dict:
     """Match users for a single job analysis."""
-    return await _calculate(db=self.db, job_analysis_id=job_analysis_id)
+    return await _calculate(db=self.db, task_id=task_id, job_analysis_id=job_analysis_id)
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
 async def match_user_recent_jobs_task(self, task_id: str, user_id: int, days: int = 30) -> dict:
     """Match a single user against recent jobs (listed within days) that already have analyses."""
-    return await _match_user(db=self.db, user_id=user_id, days=days)
+    return await _match_user(db=self.db, task_id=task_id, user_id=user_id, days=days)
 
 
-async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
+async def _calculate(db: AsyncSession, *, task_id: str, job_analysis_id: int) -> dict:
     analysis = await JobAnalysisRepository.get_by_id(db, job_analysis_id)
     if not analysis:
         return {"status": "job_analysis_not_found", "job_analysis_id": job_analysis_id}
@@ -99,6 +99,7 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
 
             if resume_id:
                 analyze_match_with_ai_task.delay(
+                    task_id=task_id,
                     match_id=match.id,
                     user_id=user_id,
                     job_id=job_analysis.job_id,
@@ -122,6 +123,7 @@ async def _calculate(db: AsyncSession, *, job_analysis_id: int) -> dict:
 )
 async def analyze_match_with_ai_task(
     self,
+    task_id: str,
     match_id: str,
     user_id: int,
     job_id: int,
@@ -150,7 +152,7 @@ async def analyze_match_with_ai_task(
         result = await AgentGateway.get().call(
             agent_id="match_analyzer",
             input_data=json.dumps(payload),
-            context={"db": self.db, "user_id": user_id},
+            context={"db": self.db, "task_id": task_id, "user_id": user_id},
         )
         ai_result = result.model_dump() if isinstance(result, MatchAnalysis) else result
 
@@ -168,7 +170,7 @@ async def analyze_match_with_ai_task(
         raise
 
 
-async def _match_user(db: AsyncSession, *, user_id: int, days: int) -> dict:
+async def _match_user(db: AsyncSession, *, task_id: str, user_id: int, days: int) -> dict:
     job_analyses = await get_recent_jobs_with_analysis(db, days=days)
     processed = 0
     ai_submitted = 0
@@ -213,6 +215,7 @@ async def _match_user(db: AsyncSession, *, user_id: int, days: int) -> dict:
 
         if resume_id:
             analyze_match_with_ai_task.delay(
+                task_id=task_id,
                 match_id=match.id,
                 user_id=user_id,
                 job_id=ja.job_id,
