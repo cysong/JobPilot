@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import async_session_factory
 from app.core.celery_lifecycle import get_worker_loop
 from app.modules.workflow.repositories import TaskRepository
+from app.shared.enums import TaskStatus
 
 
 class AsyncBaseTask(Task):
@@ -154,9 +155,21 @@ class DBTrackingTask(AsyncBaseTask):
                 await session.commit()
 
     async def _mark_failed(self, task_id: str, error_message: str):
-         async with async_session_factory() as session:
+        """
+        Mark task as FAILED only if not already in SUCCESS state.
+
+        This protects against chain transition errors that occur after
+        a task successfully completes. Such errors should not overwrite
+        the SUCCESS status of the current task.
+        """
+        async with async_session_factory() as session:
             task = await TaskRepository.get_by_id(session, task_id)
             if task:
+                # Don't overwrite SUCCESS status
+                # This handles errors from chain transitions or other post-completion issues
+                if task.status == TaskStatus.SUCCESS:
+                    return
+
                 await TaskRepository.mark_failed(
                     session,
                     task,
