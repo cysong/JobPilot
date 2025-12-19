@@ -4,14 +4,14 @@ User-related Celery tasks.
 This module contains async tasks for user skill aggregation.
 """
 from sqlalchemy import select
-from app.core.celery_app import app
+from app.core.celery_app import celery_app
 from app.modules.workflow.tasks_base import DBTrackingTask
 from app.modules.workflow.models import TaskExecution
 from app.modules.users.service import aggregate_user_skills
 from app.shared.enums import TaskType
 
 
-@app.task(base=DBTrackingTask, bind=True)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def aggregate_user_skills_task(self, user_id: int, resume_id: str, task_id: str):
     """
     Conditionally aggregate user skills from resume_skills to user_skills.
