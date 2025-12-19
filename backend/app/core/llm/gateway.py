@@ -219,12 +219,16 @@ class AgentGateway:
                 getattr(usage, "output_tokens", 0) or 0,
             )
 
+        # Convert agent version to string (config_version may be int from YAML)
+        version = getattr(agent, "config_version", None)
+        agent_version_str = str(version) if version is not None else ""
+
         await AICallRepository.create(
             db,
             task_id=task_id,
             user_id=user_id,
             agent_id=agent_id,
-            agent_version=getattr(agent, "config_version", None),
+            agent_version=agent_version_str,
             model=getattr(agent, "model", ""),
             status=ai_call_status,
             latency_ms=latency_ms,

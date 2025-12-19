@@ -123,11 +123,10 @@ class AICallRepository:
     async def create(
         db: AsyncSession,
         *,
-        workflow_id: str,
         task_id: str,
         user_id: int,
         agent_id: str,
-        agent_version: Optional[str],
+        agent_version: str,
         model: str,
         status: AICallStatus,
         latency_ms: int,
@@ -164,7 +163,6 @@ class AICallRepository:
             Created AICall instance
         """
         ai_call = AICall(
-            workflow_id=workflow_id,
             task_id=task_id,
             user_id=user_id,
             model=model,
@@ -190,15 +188,6 @@ class AICallRepository:
         query = select(AICall).where(AICall.id == ai_call_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
-
-    @staticmethod
-    async def get_by_workflow_id(
-        db: AsyncSession, workflow_id: str
-    ) -> list[AICall]:
-        """Get all AI calls for a workflow."""
-        query = select(AICall).where(AICall.workflow_id == workflow_id)
-        result = await db.execute(query)
-        return list(result.scalars().all())
 
     @staticmethod
     async def get_by_task_id(db: AsyncSession, task_id: str) -> list[AICall]:
