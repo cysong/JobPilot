@@ -291,7 +291,14 @@ class TaskService:
             filters.append(TaskExecution.worker_id == worker_id)
         if keyword:
             like = f"%{keyword}%"
-            filters.append(TaskExecution.task_name.ilike(like))
+            filters.append(
+                or_(
+                    TaskExecution.id == keyword,
+                    TaskExecution.workflow_id == keyword,
+                    TaskExecution.entity_id == keyword,
+                    TaskExecution.task_name.ilike(like),
+                )
+            )
         if start_time:
             filters.append(TaskExecution.created_at >= start_time)
         if end_time:
