@@ -22,10 +22,8 @@ from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType, ProficiencyLevel
+from app.core.config import Settings
 
-
-# Global configuration for formal resume limit (can be moved to config later)
-FORMAL_RESUME_LIMIT = 3
 
 
 class ResumeService:
@@ -174,7 +172,7 @@ class ResumeService:
         )
         if not can_create:
             raise BusinessError(
-                f"Formal resume limit ({FORMAL_RESUME_LIMIT}) exceeded. Current count: {current_count}",
+                f"Formal resume limit ({Settings.USER_FORMAL_RESUME_LIMIT}) exceeded. Current count: {current_count}",
                 response_code=ResponseCode.RESUME_LIMIT_EXCEEDED,
             )
 
@@ -239,7 +237,7 @@ class ResumeService:
         result = await db.execute(query)
         current_count = result.scalar_one()
 
-        can_create_more = current_count < FORMAL_RESUME_LIMIT
+        can_create_more = current_count < Settings.USER_FORMAL_RESUME_LIMIT
 
         return can_create_more, current_count
 
