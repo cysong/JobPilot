@@ -35,11 +35,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/utils/cn";
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const [searchParams] = useSearchParams();
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
+  const [language, setLanguage] = useState<"en" | "zh">("en");
   const jobIdNum = parseInt(jobId || "0");
   const {
     data: job,
@@ -99,6 +101,12 @@ export default function JobDetailPage() {
       </div>
     );
   }
+
+  const hasCn = Boolean(job.content_cn?.trim() || job.analysis?.cn_content?.trim());
+  const descriptionHtml =
+    language === "zh" && hasCn
+      ? job.content_cn || job.analysis?.cn_content || job.content
+      : job.content;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -389,6 +397,49 @@ export default function JobDetailPage() {
 
             {/* Job Description */}
             <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-slate-900">Job Description</h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={language === "en" ? "default" : "outline"}
+                    className={cn(
+                      "h-9",
+                      language === "en"
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        : "text-slate-700"
+                    )}
+                    onClick={() => setLanguage("en")}
+                  >
+                    English
+                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant={language === "zh" ? "default" : "outline"}
+                          className={cn(
+                            "h-9",
+                            language === "zh" && hasCn
+                              ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                              : "text-slate-700"
+                          )}
+                          onClick={() => hasCn && setLanguage("zh")}
+                          disabled={!hasCn}
+                        >
+                          中文
+                        </Button>
+                      </TooltipTrigger>
+                      {!hasCn && (
+                        <TooltipContent>
+                          <p className="text-sm text-slate-600">暂无中文版本可显示</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
 
               <div
                 className="prose prose-slate max-w-none 
@@ -401,7 +452,7 @@ export default function JobDetailPage() {
                   prose-strong:font-bold prose-strong:text-slate-900
                   prose-a:text-indigo-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline"
                 dangerouslySetInnerHTML={{
-                  __html: job.content || "<p>No description available.</p>",
+                  __html: descriptionHtml || "<p>No description available.</p>",
                 }}
               />
             </div>

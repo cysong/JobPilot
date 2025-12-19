@@ -53,6 +53,7 @@ class JobBase(BaseModel):
 class JobDetail(JobBase):
     """Detailed Job schema with full information"""
     content: Optional[str] = None
+    content_cn: Optional[str] = Field(default=None, description="Job description translated to Chinese")
 
     # Contact info
     phone_number: Optional[str] = None

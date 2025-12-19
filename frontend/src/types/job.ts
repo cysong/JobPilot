@@ -42,6 +42,7 @@ export interface Job {
 
 export interface JobDetail extends Job {
   content: string | null
+  content_cn: string | null
 
   // Contact info
   phone_number: string | null

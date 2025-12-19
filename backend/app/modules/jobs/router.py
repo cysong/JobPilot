@@ -195,7 +195,12 @@ async def get_job_detail(
     if not job:
         raise NotFoundError("Job not found")
 
-    return JobDetail.model_validate(job)
+    # Build response with analysis (includes cn_content) and convenience content_cn for UI toggle
+    job_detail = JobDetail.model_validate(job)
+    if job.analysis:
+        job_detail.analysis = JobAnalysisResponse.model_validate(job.analysis)
+        job_detail.content_cn = job.analysis.cn_content
+    return job_detail
 
 
 @router.get("/{job_id}/similar", response_model=list[JobBase])
