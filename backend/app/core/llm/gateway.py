@@ -203,12 +203,12 @@ class AgentGateway:
         # Map status string to AICallStatus enum
         status_map = {
             "success": AICallStatus.SUCCESS,
-            "error": AICallStatus.ERROR,
-            "ratelimit": AICallStatus.ERROR,
-            "timeout": AICallStatus.ERROR,
-            "auth_error": AICallStatus.ERROR,
+            "error": AICallStatus.FAILED,
+            "ratelimit": AICallStatus.FAILED,
+            "timeout": AICallStatus.FAILED,
+            "auth_error": AICallStatus.FAILED,
         }
-        ai_call_status = status_map.get(status, AICallStatus.ERROR)
+        ai_call_status = status_map.get(status, AICallStatus.FAILED)
 
         # Calculate estimated cost
         estimated_cost = None
