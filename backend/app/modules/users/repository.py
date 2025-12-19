@@ -51,17 +51,19 @@ class UserSkillRepository:
                     id=generate_id("usk"),
                     user_id=user_id,
                     skill_name=skill_data["name"],
-                    proficiency=new_proficiency,
-                    skill_type="technical",
-                    extracted_from_id=resume_id,
-                    extra_metadata={"source": "resume_analysis"},
+                    proficiency_level=new_proficiency,
+                    is_manual=False,
+                    source_count=1,
+                    last_seen_at=datetime.now(timezone.utc),
                 )
                 db.add(new_skill)
             else:
-                if proficiency_order[new_proficiency] > proficiency_order[existing_skill.proficiency]:
-                    existing_skill.promote(new_proficiency)
-                    existing_skill.extracted_from_id = resume_id
-                    existing_skill.extra_metadata = {"source": "resume_analysis"}
+                # Update if new proficiency is higher (and not manually set)
+                if not existing_skill.is_manual:
+                    if proficiency_order[new_proficiency] > proficiency_order[existing_skill.proficiency_level]:
+                        existing_skill.proficiency_level = new_proficiency
+                    existing_skill.source_count += 1
+                    existing_skill.last_seen_at = datetime.now(timezone.utc)
 
     @staticmethod
     async def get_by_user_id(db: AsyncSession, user_id: int) -> list[dict]:
@@ -69,11 +71,12 @@ class UserSkillRepository:
         result = await db.execute(select(UserSkill).where(UserSkill.user_id == user_id))
         skills = []
         for skill in result.scalars().all():
+            # Use manual_proficiency if set, otherwise use proficiency_level
+            proficiency = skill.manual_proficiency if skill.is_manual and skill.manual_proficiency else skill.proficiency_level
             skills.append(
                 {
                     "skill_name": skill.skill_name,
-                    "proficiency": skill.proficiency,
-                    "skill_type": skill.skill_type,
+                    "proficiency": proficiency.value,  # Convert enum to string
                 }
             )
         return skills
