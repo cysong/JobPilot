@@ -191,10 +191,12 @@ async def create_user_skill(
     Raises:
         ValueError: If skill already exists for this user
     """
+    normalized_skill = skill_name.strip()
+
     # Check if skill already exists
     existing_stmt = select(UserSkill).where(
         UserSkill.user_id == user_id,
-        UserSkill.skill_name == skill_name
+        func.lower(UserSkill.skill_name) == normalized_skill.lower()
     )
     existing = (await db.execute(existing_stmt)).scalar_one_or_none()
 
@@ -205,7 +207,7 @@ async def create_user_skill(
     new_skill = UserSkill(
         id=str(uuid4()),
         user_id=user_id,
-        skill_name=skill_name,
+        skill_name=normalized_skill,
         proficiency_level=proficiency_level,
         is_manual=True,
         manual_proficiency=proficiency_level,
