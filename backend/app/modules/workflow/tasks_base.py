@@ -22,9 +22,11 @@ class AsyncBaseTask(Task):
     _db_session: AsyncSession | None = None
 
     # Native Celery retry configuration
-    autoretry_for = (Exception,)
-    retry_backoff = True
-    retry_jitter = True
+    autoretry_for = (Exception,)    # Retry on any exception
+    max_retries = 3                  # Maximum retry attempts (default)
+    retry_backoff = True             # Exponential backoff between retries
+    retry_backoff_max = 600          # Max backoff time (10 minutes)
+    retry_jitter = True              # Add random jitter to prevent thundering herd
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         if asyncio.iscoroutinefunction(self.run):
