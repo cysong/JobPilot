@@ -14,7 +14,6 @@ from agent_configs.schemas import AnalyzedResume
 async def analyze_resume_task(
     self,
     resume_id: str,
-    workflow_id: str,
     task_id: str,
 ) -> dict:
     """Analyze a resume using resume_analyzer agent."""

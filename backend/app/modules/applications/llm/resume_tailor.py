@@ -22,7 +22,6 @@ async def run_resume_tailoring(
     resume_id: str,
     job_id: int,
     tailoring_level: str,
-    workflow_id: str,
     task_id: str,
     is_retry: bool = False
 ) -> dict:

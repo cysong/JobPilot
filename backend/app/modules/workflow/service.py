@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from celery import chain
 from fastapi import HTTPException, status
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, or_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.schemas import (
@@ -170,7 +170,7 @@ class TaskService:
             module = import_module(module_path)
             celery_task = getattr(module, func_name)
 
-            task_kwargs = {"workflow_id": workflow_id, "task_id": task_id}
+            task_kwargs = {"task_id": task_id}
             task_kwargs.update(spec.input_data or {})
 
             # Use immutable signature to avoid previous result being injected as first arg in chain
@@ -486,7 +486,7 @@ class TaskService:
             module = import_module(module_path)
             celery_task = getattr(module, func_name)
 
-            task_kwargs = {"workflow_id": t.workflow_id, "task_id": t.id}
+            task_kwargs = {"task_id": t.id}
             task_kwargs.update(t.input_data or {})
 
             # Use immutable signature so prior task result isn't injected into args

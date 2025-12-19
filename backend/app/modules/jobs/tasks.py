@@ -15,7 +15,6 @@ from agent_configs.schemas import AnalyzedJob, TranslatedText
 async def analyze_job_task(
     self,
     job_id: int,
-    workflow_id: str,
     task_id: str,
 ) -> dict:
     """Analyze a job using job_analyzer agent."""

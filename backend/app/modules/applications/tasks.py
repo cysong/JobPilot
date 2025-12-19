@@ -92,7 +92,6 @@ async def application_initialization_task(
     job_id: int,
     resume_id: str,
     tailoring_level: str,
-    workflow_id: str,
     task_id: str,
     is_retry: bool = False
 ):
@@ -204,7 +203,6 @@ async def resume_tailoring_task(
     resume_id: str,
     job_id: int,
     tailoring_level: str,
-    workflow_id: str,
     task_id: str,
     is_retry: bool = False
 ):
@@ -229,7 +227,6 @@ async def resume_tailoring_task(
         resume_id=resume_id,
         job_id=job_id,
         tailoring_level=tailoring_level,
-        workflow_id=workflow_id,
         task_id=task_id,
         is_retry=is_retry
     )
@@ -244,9 +241,7 @@ async def resume_tailoring_task(
 async def cover_letter_generation_task(
     self,
     application_id: str,
-    workflow_id: str,
     task_id: str,
-    job_id: int = None,
     is_retry: bool = False,
     **kwargs
 ):
@@ -270,7 +265,6 @@ async def cover_letter_generation_task(
     result = await run_cover_letter_task(
         db=self.db,
         application=application,
-        workflow_id=workflow_id,
         task_id=task_id,
         is_retry=is_retry,
     )

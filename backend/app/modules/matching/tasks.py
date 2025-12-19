@@ -27,13 +27,13 @@ from app.core.llm.gateway import AgentGateway
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
-async def calculate_job_user_matches_task(self, workflow_id: str, task_id: str, job_analysis_id: int) -> dict:
+async def calculate_job_user_matches_task(self, task_id: str, job_analysis_id: int) -> dict:
     """Match users for a single job analysis."""
     return await _calculate(db=self.db, job_analysis_id=job_analysis_id)
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
-async def match_user_recent_jobs_task(self, workflow_id: str, task_id: str, user_id: int, days: int = 30) -> dict:
+async def match_user_recent_jobs_task(self, task_id: str, user_id: int, days: int = 30) -> dict:
     """Match a single user against recent jobs (listed within days) that already have analyses."""
     return await _match_user(db=self.db, user_id=user_id, days=days)
 

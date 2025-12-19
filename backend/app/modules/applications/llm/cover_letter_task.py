@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 async def run_cover_letter_task(
     db: AsyncSession,
     application: Application,
-    workflow_id: str,
     task_id: str,
     is_retry: bool = False
 ):
