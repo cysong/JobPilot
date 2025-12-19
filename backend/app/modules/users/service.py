@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 
-from sqlalchemy import select, func, delete, Integer
+from sqlalchemy import case, select, func, delete, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import UserSkill
@@ -148,11 +148,20 @@ async def get_user_skills(
     Returns:
         List of UserSkill objects
     """
+    # Order proficiency by custom weight (expert > advanced > intermediate > beginner)
+    proficiency_weight = case(
+        (UserSkill.proficiency_level == ProficiencyLevel.EXPERT, 4),
+        (UserSkill.proficiency_level == ProficiencyLevel.ADVANCED, 3),
+        (UserSkill.proficiency_level == ProficiencyLevel.INTERMEDIATE, 2),
+        (UserSkill.proficiency_level == ProficiencyLevel.BEGINNER, 1),
+        else_=0,
+    )
+
     stmt = (
         select(UserSkill)
         .where(UserSkill.user_id == user_id)
         .order_by(
-            UserSkill.proficiency_level.desc(),
+            proficiency_weight.desc(),
             UserSkill.skill_name.asc()
         )
     )
