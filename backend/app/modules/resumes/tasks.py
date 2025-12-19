@@ -59,26 +59,12 @@ async def analyze_resume_task(
 
     await self.db.commit()
 
-    # Trigger skill aggregation task (only for formal resumes)
-    if not resume.is_draft and (skills_updated > 0 or skills_deleted > 0):
-        await TaskService.submit_task(
-            db=self.db,
-            spec=TaskSubmissionSpec(
-                task_type=TaskType.SKILL_AGGREGATION,
-                entity_id=resume_id,
-                user_id=resume.user_id,
-                input_data={
-                    "user_id": resume.user_id,
-                    "resume_id": resume_id,
-                },
-            ),
-        )
-        await self.db.commit()
-
+    # Return output data for downstream tasks to decide execution
     return {
         "output_data": {
             "status": "completed",
             "resume_id": resume_id,
+            "is_draft": resume.is_draft,
             "skills_updated": skills_updated,
             "skills_deleted": skills_deleted,
         }

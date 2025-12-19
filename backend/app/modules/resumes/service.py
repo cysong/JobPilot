@@ -435,6 +435,14 @@ class ResumeService:
 
     @staticmethod
     async def _submit_resume_analysis_tasks(db: AsyncSession, resume_id: str, user_id: int) -> list[TaskExecution]:
+        """
+        Submit resume analysis workflow tasks.
+
+        Task sequence:
+        1. RESUME_ANALYSIS - Analyzes resume, outputs skills_updated/skills_deleted/is_draft
+        2. SKILL_AGGREGATION - Conditionally aggregates skills (checks RESUME_ANALYSIS output)
+        3. USER_JOB_MATCHING - Matches user with recent jobs (depends on skill aggregation)
+        """
         return await TaskService.submit_sequential_tasks(
             db=db,
             entity_type="resume",
@@ -445,6 +453,14 @@ class ResumeService:
                     task_type=TaskType.RESUME_ANALYSIS,
                     entity_id=resume_id,
                     input_data={"resume_id": resume_id},
+                ),
+                TaskSubmissionSpec(
+                    task_type=TaskType.SKILL_AGGREGATION,
+                    entity_id=resume_id,
+                    input_data={
+                        "user_id": user_id,
+                        "resume_id": resume_id,
+                    },
                 ),
                 TaskSubmissionSpec(
                     task_type=TaskType.USER_JOB_MATCHING,
