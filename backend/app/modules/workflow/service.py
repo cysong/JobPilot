@@ -40,6 +40,8 @@ class TaskSubmissionSpec:
     task_type: TaskType
     input_data: Optional[dict] = field(default_factory=dict)
     celery_kwargs: Optional[dict] = field(default_factory=dict)
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
 
 
 class TaskService:
@@ -153,8 +155,8 @@ class TaskService:
                 db=db,
                 id=task_id,
                 workflow_id=workflow_id,
-                entity_type=entity_type or info.entity,
-                entity_id=entity_id,
+                entity_type=spec.entity_type or info.entity or entity_type,
+                entity_id=spec.entity_id or entity_id,
                 user_id=user_id,
                 task_type=info.value,
                 task_name=info.display_name,

@@ -23,6 +23,7 @@ from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType, ProficiencyLevel
 from app.core.config import settings
+from app.modules.workflow import TaskExecution
 
 
 
@@ -269,22 +270,7 @@ class ResumeService:
         if not should_analyze:
             return
 
-        await TaskService.submit_sequential_tasks(
-            db=db,
-            entity_type="resume",
-            entity_id=resume.id,
-            user_id=user_id,
-            tasks=[
-                TaskSubmissionSpec(
-                    task_type=TaskType.RESUME_ANALYSIS,
-                    input_data={"resume_id": resume.id},
-                ),
-                TaskSubmissionSpec(
-                    task_type=TaskType.USER_JOB_MATCHING,
-                    input_data={"resume_id": resume.id, "user_id": user_id, "days": 30},
-                ),
-            ],
-        )
+        await ResumeService._submit_resume_analysis_tasks(db, resume.id, user_id)
 
     @staticmethod
     async def get_resume_versions(
@@ -315,25 +301,7 @@ class ResumeService:
         if not resume or resume.user_id != user_id:
             raise NotFoundError("Resume not found")
 
-        tasks = [
-            TaskSubmissionSpec(
-                task_type=TaskType.RESUME_ANALYSIS,
-                input_data={"resume_id": resume_id, "manual_trigger": manual_trigger},
-            ),
-            TaskSubmissionSpec(
-                task_type=TaskType.USER_JOB_MATCHING,
-                input_data={"resume_id": resume_id, "user_id": user_id, "days": 30},
-            ),
-        ]
-
-        created_tasks = await TaskService.submit_sequential_tasks(
-            db=db,
-            entity_type="resume",
-            entity_id=resume_id,
-            user_id=user_id,
-            tasks=tasks,
-        )
-
+        created_tasks = await ResumeService._submit_resume_analysis_tasks(db, resume_id, user_id)
         await db.commit()
         return created_tasks[0].workflow_id
 
@@ -464,3 +432,25 @@ class ResumeService:
             deleted_skills = (await db.execute(stmt)).rowcount
 
         return len(skill_names_in_list), deleted_skills
+
+    @staticmethod
+    async def _submit_resume_analysis_tasks(db: AsyncSession, resume_id: str, user_id: int) -> list[TaskExecution]:
+        return await TaskService.submit_sequential_tasks(
+            db=db,
+            entity_type="resume",
+            entity_id=resume_id,
+            user_id=user_id,
+            tasks=[
+                TaskSubmissionSpec(
+                    task_type=TaskType.RESUME_ANALYSIS,
+                    entity_id=resume_id,
+                    input_data={"resume_id": resume_id},
+                ),
+                TaskSubmissionSpec(
+                    task_type=TaskType.USER_JOB_MATCHING,
+                    entity_id=user_id,
+                    input_data={"resume_id": resume_id,
+                                "user_id": user_id, "days": 30},
+                ),
+            ],
+        )
