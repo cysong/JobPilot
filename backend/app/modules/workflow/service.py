@@ -71,7 +71,7 @@ class TaskService:
             db=db,
             id=task_id,
             workflow_id=workflow_id,
-            entity_type=entity_type,
+            entity_type=entity_type or info.entity,
             entity_id=entity_id,
             user_id=user_id,
             task_type=info.value,
@@ -96,7 +96,6 @@ class TaskService:
         celery_options.update(celery_kwargs)
 
         task_kwargs = {
-            "workflow_id": workflow_id,
             "task_id": task_id,
             **(input_data or {}),
         }
@@ -154,7 +153,7 @@ class TaskService:
                 db=db,
                 id=task_id,
                 workflow_id=workflow_id,
-                entity_type=entity_type,
+                entity_type=entity_type or info.entity,
                 entity_id=entity_id,
                 user_id=user_id,
                 task_type=info.value,

@@ -385,12 +385,12 @@ class ResumeService:
             raise JobPilotException(str(exc))
 
     @staticmethod
-    async def save_resume_skills(
+    async def update_resume_skills(
         db: AsyncSession,
         resume_id: str,
         user_id: int,
         skills: list[dict]
-    ) -> int:
+    ) -> tuple[int, int]:
         """
         Save or update skills for a resume.
 
@@ -408,21 +408,15 @@ class ResumeService:
         Returns:
             Number of skills saved
         """
-        if not skills:
-            # Delete all skills for this resume
-            from sqlalchemy import delete
-            stmt = delete(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
-            await db.execute(stmt)
-            return 0
-
         # Step 1 & 2: Insert or update each skill
         skill_names_in_list = set()
         for skill_data in skills:
             skill_name = skill_data.get("name", "").strip()
-            proficiency_str = skill_data.get("proficiency", "").lower()
+            if not skill_name:
+                continue
 
-            if not skill_name or not proficiency_str:
-                continue  # Skip invalid skills
+            proficiency_str = skill_data.get(
+                "proficiency", ProficiencyLevel.INTERMEDIATE.value).lower()
 
             skill_names_in_list.add(skill_name)
 
@@ -430,8 +424,7 @@ class ResumeService:
             try:
                 proficiency = ProficiencyLevel(proficiency_str)
             except ValueError:
-                # Invalid proficiency level, skip
-                continue
+                proficiency = ProficiencyLevel.INTERMEDIATE
 
             # Check if skill already exists
             stmt = select(ResumeSkill).where(
@@ -463,12 +456,11 @@ class ResumeService:
                 ResumeSkill.resume_id == resume_id,
                 ResumeSkill.skill_name.notin_(skill_names_in_list)
             )
-            await db.execute(stmt)
+            deleted_skills = (await db.execute(stmt)).rowcount
         else:
             # All skills removed, delete all
             from sqlalchemy import delete
             stmt = delete(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
-            await db.execute(stmt)
+            deleted_skills = (await db.execute(stmt)).rowcount
 
-        # Note: Caller should commit the transaction
-        return len(skill_names_in_list)
+        return len(skill_names_in_list), deleted_skills

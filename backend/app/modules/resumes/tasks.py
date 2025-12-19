@@ -47,11 +47,11 @@ async def analyze_resume_task(
 
     # Extract and save skills
     technical_skills = analysis_data.get("technical_skills", [])
-    skills_saved = 0
+    skills_updated, skills_deleted = 0, 0
 
     if technical_skills:
         # Save skills to resume_skills table
-        skills_saved = await ResumeService.save_resume_skills(
+        skills_updated, skills_deleted = await ResumeService.update_resume_skills(
             db=self.db,
             resume_id=resume_id,
             user_id=resume.user_id,
@@ -61,7 +61,7 @@ async def analyze_resume_task(
     await self.db.commit()
 
     # Trigger skill aggregation task (only for formal resumes)
-    if not resume.is_draft and skills_saved > 0:
+    if not resume.is_draft and (skills_updated > 0 or skills_deleted > 0):
         await TaskService.submit_task(
             db=self.db,
             spec=TaskSubmissionSpec(
@@ -80,6 +80,7 @@ async def analyze_resume_task(
         "output_data": {
             "status": "completed",
             "resume_id": resume_id,
-            "skills_extracted": skills_saved,
+            "skills_updated": skills_updated,
+            "skills_deleted": skills_deleted,
         }
     }
