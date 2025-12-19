@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import UserSkill
@@ -116,7 +116,7 @@ async def aggregate_user_skills(
     # Step 4: Get summary counts
     summary_stmt = select(
         func.count(UserSkill.id).label('total'),
-        func.sum(func.cast(UserSkill.is_manual, db.bind.dialect.INTEGER)).label('manual'),
+        func.sum(func.cast(UserSkill.is_manual, Integer)).label('manual'),
     ).where(UserSkill.user_id == user_id)
 
     summary_result = (await db.execute(summary_stmt)).one()
