@@ -464,9 +464,8 @@ class ResumeService:
                 ),
                 TaskSubmissionSpec(
                     task_type=TaskType.USER_JOB_MATCHING,
-                    entity_id=user_id,
-                    input_data={"resume_id": resume_id,
-                                "user_id": user_id, "days": 30},
+                    entity_id=str(user_id),  # Convert int to str for entity_id
+                    input_data={"user_id": user_id, "days": 30},  # Remove resume_id - not accepted by task
                 ),
             ],
         )
