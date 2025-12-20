@@ -4,6 +4,7 @@ import Login from '@/features/auth/Login'
 import Register from '@/features/auth/Register'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import MainLayout from '@/components/layout/MainLayout'
+import FullWidthLayout from '@/components/layout/FullWidthLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import LandingPage from '@/features/landing/LandingPage'
 import PlaceholderPage from '@/features/common/PlaceholderPage'
@@ -47,22 +48,26 @@ function App() {
           <Route path="/admin/login" element={<Login redirectPath="/admin/dashboard" />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected routes */}
+          {/* Protected routes - standard layout */}
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<PlaceholderPage />} />
             <Route path="/jobs" element={<JobListingPage />} />
             <Route path="/jobs/:jobId" element={<JobDetailPage />} />
             <Route path="/applications" element={<ApplicationListingPage />} />
             <Route path="/applications/:applicationId" element={<ApplicationDetailPage />} />
-            <Route path="/applications/:applicationId/resume/edit" element={<TailoredResumeEditPage />} />
-            <Route path="/applications/:applicationId/cover-letter/edit" element={<CoverLetterEditPage />} />
             <Route path="/resumes" element={<ResumeListingPage />} />
-            <Route path="/resumes/new" element={<ResumeEditPage />} />
-            <Route path="/resumes/:id/edit" element={<ResumeContentEditPage />} />
-            <Route path="/resumes/:id" element={<ResumeEditPage />} />
             <Route path="/skills" element={<SkillsPage />} />
             <Route path="/profile" element={<PlaceholderPage />} />
             <Route path="/settings" element={<PlaceholderPage />} />
+          </Route>
+
+          {/* Protected routes - full width layout (document editors) */}
+          <Route element={<ProtectedRoute><FullWidthLayout /></ProtectedRoute>}>
+            <Route path="/applications/:applicationId/resume/edit" element={<TailoredResumeEditPage />} />
+            <Route path="/applications/:applicationId/cover-letter/edit" element={<CoverLetterEditPage />} />
+            <Route path="/resumes/:id/edit" element={<ResumeContentEditPage />} />
+            <Route path="/resumes/new" element={<ResumeEditPage />} />
+            <Route path="/resumes/:id" element={<ResumeEditPage />} />
           </Route>
 
           {/* Admin protected routes */}
