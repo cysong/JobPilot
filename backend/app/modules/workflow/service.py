@@ -52,7 +52,7 @@ class TaskService:
         db: AsyncSession,
         *,
         task_type: TaskType,
-        entity_type: str,
+        entity_type: Optional[str] = None,
         entity_id: str,
         user_id: int | None = None,
         input_data: Optional[dict] = None,
