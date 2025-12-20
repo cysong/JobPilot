@@ -13,6 +13,9 @@ import ApplicationListingPage from '@/features/applications/ApplicationListingPa
 import ApplicationDetailPage from '@/features/applications/ApplicationDetailPage'
 import ResumeListingPage from '@/features/resumes/ResumeListingPage'
 import ResumeEditPage from '@/features/resumes/ResumeEditPage'
+import ResumeContentEditPage from '@/features/resumes/ResumeContentEditPage'
+import TailoredResumeEditPage from '@/features/applications/TailoredResumeEditPage'
+import CoverLetterEditPage from '@/features/applications/CoverLetterEditPage'
 import { SkillsPage } from '@/features/skills/SkillsPage'
 import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
 import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
@@ -51,8 +54,11 @@ function App() {
             <Route path="/jobs/:jobId" element={<JobDetailPage />} />
             <Route path="/applications" element={<ApplicationListingPage />} />
             <Route path="/applications/:applicationId" element={<ApplicationDetailPage />} />
+            <Route path="/applications/:applicationId/resume/edit" element={<TailoredResumeEditPage />} />
+            <Route path="/applications/:applicationId/cover-letter/edit" element={<CoverLetterEditPage />} />
             <Route path="/resumes" element={<ResumeListingPage />} />
             <Route path="/resumes/new" element={<ResumeEditPage />} />
+            <Route path="/resumes/:id/edit" element={<ResumeContentEditPage />} />
             <Route path="/resumes/:id" element={<ResumeEditPage />} />
             <Route path="/skills" element={<SkillsPage />} />
             <Route path="/profile" element={<PlaceholderPage />} />

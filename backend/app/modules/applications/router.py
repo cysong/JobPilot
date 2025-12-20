@@ -14,6 +14,7 @@ from app.modules.applications.schemas import (
 from app.modules.applications.service import ApplicationService
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.shared.pagination import PaginationParams
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -38,6 +39,48 @@ async def create_application(
     """Create a new application and kick off cover letter generation workflow."""
     application = await ApplicationService.create_application(db, current_user, payload)
     return application
+
+
+@router.get("/{application_id}/resume/edit", response_model=DocumentEditResponse)
+async def get_tailored_resume_for_edit(
+    application_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get tailored resume document for unified editor."""
+    return await ApplicationService.get_tailored_resume_for_edit(db, application_id, current_user)
+
+
+@router.patch("/{application_id}/resume", response_model=ApplicationDetail)
+async def update_tailored_resume(
+    application_id: str,
+    payload: DocumentUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Update tailored resume content (new document version)."""
+    return await ApplicationService.update_resume_content(db, application_id, current_user, payload)
+
+
+@router.get("/{application_id}/cover-letter/edit", response_model=DocumentEditResponse)
+async def get_cover_letter_for_edit(
+    application_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get cover letter document for unified editor."""
+    return await ApplicationService.get_cover_letter_for_edit(db, application_id, current_user)
+
+
+@router.patch("/{application_id}/cover-letter", response_model=ApplicationDetail)
+async def update_cover_letter(
+    application_id: str,
+    payload: DocumentUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Update cover letter content (new document version)."""
+    return await ApplicationService.update_cover_letter_content(db, application_id, current_user, payload)
 
 
 @router.get("/{application_id}", response_model=ApplicationDetail)

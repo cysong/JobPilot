@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { resumeApi } from '@/api/resumes'
 import type { CreateResumeRequest, UpdateResumeRequest } from '@/types/resume'
+import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 import { useToast } from '@/components/ui/use-toast'
 import { useNavigate } from 'react-router-dom'
 
@@ -16,6 +17,26 @@ export const useResume = (id: string) => {
         queryKey: ['resumes', id],
         queryFn: () => resumeApi.getResumeById(id),
         enabled: !!id,
+    })
+}
+
+export const useResumeEdit = (resumeId: string) => {
+    return useQuery<DocumentEditData>({
+        queryKey: ['resume-edit', resumeId],
+        queryFn: () => resumeApi.getResumeForEdit(resumeId),
+        enabled: !!resumeId,
+    })
+}
+
+export const useUpdateResumeContent = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
+            resumeApi.updateResumeContent(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['resumes'] })
+            queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
+        },
     })
 }
 

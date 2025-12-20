@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
 import type { CreateApplicationRequest } from '@/types/application'
+import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 import { useToast } from '@/components/ui/use-toast'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/types/api'
@@ -17,6 +18,46 @@ export const useApplication = (id: string) => {
         queryKey: ['applications', id],
         queryFn: () => applicationApi.get(id),
         enabled: !!id,
+    })
+}
+
+export const useTailoredResumeEdit = (applicationId: string) => {
+    return useQuery<DocumentEditData>({
+        queryKey: ['tailored-resume-edit', applicationId],
+        queryFn: () => applicationApi.getTailoredResumeForEdit(applicationId),
+        enabled: !!applicationId,
+    })
+}
+
+export const useUpdateTailoredResume = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
+            applicationApi.updateTailoredResume(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['applications'] })
+            queryClient.invalidateQueries({ queryKey: ['tailored-resume-edit', variables.id] })
+        },
+    })
+}
+
+export const useCoverLetterEdit = (applicationId: string) => {
+    return useQuery<DocumentEditData>({
+        queryKey: ['cover-letter-edit', applicationId],
+        queryFn: () => applicationApi.getCoverLetterForEdit(applicationId),
+        enabled: !!applicationId,
+    })
+}
+
+export const useUpdateCoverLetter = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
+            applicationApi.updateCoverLetter(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['applications'] })
+            queryClient.invalidateQueries({ queryKey: ['cover-letter-edit', variables.id] })
+        },
     })
 }
 

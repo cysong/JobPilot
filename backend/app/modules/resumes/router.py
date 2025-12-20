@@ -26,6 +26,7 @@ from app.modules.resumes.schemas import (
     ResumeUpdate,
     WorkflowResponse,
 )
+from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.core.config import settings
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -40,6 +41,19 @@ async def create_resume(
     """Create a new draft resume."""
     resume = await service.ResumeService.create_resume(db, current_user.id, resume_data)
     return ResumeResponse.model_validate(resume)
+
+
+@router.get("/{resume_id}/edit", response_model=DocumentEditResponse)
+async def get_resume_for_edit(
+    resume_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get resume content for unified editor."""
+    doc = await service.ResumeService.get_resume_for_edit(
+        db=db, resume_id=resume_id, user_id=current_user.id
+    )
+    return doc
 
 
 @router.get("/", response_model=ResumeListResponse)
@@ -107,6 +121,20 @@ async def get_resume(
     if not resume:
         raise NotFoundError("Resume not found")
 
+    return ResumeResponse.model_validate(resume)
+
+
+@router.patch("/{resume_id}", response_model=ResumeResponse)
+async def update_resume_content(
+    resume_id: str,
+    payload: DocumentUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Update resume content (new document version)."""
+    resume = await service.ResumeService.update_resume_content(
+        db=db, resume_id=resume_id, user_id=current_user.id, payload=payload
+    )
     return ResumeResponse.model_validate(resume)
 
 

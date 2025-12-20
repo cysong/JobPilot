@@ -7,12 +7,23 @@ import type {
     ResumeListResponse,
     ResumeExportRequest
 } from '@/types/resume'
+import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 
 export const resumeApi = {
     getResumes: async (page = 1, size = 100) => {
         const result = await client.get<ResumeListResponse, ResumeListResponse>('/resumes', {
             params: { page, size }
         })
+        return result
+    },
+
+    getResumeForEdit: async (id: string) => {
+        const result = await client.get<DocumentEditData, DocumentEditData>(`/resumes/${id}/edit`)
+        return result
+    },
+
+    updateResumeContent: async (id: string, data: DocumentUpdatePayload) => {
+        const result = await client.patch<Resume, Resume>(`/resumes/${id}`, data)
         return result
     },
 

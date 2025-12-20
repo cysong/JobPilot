@@ -1,8 +1,7 @@
 """
 Resume service layer - business logic for resume operations.
 """
-import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -13,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import (
     BadRequestError,
     BusinessError,
+    ForbiddenError,
     JobPilotException,
     NotFoundError,
 )
@@ -24,11 +24,81 @@ from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType, ProficiencyLevel
 from app.core.config import settings
 from app.modules.workflow import TaskExecution
+from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 
 
 
 class ResumeService:
     """Service class for Resume-related operations."""
+
+    @staticmethod
+    async def get_resume_for_edit(
+        db: AsyncSession, resume_id: str, user_id: int
+    ) -> DocumentEditResponse:
+        """Get resume data for editing, returned as unified DocumentEditResponse."""
+        resume = await ResumeRepository.get_with_document(db, resume_id)
+        if not resume:
+            raise NotFoundError("Resume not found")
+        if resume.user_id != user_id:
+            raise ForbiddenError("You don't have permission to edit this resume")
+
+        document = resume.document
+        return DocumentEditResponse(
+            business_type="resume",
+            business_id=resume.id,
+            title=resume.title,
+            document_id=document.id,
+            content=document.content,
+            format=document.format,
+            created_at=resume.created_at,
+            updated_at=resume.updated_at,
+        )
+
+    @staticmethod
+    async def update_resume_content(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        payload: DocumentUpdateRequest,
+    ) -> Resume:
+        """Update resume content by creating a new document version and relinking."""
+        resume = await ResumeRepository.get_with_document(db, resume_id)
+        if not resume:
+            raise NotFoundError("Resume not found")
+        if resume.user_id != user_id:
+            raise ForbiddenError("You don't have permission to edit this resume")
+
+        current_doc = resume.document
+        if not current_doc:
+            raise NotFoundError("Document not found")
+        previous_hash = current_doc.content_hash if current_doc else None
+
+        new_document = await DocumentRepository.create_new_version(
+            db=db,
+            parent_document=current_doc,
+            content=payload.content,
+            created_by=user_id,
+            change_comments=payload.change_comments or "Content updated",
+        )
+
+        resume.document_id = new_document.id
+        resume.updated_at = datetime.now(timezone.utc)
+        db.add(resume)
+
+        await ResumeService._trigger_analysis_if_needed(
+            db,
+            resume,
+            user_id,
+            previous_content_hash=previous_hash,
+            new_content_hash=new_document.content_hash,
+        )
+
+        await db.commit()
+        await db.refresh(resume)
+        await db.refresh(new_document)
+        resume.document = new_document
+
+        return resume
 
     @staticmethod
     async def create_resume(

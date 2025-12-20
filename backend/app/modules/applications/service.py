@@ -1,12 +1,12 @@
 """Service layer for application creation and workflow execution."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import BadRequestError, NotFoundError
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
@@ -14,13 +14,157 @@ from app.modules.applications.schemas import ApplicationCreateRequest
 from app.modules.auth.models import User
 from app.modules.jobs.service import JobService
 from app.modules.resumes.models import Document, Resume
+from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
+from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.shared.enums import ApplicationStatus
 from app.shared.pagination import PaginatedResponse, PaginationParams
 
 
 class ApplicationService:
     """Business logic for job applications and workflow orchestration."""
+
+    @staticmethod
+    async def get_tailored_resume_for_edit(
+        db: AsyncSession, application_id: str, user: User
+    ) -> DocumentEditResponse:
+        """Get tailored resume document for unified editor."""
+        application = await ApplicationRepository.get_with_dependencies(db, application_id)
+        if not application or application.user_id != user.id:
+            raise NotFoundError("Application not found")
+
+        if not application.resume_document_id:
+            raise NotFoundError("Tailored resume not generated yet")
+
+        resume_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
+        if not resume_doc:
+            raise NotFoundError("Resume document not found")
+
+        job_title = application.job.title if application.job else ""
+        company_name = None
+        if application.job:
+            company_name = getattr(application.job, "company_name", None) or getattr(
+                application.job, "advertiser_name", None
+            )
+
+        return DocumentEditResponse(
+            business_type="tailored_resume",
+            business_id=application.id,
+            title=f"Resume for {job_title}" if job_title else "Tailored Resume",
+            document_id=resume_doc.id,
+            content=resume_doc.content,
+            format=resume_doc.format,
+            created_at=application.created_at,
+            updated_at=application.updated_at,
+            job_title=job_title or None,
+            company_name=company_name,
+            source_resume_title=application.source_resume.title if application.source_resume else None,
+        )
+
+    @staticmethod
+    async def update_resume_content(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        payload: DocumentUpdateRequest,
+    ) -> Application:
+        """Update tailored resume content for an application."""
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+        if not application.resume_document_id:
+            raise NotFoundError("Resume document not found")
+
+        current_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
+        if not current_doc:
+            raise NotFoundError("Resume document not found")
+        new_doc = await DocumentRepository.create_new_version(
+            db=db,
+            parent_document=current_doc,
+            content=payload.content,
+            created_by=user.id,
+            change_comments=payload.change_comments or "Content updated",
+        )
+
+        application.resume_document_id = new_doc.id
+        application.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(application)
+        await db.refresh(new_doc)
+        application.resume_document = new_doc
+
+        return application
+
+    @staticmethod
+    async def get_cover_letter_for_edit(
+        db: AsyncSession, application_id: str, user: User
+    ) -> DocumentEditResponse:
+        """Get cover letter document for unified editor."""
+        application = await ApplicationRepository.get_with_dependencies(db, application_id)
+        if not application or application.user_id != user.id:
+            raise NotFoundError("Application not found")
+
+        if not application.cover_letter_document_id:
+            raise NotFoundError("Cover letter not generated yet")
+
+        cover_letter_doc = await DocumentRepository.get_by_id(db, application.cover_letter_document_id)
+        if not cover_letter_doc:
+            raise NotFoundError("Cover letter document not found")
+
+        job_title = application.job.title if application.job else ""
+        company_name = None
+        if application.job:
+            company_name = getattr(application.job, "company_name", None) or getattr(
+                application.job, "advertiser_name", None
+            )
+
+        return DocumentEditResponse(
+            business_type="cover_letter",
+            business_id=application.id,
+            title="Cover Letter",
+            document_id=cover_letter_doc.id,
+            content=cover_letter_doc.content,
+            format=cover_letter_doc.format,
+            created_at=application.created_at,
+            updated_at=application.updated_at,
+            job_title=job_title or None,
+            company_name=company_name,
+            source_resume_title=application.source_resume.title if application.source_resume else None,
+        )
+
+    @staticmethod
+    async def update_cover_letter_content(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        payload: DocumentUpdateRequest,
+    ) -> Application:
+        """Update cover letter content for an application."""
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+        if not application.cover_letter_document_id:
+            raise NotFoundError("Cover letter document not found")
+
+        current_doc = await DocumentRepository.get_by_id(db, application.cover_letter_document_id)
+        if not current_doc:
+            raise NotFoundError("Cover letter document not found")
+        new_doc = await DocumentRepository.create_new_version(
+            db=db,
+            parent_document=current_doc,
+            content=payload.content,
+            created_by=user.id,
+            change_comments=payload.change_comments or "Content updated",
+        )
+
+        application.cover_letter_document_id = new_doc.id
+        application.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(application)
+        await db.refresh(new_doc)
+        application.cover_letter_document = new_doc
+
+        return application
 
     @staticmethod
     async def create_application(

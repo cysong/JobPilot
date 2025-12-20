@@ -1,5 +1,6 @@
 import client from './client';
 import type { Application, ApplicationListResponse, CreateApplicationRequest } from '@/types/application';
+import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document';
 
 export const applicationApi = {
     create: async (data: CreateApplicationRequest) => {
@@ -34,6 +35,26 @@ export const applicationApi = {
 
     retryCoverLetter: async (id: string) => {
         const result = await client.post<Application, Application>(`/applications/${id}/retry`);
+        return result;
+    },
+
+    getTailoredResumeForEdit: async (applicationId: string) => {
+        const result = await client.get<DocumentEditData, DocumentEditData>(`/applications/${applicationId}/resume/edit`);
+        return result;
+    },
+
+    updateTailoredResume: async (applicationId: string, data: DocumentUpdatePayload) => {
+        const result = await client.patch<Application, Application>(`/applications/${applicationId}/resume`, data);
+        return result;
+    },
+
+    getCoverLetterForEdit: async (applicationId: string) => {
+        const result = await client.get<DocumentEditData, DocumentEditData>(`/applications/${applicationId}/cover-letter/edit`);
+        return result;
+    },
+
+    updateCoverLetter: async (applicationId: string, data: DocumentUpdatePayload) => {
+        const result = await client.patch<Application, Application>(`/applications/${applicationId}/cover-letter`, data);
         return result;
     }
 };
