@@ -468,7 +468,7 @@ class TaskService:
         to_retry = workflow_tasks[start_idx:]
         signatures = []
         for t in to_retry:
-            task_type_enum = TaskService._resolve_task_type(t.task_type)
+            task_type_enum = TaskType.from_value(t.task_type)
             if not task_type_enum:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Unsupported task type {t.task_type} for retry")
             info: TaskTypeInfo = task_type_enum.value
@@ -649,10 +649,3 @@ class TaskService:
             )
 
         return TaskStatisticsResponse(task_type_stats=items)
-
-    @staticmethod
-    def _resolve_task_type(task_type_value: Optional[str]):
-        for t in TaskType:
-            if t.value.value == task_type_value:
-                return t
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Unsupported task type for retry")

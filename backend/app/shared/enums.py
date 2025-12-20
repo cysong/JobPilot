@@ -56,6 +56,22 @@ class TaskType(Enum):
         task_type.value.celery_task        # "app.modules.jobs.tasks.analyze_job_async"
     """
 
+    @classmethod
+    def from_value(cls, task_type_value: Optional[str]) -> Optional["TaskType"]:
+        """
+        Resolve a task type string value to its corresponding TaskType enum.
+
+        Args:
+            task_type_value: The string value to look up (e.g., "job_analysis")
+
+        Returns:
+            The matching TaskType enum member, or None if not found.
+        """
+        for t in cls:
+            if t.value.value == task_type_value:
+                return t
+        return None
+
     # Job-related tasks
     JOB_ANALYSIS = TaskTypeInfo(
         value="job_analysis",
