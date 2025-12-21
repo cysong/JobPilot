@@ -158,7 +158,7 @@ export default function ApplicationDetailPage() {
                             {application.resume_document_id && (
                                 <div className="flex gap-2">
                                     <Button variant="outline" size="sm" asChild>
-                                        <Link to={`/applications/${application.id}/resume/edit`}>
+                                        <Link to={`/applications/${application.id}/resume`}>
                                             <FileText className="h-3.5 w-3.5 mr-2" />
                                             Edit
                                         </Link>
@@ -195,7 +195,7 @@ export default function ApplicationDetailPage() {
                             </div>
                             {application.cover_letter_document_id && (
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link to={`/applications/${application.id}/cover-letter/edit`}>
+                                    <Link to={`/applications/${application.id}/cover-letter`}>
                                         <FileText className="h-3.5 w-3.5 mr-2" />
                                         Edit
                                     </Link>

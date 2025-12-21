@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { FileCheck } from 'lucide-react'
 import { DocumentEditPage } from '@/components/DocumentEditPage'
 import {
-  useResumeEdit,
+  useResumeForEdit,
   useCreateResume,
   useUpdateResumeContent,
   useResumeMutations
@@ -13,13 +13,13 @@ import {
 import { resumeApi } from '@/api/resumes'
 import type { DocumentEditConfig } from '@/components/DocumentEditPage/types'
 
-export default function ResumeContentEditPage() {
+export default function ResumeEditPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isNew = !id || id === 'new'
 
   // Get Resume data (only for edit mode)
-  const { data: resume } = useResumeEdit(isNew ? '' : id!)
+  const { data: resume } = useResumeForEdit(isNew ? '' : id!)
   const { finalizeResume } = useResumeMutations()
 
   const handleExportPdf = async (id: string, title: string) => {
@@ -81,7 +81,7 @@ export default function ResumeContentEditPage() {
     },
     lifecycle: {
       onCreateSuccess: (newId: string) => {
-        navigate(`/resumes/${newId}/edit`, { replace: true });
+        navigate(`/resumes/${newId}`, { replace: true });
       },
     },
   }), [isNew, resume?.is_draft, handleFinalize, navigate]);
@@ -89,7 +89,7 @@ export default function ResumeContentEditPage() {
   return (
     <DocumentEditPage
       config={config}
-      useDocument={useResumeEdit}
+      useDocument={useResumeForEdit}
       useCreateDocument={useCreateResume}
       useUpdateDocument={useUpdateResumeContent}
       useExportPdf={handleExportPdf}

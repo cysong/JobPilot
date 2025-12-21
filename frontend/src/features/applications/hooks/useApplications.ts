@@ -21,7 +21,7 @@ export const useApplication = (id: string) => {
     })
 }
 
-export const useTailoredResumeEdit = (applicationId: string) => {
+export const useTailoredResumeForEdit = (applicationId: string) => {
     return useQuery<DocumentEditData>({
         queryKey: ['tailored-resume-edit', applicationId],
         queryFn: () => applicationApi.getTailoredResumeForEdit(applicationId),
@@ -29,10 +29,10 @@ export const useTailoredResumeEdit = (applicationId: string) => {
     })
 }
 
-export const useUpdateTailoredResume = () => {
+export const useUpdateTailoredResumeContent = () => {
     const queryClient = useQueryClient()
     return useMutation({
-        mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
+        mutationFn: ({ id, ...data }: { id: string} & DocumentUpdatePayload) =>
             applicationApi.updateTailoredResume(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['applications'] })
@@ -41,7 +41,7 @@ export const useUpdateTailoredResume = () => {
     })
 }
 
-export const useCoverLetterEdit = (applicationId: string) => {
+export const useCoverLetterForEdit = (applicationId: string) => {
     return useQuery<DocumentEditData>({
         queryKey: ['cover-letter-edit', applicationId],
         queryFn: () => applicationApi.getCoverLetterForEdit(applicationId),
@@ -49,7 +49,7 @@ export const useCoverLetterEdit = (applicationId: string) => {
     })
 }
 
-export const useUpdateCoverLetter = () => {
+export const useUpdateCoverLetterContent = () => {
     const queryClient = useQueryClient()
     return useMutation({
         mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>

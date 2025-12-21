@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { DocumentEditPage } from '@/components/DocumentEditPage'
-import { useTailoredResumeEdit, useUpdateTailoredResume } from './hooks/useApplications'
+import { useTailoredResumeForEdit, useUpdateTailoredResumeContent } from './hooks/useApplications'
 import type { DocumentEditConfig } from '@/components/DocumentEditPage/types'
 
 export default function TailoredResumeEditPage() {
@@ -26,8 +26,8 @@ export default function TailoredResumeEditPage() {
   return (
     <DocumentEditPage
       config={config}
-      useDocument={useTailoredResumeEdit}
-      useUpdateDocument={useUpdateTailoredResume}
+      useDocument={useTailoredResumeForEdit}
+      useUpdateDocument={useUpdateTailoredResumeContent}
       returnPath={`/applications/${applicationId}`}
       storageKeyPrefix="application-resume"
       documentId={applicationId}

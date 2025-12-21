@@ -11,7 +11,7 @@ export const useResumes = () => {
     })
 }
 
-export const useResumeEdit = (resumeId: string) => {
+export const useResumeForEdit = (resumeId: string) => {
     return useQuery<DocumentEditData>({
         queryKey: ['resume-edit', resumeId],
         queryFn: () => resumeApi.getResumeForEdit(resumeId),

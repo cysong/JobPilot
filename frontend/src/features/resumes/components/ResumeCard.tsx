@@ -42,7 +42,7 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
 
     return (
         <Link
-            to={`/resumes/${resume.id}/edit`}
+            to={`/resumes/${resume.id}`}
             className="block bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative"
         >
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">

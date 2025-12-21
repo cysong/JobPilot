@@ -34,6 +34,7 @@ class DocumentEditResponse(BaseModel):
     job_title: Optional[str] = None
     company_name: Optional[str] = None
     source_resume_title: Optional[str] = None
+    is_draft: Optional[bool] = None  # For resumes only
 
     model_config = ConfigDict(from_attributes=True)
 

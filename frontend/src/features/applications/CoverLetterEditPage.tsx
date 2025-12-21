@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { DocumentEditPage } from '@/components/DocumentEditPage'
-import { useCoverLetterEdit, useUpdateCoverLetter } from './hooks/useApplications'
+import { useCoverLetterForEdit, useUpdateCoverLetterContent } from './hooks/useApplications'
 import type { DocumentEditConfig } from '@/components/DocumentEditPage/types'
 
 export default function CoverLetterEditPage() {
@@ -26,8 +26,8 @@ export default function CoverLetterEditPage() {
   return (
     <DocumentEditPage
       config={config}
-      useDocument={useCoverLetterEdit}
-      useUpdateDocument={useUpdateCoverLetter}
+      useDocument={useCoverLetterForEdit}
+      useUpdateDocument={useUpdateCoverLetterContent}
       returnPath={`/applications/${applicationId}`}
       storageKeyPrefix="application-coverletter"
       documentId={applicationId}

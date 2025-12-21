@@ -52,6 +52,7 @@ class ResumeService:
             format=document.format,
             created_at=resume.created_at,
             updated_at=resume.updated_at,
+            is_draft=resume.is_draft,
         )
 
     @staticmethod
