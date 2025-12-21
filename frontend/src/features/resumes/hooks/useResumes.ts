@@ -40,6 +40,17 @@ export const useUpdateResumeContent = () => {
     })
 }
 
+// Hook for creating resume without auto-navigation (for config-driven DocumentEditPage)
+export const useCreateResume = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (data: CreateResumeRequest) => resumeApi.createResume(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['resumes'] })
+        },
+    })
+}
+
 export const useResumeMutations = () => {
     const queryClient = useQueryClient()
     const { toast } = useToast()

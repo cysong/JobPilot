@@ -1,133 +1,213 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useForm } from 'react-hook-form'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
 import { ArrowLeft, Save, Download } from 'lucide-react'
-import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { MarkdownPreview } from '@/components/MarkdownPreview'
 import { useAutoSave } from '@/hooks/useAutoSave'
-import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
+import type { DocumentEditPageProps } from './types'
 
-type UpdateVariables = { id: string } & DocumentUpdatePayload
-
-type UseDocumentHook = (id: string) => UseQueryResult<DocumentEditData>
-type UseUpdateDocumentHook = () => UseMutationResult<any, unknown, UpdateVariables, unknown>
-
-interface DocumentEditPageProps {
-  useDocument: UseDocumentHook
-  useUpdateDocument: UseUpdateDocumentHook
-  returnPath: string
-  storageKeyPrefix: string
-  useExportPdf?: (id: string, title: string) => Promise<void>
-}
-
-interface FormValues {
-  content: string
-  change_comments?: string
-}
-
-export function DocumentEditPage({
+export function DocumentEditPage<TData = any>({
+  config,
   useDocument,
+  useCreateDocument,
   useUpdateDocument,
+  useExportPdf,
   returnPath,
   storageKeyPrefix,
-  useExportPdf,
-}: DocumentEditPageProps) {
-  const params = useParams()
+  documentId
+}: DocumentEditPageProps<TData>) {
+  const { id: urlId } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
 
-  const entityId = useMemo(() => params.id || params.applicationId, [params.id, params.applicationId])
-  const { data: document, isLoading } = useDocument(entityId || '')
+  // Use documentId prop if provided, otherwise fall back to URL param
+  const id = documentId || urlId
+
+  // Determine mode
+  const mode = useMemo(() => {
+    if (config.mode === 'auto') {
+      return id && id !== 'new' ? 'edit' : 'create'
+    }
+    return config.mode || 'edit'
+  }, [config.mode, id])
+
+  const isCreating = mode === 'create'
+
+  // Fetch document (only in edit mode)
+  const { data: document, isLoading } = useDocument(
+    !isCreating && id ? id : ''
+  )
+
   const updateMutation = useUpdateDocument()
+  const createMutation = useCreateDocument?.()
 
-  const form = useForm<FormValues>({
-    defaultValues: { content: '', change_comments: '' },
+  // Form management
+  const form = useForm({
+    defaultValues: {
+      title: '',
+      content: ''
+    }
   })
 
+  // Storage key
   const storageKey = useMemo(() => {
-    if (!document && !entityId) return undefined
-    const id = document?.business_id || entityId
-    return `${storageKeyPrefix}-${id}`
-  }, [document?.business_id, entityId, storageKeyPrefix])
+    const docId = isCreating ? 'new' : (document?.business_id || id)
+    return docId ? `${storageKeyPrefix}-${docId}` : undefined
+  }, [storageKeyPrefix, document?.business_id, id, isCreating])
 
-  // Load data and possibly restore draft
+  // Load document data and check for local draft
   useEffect(() => {
-    if (!document) return
-    const savedDraftRaw = storageKey ? localStorage.getItem(storageKey) : null
+    if (isCreating) {
+      // Create mode: check for local draft
+      if (storageKey) {
+        const savedDraft = localStorage.getItem(storageKey)
+        if (savedDraft) {
+          try {
+            const draft = JSON.parse(savedDraft)
+            toast({
+              title: "Unsaved Draft",
+              description: "Restoring your previous work...",
+            })
+            form.setValue('title', draft.title || '', { shouldDirty: true })
+            form.setValue('content', draft.content || '', { shouldDirty: true })
+          } catch {
+            localStorage.removeItem(storageKey)
+          }
+        }
+      }
+      return
+    }
 
-    if (savedDraftRaw) {
+    if (!document) return
+
+    const savedDraft = storageKey ? localStorage.getItem(storageKey) : null
+
+    // Always load server data first
+    form.reset({
+      title: document.title,
+      content: document.content
+    })
+
+    // Check for newer local draft
+    if (savedDraft) {
       try {
-        const draft = JSON.parse(savedDraftRaw)
+        const draft = JSON.parse(savedDraft)
         const draftTime = draft.savedAt ? new Date(draft.savedAt).getTime() : 0
         const serverTime = document.updated_at ? new Date(document.updated_at).getTime() : 0
 
         if (draftTime > serverTime && draft.content) {
-          form.setValue('content', draft.content, { shouldDirty: true })
+          toast({
+            title: "Unsaved Changes Found",
+            description: "Would you like to restore your unsaved work?",
+            action: (
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (config.fields.title?.enabled && draft.title) {
+                    form.setValue('title', draft.title, { shouldDirty: true })
+                  }
+                  form.setValue('content', draft.content, { shouldDirty: true })
+                  toast({ title: "Draft Restored" })
+                }}
+              >
+                Restore
+              </Button>
+            ),
+          })
         } else {
-          form.reset({ content: document.content })
           localStorage.removeItem(storageKey!)
         }
       } catch {
-        form.reset({ content: document.content })
         localStorage.removeItem(storageKey!)
       }
-    } else {
-      form.reset({ content: document.content })
     }
-  }, [document, form, storageKey])
+  }, [document, form, toast, storageKey, isCreating, config.fields.title])
 
-  // Auto-save to localStorage only
-  const watchedContent = form.watch('content')
+  // Auto-save to localStorage
+  const watchedValues = form.watch()
   const noopSave = useCallback(() => {}, [])
   useAutoSave({
-    data: { content: watchedContent },
+    data: watchedValues,
     onSave: noopSave,
     storageKey,
-    enabled: !!document,
+    enabled: form.formState.isDirty,
     interval: 4000,
   })
 
-  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
+  // Submit handler
+  const handleSubmit = useCallback(async (values: any) => {
+    // Validation
+    if (!values.content?.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Content cannot be empty',
+        variant: 'destructive'
+      })
+      return
+    }
 
-  const handleSubmit = useCallback(
-    (values: FormValues) => {
-      if (!entityId) return
-      if (!values.content.trim()) {
-        toast({
-          title: 'Content is required',
-          description: 'Please add some content before saving.',
-          variant: 'destructive',
-        })
-        return
-      }
+    if (config.fields.title?.enabled && config.fields.title.required && !values.title?.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Title cannot be empty',
+        variant: 'destructive'
+      })
+      return
+    }
 
-      updateMutation.mutate(
-        { id: entityId, content: values.content, change_comments: values.change_comments },
-        {
-          onSuccess: () => {
-            if (storageKey) localStorage.removeItem(storageKey)
-            toast({ title: 'Saved successfully' })
-            form.reset(values)
-          },
-          onError: () => {
-            toast({
-              title: 'Save failed',
-              description: 'Please try again',
-              variant: 'destructive',
-            })
-          },
+    // Lifecycle hook
+    let processedData = values
+    if (config.lifecycle?.onBeforeSave) {
+      processedData = await config.lifecycle.onBeforeSave(values)
+    }
+
+    const mutation = isCreating ? createMutation : updateMutation
+
+    if (!mutation) {
+      toast({
+        title: 'Error',
+        description: 'Operation not available',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const payload = isCreating
+      ? processedData
+      : { id: id!, ...processedData }
+
+    mutation.mutate(payload, {
+      onSuccess: (result) => {
+        if (storageKey) {
+          localStorage.removeItem(storageKey)
         }
-      )
-    },
-    [entityId, form, storageKey, toast, updateMutation]
-  )
+        toast({ title: 'Saved successfully' })
+        form.reset(values)
 
-  // Ctrl/Cmd + S support
+        if (isCreating && config.lifecycle?.onCreateSuccess) {
+          config.lifecycle.onCreateSuccess(result.id, result)
+        } else if (config.lifecycle?.onAfterSave) {
+          config.lifecycle.onAfterSave(result)
+        }
+      },
+      onError: () => {
+        toast({
+          title: 'Save failed',
+          description: 'Please try again',
+          variant: 'destructive'
+        })
+      }
+    })
+  }, [config, isCreating, id, createMutation, updateMutation, storageKey, toast, form])
+
+  // Keyboard shortcut: Ctrl+S
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -139,30 +219,30 @@ export function DocumentEditPage({
     return () => window.removeEventListener('keydown', handler)
   }, [form, handleSubmit])
 
+  // Export PDF
   const handleExportPdf = async () => {
-    if (!useExportPdf || !document || !entityId) return
+    if (!useExportPdf || !document || !id) return
     try {
-      await useExportPdf(entityId, document.title)
+      await useExportPdf(id, document.title)
     } catch {
       toast({
         title: 'Export failed',
         description: 'Failed to export PDF',
-        variant: 'destructive',
+        variant: 'destructive'
       })
     }
   }
 
-  if (!entityId) {
-    return <div className="p-8">Invalid document</div>
-  }
-
-  if (isLoading) {
+  // Loading state
+  if (!isCreating && isLoading) {
     return <div className="p-8">Loading...</div>
   }
 
-  if (!document) {
+  if (!isCreating && !document) {
     return <div className="p-8">Document not found</div>
   }
+
+  const displayTitle = isCreating ? 'New Document' : document?.title
 
   return (
     <div className="h-screen flex flex-col">
@@ -173,9 +253,18 @@ export function DocumentEditPage({
             <ArrowLeft className="w-4 h-4" />
           </Button>
 
-          <div>
-            <h1 className="text-lg font-semibold">{document.title}</h1>
-            {document.job_title && (
+          <div className="flex items-center gap-2">
+            {config.fields.title?.enabled ? (
+              <Input
+                {...form.register('title')}
+                placeholder={config.fields.title.placeholder || 'Enter title...'}
+                className="text-lg font-semibold border-transparent hover:border-slate-200 focus:border-indigo-500 w-[300px]"
+              />
+            ) : (
+              <h1 className="text-lg font-semibold">{displayTitle}</h1>
+            )}
+
+            {document?.job_title && (
               <p className="text-sm text-slate-500">
                 {document.company_name ? `${document.company_name} · ` : ''}
                 {document.job_title}
@@ -183,11 +272,13 @@ export function DocumentEditPage({
             )}
           </div>
 
-          {document.business_type !== 'resume' && (
+          {config.ui?.showBusinessBadge && document && document.business_type !== 'resume' && (
             <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
               {document.business_type === 'tailored_resume' ? 'Tailored Resume' : 'Cover Letter'}
             </Badge>
           )}
+
+          {config.slots?.headerExtra}
         </div>
 
         <div className="flex items-center gap-2">
@@ -211,7 +302,9 @@ export function DocumentEditPage({
             </button>
           </div>
 
-          {useExportPdf && (
+          {config.slots?.actionsBefore}
+
+          {config.ui?.showExportPdf && !isCreating && useExportPdf && (
             <Button variant="outline" onClick={handleExportPdf}>
               <Download className="w-4 h-4 mr-2" />
               Export PDF
@@ -220,11 +313,13 @@ export function DocumentEditPage({
 
           <Button
             onClick={form.handleSubmit(handleSubmit)}
-            disabled={!form.formState.isDirty || updateMutation.isPending}
+            disabled={!form.formState.isDirty || updateMutation?.isPending || createMutation?.isPending}
           >
             <Save className="w-4 h-4 mr-2" />
-            {updateMutation.isPending ? 'Saving...' : 'Save'}
+            {updateMutation?.isPending || createMutation?.isPending ? 'Saving...' : 'Save'}
           </Button>
+
+          {config.slots?.actionsAfter}
         </div>
       </div>
 
@@ -272,3 +367,5 @@ export function DocumentEditPage({
     </div>
   )
 }
+
+export * from './types'
