@@ -13,7 +13,6 @@ import JobDetailPage from '@/features/jobs/JobDetailPage'
 import ApplicationListingPage from '@/features/applications/ApplicationListingPage'
 import ApplicationDetailPage from '@/features/applications/ApplicationDetailPage'
 import ResumeListingPage from '@/features/resumes/ResumeListingPage'
-import ResumeEditPage from '@/features/resumes/ResumeEditPage'
 import ResumeContentEditPage from '@/features/resumes/ResumeContentEditPage'
 import TailoredResumeEditPage from '@/features/applications/TailoredResumeEditPage'
 import CoverLetterEditPage from '@/features/applications/CoverLetterEditPage'
@@ -65,9 +64,8 @@ function App() {
           <Route element={<ProtectedRoute><FullWidthLayout /></ProtectedRoute>}>
             <Route path="/applications/:applicationId/resume/edit" element={<TailoredResumeEditPage />} />
             <Route path="/applications/:applicationId/cover-letter/edit" element={<CoverLetterEditPage />} />
+            <Route path="/resumes/new" element={<ResumeContentEditPage />} />
             <Route path="/resumes/:id/edit" element={<ResumeContentEditPage />} />
-            <Route path="/resumes/new" element={<ResumeEditPage />} />
-            <Route path="/resumes/:id" element={<ResumeEditPage />} />
           </Route>
 
           {/* Admin protected routes */}

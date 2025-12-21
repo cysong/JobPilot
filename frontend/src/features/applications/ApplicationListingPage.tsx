@@ -124,7 +124,7 @@ export default function ApplicationListingPage() {
                                     {app.status === 'Ready' && app.resume_document_id && (
                                         <>
                                             <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/resumes/${app.resume_document_id}`}>
+                                                <Link to={`/resumes/${app.resume_document_id}/edit`}>
                                                     <FileText className="h-3.5 w-3.5 mr-2" />
                                                     Edit Resume
                                                 </Link>
