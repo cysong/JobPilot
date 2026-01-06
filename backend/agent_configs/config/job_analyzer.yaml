@@ -11,22 +11,33 @@ instructions: |
   Extract structured information from the job description below.
 
   **Critical Rules:**
-  1. ONLY extract information EXPLICITLY mentioned in the text
-  2. Do NOT infer, assume, or hallucinate information
-  3. If information is missing or unclear, leave the field empty or return []
-  4. Normalize skill names (e.g., "React.js" → "React", "Node JS" → "Node.js")
-  5. Filter out advertising language and focus on concrete requirements
-  6. Handle inconsistencies: if multiple experience requirements are mentioned, take the minimum
-  7. Be consistent: similar jobs should produce similar outputs
-  8. Aim for deterministic results - same input should give same output
+  * ONLY extract information EXPLICITLY mentioned in the text
+  * Do NOT infer, assume, or hallucinate information
+  * If information is missing or unclear, leave the field empty or return []
+  * Normalize skill names (e.g., "React.js" → "React", "Node JS" → "Node.js")
+  * Filter out advertising language and focus on concrete requirements
+  * Handle inconsistencies: if multiple experience requirements are mentioned, take the minimum
+  * Be consistent: similar jobs should produce similar outputs
+  * Aim for deterministic results - same input should give same output
 
   **Field Extraction Guidelines:**
 
   - **normalized_job_title**: Standardized title stripped of seniority/location/tech modifiers (e.g., "Senior Backend Engineer (Python/FastAPI)" -> "Backend Developer"); if no clear role, leave empty.
   - **required_skills**: Explicitly marked required/must-have hard skills.
-  - **preferred_skills**: Only items labeled preferred/nice-to-have/plus; do not include required items or unlabelled tech_stack.
+  - **preferred_skills**: Only items labeled preferred/nice-to-have/plus/advantageous; do not include required items.
   - **certifications**: Explicit certifications (e.g., AWS/Azure certs, CCNA, PMP, CISSP). If none, return [].
-  - **tech_stack**: Core language/framework families and major platforms/tools no more than 3 items(e.g., Java, Python, C#, JavaScript, React, Vue, Angular, .NET, Spring, Docker, Kubernetes). Keep concise names; no marketing phrases.
+  - **tech_stack**: Extract up to 3 items. Use standard skill names and spelling. Prefer abstract categories only when clearly implied by explicit mentions. Rules:
+    * Programming languages: use the language name (e.g., Java, C#, Python, JavaScript).
+    * Frameworks: use the framework name (e.g., Spring Boot, Flask, Django, FastAPI, React, Vue, AngularJS).
+    * Multiple components of the same language/framework: use the language/framework name only (e.g., Spring modules -> "Spring", Django packages -> "Django", React ecosystem tools -> "React").
+    * Testing:
+      * If multiple testing tools OR general testing responsibilities are mentioned, output "Automation Testing".
+      * If only a single specific testing tool is mentioned, output the tool name (e.g., Playwright, Cypress, Selenium, JMeter).
+    * Performance testing:
+      * If explicitly stated as a practice, you may output "Performance Testing".
+      * If only a single tool is mentioned (e.g., JMeter) and no other testing tools, output the tool name only.
+    * Cloud: if AWS/Azure components are explicitly mentioned, output "AWS" or "Azure" (not individual services).
+    * Do not add items without explicit evidence. No advertising language.
   - **seniority**: Choose from {Intern, Junior, Mid-level, Intermediate, Senior, Lead, Principal, Manager, Director, Level x}; if unclear, leave empty.
   - **key_responsibilities**: 3-5 concise duties, one line each; if fewer are explicit, return only those.
   - **experience_years**: CRITICAL - STRICT FORMAT REQUIRED (MAX 50 chars):
