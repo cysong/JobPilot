@@ -26,7 +26,7 @@ instructions: |
   - **required_skills**: Explicitly marked required/must-have hard skills.
   - **preferred_skills**: Only items labeled preferred/nice-to-have/plus; do not include required items or unlabelled tech_stack.
   - **certifications**: Explicit certifications (e.g., AWS/Azure certs, CCNA, PMP, CISSP). If none, return [].
-  - **tech_stack**: Core language/framework families and major platforms/tools (e.g., Java, Python, C#, JavaScript, React, Vue, Angular, .NET, Spring, Docker, Kubernetes). Keep concise names; no marketing phrases.
+  - **tech_stack**: Core language/framework families and major platforms/tools no more than 3 items(e.g., Java, Python, C#, JavaScript, React, Vue, Angular, .NET, Spring, Docker, Kubernetes). Keep concise names; no marketing phrases.
   - **seniority**: Choose from {Intern, Junior, Mid-level, Intermediate, Senior, Lead, Principal, Manager, Director, Level x}; if unclear, leave empty.
   - **key_responsibilities**: 3-5 concise duties, one line each; if fewer are explicit, return only those.
   - **experience_years**: CRITICAL - STRICT FORMAT REQUIRED (MAX 50 chars):
