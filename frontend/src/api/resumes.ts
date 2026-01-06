@@ -3,6 +3,7 @@ import type {
     Resume,
     ResumeListItem,
     CreateResumeRequest,
+    ResumeTitleUpdate,
     UpdateResumeRequest,
     ResumeListResponse,
     ResumeExportRequest
@@ -39,6 +40,11 @@ export const resumeApi = {
 
     updateResume: async (id: string, data: UpdateResumeRequest) => {
         const result = await client.put<Resume, Resume>(`/resumes/${id}`, data)
+        return result
+    },
+
+    updateResumeTitle: async (id: string, data: ResumeTitleUpdate) => {
+        const result = await client.patch<Resume, Resume>(`/resumes/${id}/title`, data)
         return result
     },
 

@@ -18,6 +18,7 @@ export function DocumentEditPage<TData = any>({
   useCreateDocument,
   useUpdateDocument,
   useExportPdf,
+  onTitleSave,
   returnPath,
   storageKeyPrefix,
   documentId
@@ -75,7 +76,6 @@ export function DocumentEditPage<TData = any>({
               title: "Unsaved Draft",
               description: "Restoring your previous work...",
             })
-            form.setValue('title', draft.title || '', { shouldDirty: true })
             form.setValue('content', draft.content || '', { shouldDirty: true })
           } catch {
             localStorage.removeItem(storageKey)
@@ -102,7 +102,15 @@ export function DocumentEditPage<TData = any>({
         const draftTime = draft.savedAt ? new Date(draft.savedAt).getTime() : 0
         const serverTime = document.updated_at ? new Date(document.updated_at).getTime() : 0
 
-        if (draftTime > serverTime && draft.content) {
+        const getStringValue = (value: unknown) => (
+          typeof value === 'string' ? value : ''
+        )
+        const serverContent = getStringValue(document.content)
+        const draftContent = getStringValue(draft.content)
+        const contentChanged = draftContent !== serverContent
+        const draftHasChanges = contentChanged && draftContent.length > 0
+
+        if (draftTime > serverTime && draftHasChanges) {
           toast({
             title: "Unsaved Changes Found",
             description: "Would you like to restore your unsaved work?",
@@ -110,10 +118,9 @@ export function DocumentEditPage<TData = any>({
               <Button
                 size="sm"
                 onClick={() => {
-                  if (config.fields.title?.enabled && draft.title) {
-                    form.setValue('title', draft.title, { shouldDirty: true })
+                  if (typeof draft.content === 'string') {
+                    form.setValue('content', draft.content, { shouldDirty: true })
                   }
-                  form.setValue('content', draft.content, { shouldDirty: true })
                   toast({ title: "Draft Restored" })
                 }}
               >
@@ -128,18 +135,53 @@ export function DocumentEditPage<TData = any>({
         localStorage.removeItem(storageKey!)
       }
     }
-  }, [document, form, toast, storageKey, isCreating, config.fields.title])
+  }, [document, form, toast, storageKey, isCreating])
 
   // Auto-save to localStorage
   const watchedValues = form.watch()
+  const isContentDirty = form.getFieldState('content', form.formState).isDirty
   const noopSave = useCallback(() => {}, [])
   useAutoSave({
-    data: watchedValues,
+    data: { content: watchedValues.content },
     onSave: noopSave,
     storageKey,
-    enabled: form.formState.isDirty,
+    enabled: isContentDirty,
     interval: 4000,
   })
+
+  const handleTitleBlur = useCallback(async () => {
+    if (!onTitleSave || !config.fields.title?.enabled || isCreating || !id || !document) {
+      return
+    }
+
+    const title = form.getValues('title').trim()
+    const serverTitle = typeof document.title === 'string' ? document.title : ''
+
+    if (config.fields.title.required && !title) {
+      toast({
+        title: 'Validation Error',
+        description: 'Title cannot be empty',
+        variant: 'destructive'
+      })
+      form.setValue('title', serverTitle, { shouldDirty: false })
+      return
+    }
+
+    if (!title || title === serverTitle) {
+      return
+    }
+
+    try {
+      await onTitleSave(id, title)
+    } catch {
+      toast({
+        title: 'Title save failed',
+        description: 'Please try again',
+        variant: 'destructive'
+      })
+      form.setValue('title', serverTitle, { shouldDirty: false })
+    }
+  }, [onTitleSave, config.fields.title, isCreating, id, document, form, toast])
 
   // Submit handler
   const handleSubmit = useCallback(async (values: any) => {
@@ -181,7 +223,7 @@ export function DocumentEditPage<TData = any>({
 
     const payload = isCreating
       ? processedData
-      : { id: id!, ...processedData }
+      : { id: id!, content: processedData.content }
 
     mutation.mutate(payload, {
       onSuccess: (result) => {
@@ -189,7 +231,11 @@ export function DocumentEditPage<TData = any>({
           localStorage.removeItem(storageKey)
         }
         toast({ title: 'Saved successfully' })
-        form.reset(values)
+        if (isCreating) {
+          form.reset(values)
+        } else {
+          form.resetField('content', { defaultValue: values.content })
+        }
 
         if (isCreating && config.lifecycle?.onCreateSuccess) {
           config.lifecycle.onCreateSuccess(result.id, result)
@@ -255,12 +301,13 @@ export function DocumentEditPage<TData = any>({
 
           <div className="flex items-center gap-2">
             {config.fields.title?.enabled ? (
-              <Input
-                {...form.register('title')}
-                placeholder={config.fields.title.placeholder || 'Enter title...'}
-                className="text-lg font-semibold border-transparent hover:border-slate-200 focus:border-indigo-500 w-[300px]"
-              />
-            ) : (
+          <Input
+            {...form.register('title')}
+            placeholder={config.fields.title.placeholder || 'Enter title...'}
+            className="text-lg font-semibold border-transparent hover:border-slate-200 focus:border-indigo-500 w-[300px]"
+            onBlur={handleTitleBlur}
+          />
+        ) : (
               <h1 className="text-lg font-semibold">{displayTitle}</h1>
             )}
 
@@ -313,7 +360,7 @@ export function DocumentEditPage<TData = any>({
 
           <Button
             onClick={form.handleSubmit(handleSubmit)}
-            disabled={!form.formState.isDirty || updateMutation?.isPending || createMutation?.isPending}
+            disabled={!isContentDirty || updateMutation?.isPending || createMutation?.isPending}
           >
             <Save className="w-4 h-4 mr-2" />
             {updateMutation?.isPending || createMutation?.isPending ? 'Saving...' : 'Save'}

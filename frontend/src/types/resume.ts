@@ -36,6 +36,10 @@ export interface UpdateResumeRequest {
     content?: string
 }
 
+export interface ResumeTitleUpdate {
+    title: string
+}
+
 export interface ResumeListResponse {
     items: ResumeListItem[]
     total: number

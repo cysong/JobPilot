@@ -20,15 +20,27 @@ export const useResumeForEdit = (resumeId: string) => {
 }
 
 export const useUpdateResumeContent = () => {
-    const queryClient = useQueryClient()
-    return useMutation({
-        mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
-            resumeApi.updateResumeContent(id, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['resumes'] })
-            queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
-        },
-    })
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & DocumentUpdatePayload) =>
+      resumeApi.updateResumeContent(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] })
+      queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
+    },
+  })
+}
+
+export const useUpdateResumeTitle = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      resumeApi.updateResumeTitle(id, { title }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] })
+      queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
+    },
+  })
 }
 
 // Hook for creating resume without auto-navigation (for config-driven DocumentEditPage)
@@ -62,6 +74,7 @@ export const useResumeMutations = () => {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['resumes'] })
             queryClient.invalidateQueries({ queryKey: ['resumes', data.id] })
+            queryClient.invalidateQueries({ queryKey: ['resume-edit', data.id] })
             toast({ title: 'Success', description: 'Resume finalized successfully' })
         },
         onError: () => {

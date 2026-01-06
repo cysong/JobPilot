@@ -8,7 +8,8 @@ import {
   useResumeForEdit,
   useCreateResume,
   useUpdateResumeContent,
-  useResumeMutations
+  useResumeMutations,
+  useUpdateResumeTitle
 } from '@/features/resumes/hooks/useResumes'
 import { resumeApi } from '@/api/resumes'
 import type { DocumentEditConfig } from '@/components/DocumentEditPage/types'
@@ -21,6 +22,7 @@ export default function ResumeEditPage() {
   // Get Resume data (only for edit mode)
   const { data: resume } = useResumeForEdit(isNew ? '' : id!)
   const { finalizeResume } = useResumeMutations()
+  const updateTitleMutation = useUpdateResumeTitle()
 
   const handleExportPdf = async (id: string, title: string) => {
     const blob = await resumeApi.exportResume(id)
@@ -39,6 +41,10 @@ export default function ResumeEditPage() {
       finalizeResume.mutate(id)
     }
   }, [id, finalizeResume])
+
+  const handleTitleSave = useCallback(async (resumeId: string, title: string) => {
+    await updateTitleMutation.mutateAsync({ id: resumeId, title })
+  }, [updateTitleMutation])
 
   // Use useMemo to make config reactive to resume data changes
   const config: DocumentEditConfig = useMemo(() => ({
@@ -93,6 +99,7 @@ export default function ResumeEditPage() {
       useCreateDocument={useCreateResume}
       useUpdateDocument={useUpdateResumeContent}
       useExportPdf={handleExportPdf}
+      onTitleSave={handleTitleSave}
       returnPath="/resumes"
       storageKeyPrefix="resume"
     />

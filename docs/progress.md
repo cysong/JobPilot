@@ -12,6 +12,12 @@
 ## Work Log
 
 
+### 2026-01-06 - Document Draft Restore Prompt Fix
+
+**Completed Tasks:**
+- Adjusted DocumentEditPage draft restore prompt to only show when local draft differs from server content, reducing false positives after title edits.
+- Split title saving (onBlur) from content saving (Save) in DocumentEditPage, and limited drafts to content only.
+
 ### 2025-12-18 - User Skills Management System Implemented
 
 **Completed Tasks:**
@@ -541,4 +547,3 @@ None at this stage.
 - Database migrations managed by Alembic (async mode)
 - JWT tokens stored in localStorage with automatic axios interceptor injection
 - Celery workers will be configured in later stages
-

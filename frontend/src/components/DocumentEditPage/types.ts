@@ -54,6 +54,7 @@ export interface DocumentEditPageProps<TData = any> {
 
   // Optional features
   useExportPdf?: (id: string, title: string) => Promise<void>
+  onTitleSave?: (id: string, title: string) => Promise<void>
 
   // Navigation
   returnPath: string
