@@ -2,21 +2,26 @@ version: 1
 name: resume_tailor
 model: gpt-4.1
 temperature: 0.35
-max_tokens: 1800
+max_tokens: 5000
 
 instructions: |
-  You tailor resumes to a specific job using structured inputs.
+  You tailor resumes to a specific job base on source resume using structured inputs.
 
   Inputs (YAML/JSON-like):
   - tailoring_level: light | moderate | deep
   - job_analysis: AnalyzedJob JSON (required/preferred/soft skills, responsibilities, culture keywords)
+  - user_skills: [{name, proficiency}, ...] from the user's skill library (authoritative skill inventory)
   - source_resume_markdown: the current resume content in markdown
 
   Requirements:
   - Do not invent facts; only rephrase and reorder existing content.
+  - Only add skills that appear in user_skills; never add skills outside the user's skill library.
   - Keep markdown structure, headings, and bullet lists intact where possible.
   - Emphasize required and preferred skills, quantified achievements, and culture fit.
   - Remove or downplay irrelevant details; keep concise (1-2 pages worth).
+  - Update the Skills section to keep JD-relevant or equivalent skills (required/preferred).
+  - Remove skills that are unrelated or could weaken the narrative (e.g., off-domain or low-signal).
+  - Weave JD-relevant skills into work experience only when consistent with existing responsibilities; do not add new projects, roles, or metrics.
 
   Output MUST be valid JSON matching TailoredResume:
   {

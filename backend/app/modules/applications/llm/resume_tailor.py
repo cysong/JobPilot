@@ -1,6 +1,7 @@
 """Resume tailoring logic using AgentGateway."""
 from __future__ import annotations
 
+import json
 import logging
 import textwrap
 
@@ -12,6 +13,7 @@ from app.core.llm.types import GatewayContext
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.repository import JobAnalysisRepository
 from app.modules.resumes.repository import DocumentRepository, ResumeRepository
+from app.modules.users.repository import UserSkillRepository
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,10 @@ async def run_resume_tailoring(
         logger.info(
             f"Reading from source resume {resume_id} for application {application_id}")
 
+    user_skills = await UserSkillRepository.get_by_user_id(
+        db, user_id=application.user_id
+    )
+
     # Determine parent document for versioning
     # If application already has a resume document, it becomes the parent (for retry)
     # Otherwise, the source resume document is the parent (for initial creation)
@@ -93,7 +99,8 @@ async def run_resume_tailoring(
     prompt_input = _build_tailoring_prompt(
         source_content=source_content,
         job_analysis=job_analysis,
-        tailoring_level=tailoring_level
+        tailoring_level=tailoring_level,
+        user_skills=user_skills,
     )
 
     tailored_content = await AgentGateway.get().call(
@@ -154,31 +161,25 @@ async def run_resume_tailoring(
 def _build_tailoring_prompt(
     source_content: str,
     job_analysis: AnalyzedJob,
-    tailoring_level: str
+    tailoring_level: str,
+    user_skills: list[dict],
 ) -> str:
     """Construct prompt for resume tailoring."""
-    
-    # SAFEGUARD: calling .required_skills on SQL model might fail if they are JSON columns not automatically cast to object
-    # Assuming they are JSON columns which SQLAlchemy maps to list/dict in Python.
-    
-    req_skills = ", ".join(job_analysis.required_skills or [])
-    preferred_skills = ", ".join(job_analysis.preferred_skills or [])
-    soft_skills = ", ".join(job_analysis.soft_skills or [])
-    culture_keywords = ", ".join(job_analysis.company_culture_keywords or [])
+
     job_json = job_analysis.model_dump_json(indent=2)
-    resume_block = textwrap.indent(source_content[:6000] if source_content else "", "  ")
+    normalized_skills = [
+        {
+            "name": skill.get("skill_name", "").strip(),
+            "proficiency": skill.get("proficiency"),
+        }
+        for skill in user_skills
+        if skill.get("skill_name", "").strip()
+    ]
+    user_skills_json = json.dumps(normalized_skills, ensure_ascii=True, indent=2)
     
     return (
         f"tailoring_level: {tailoring_level}\n"
-        f"job_analysis: {job_json}\n"
-        f"source_resume_markdown: |\n{resume_block}\n\n"
-        f"Skill highlights (for quick reference):\n"
-        f"- Required: {req_skills}\n"
-        f"- Preferred: {preferred_skills}\n"
-        f"- Soft skills: {soft_skills}\n"
-        f"- Culture keywords: {culture_keywords}\n\n"
-        f"INSTRUCTIONS:\n"
-        f"Rewrite the resume content in Markdown to highlight experience relevant to the job requirements.\n"
-        f"Do not invent facts. Emphasize matching skills and achievements.\n"
-        f"Maintain the same structure but optimize wording.\n"
+        f"job_analysis: {job_json}\n\n"
+        f"user_skills: {user_skills_json}\n\n"
+        f"source_resume_markdown: |\n{source_content}\n"
     )
