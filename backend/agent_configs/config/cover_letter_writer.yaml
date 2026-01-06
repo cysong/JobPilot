@@ -2,7 +2,7 @@ version: 1
 name: cover_letter_writer
 model: gpt-4.1
 temperature: 0.7
-max_tokens: 1500
+max_tokens: 5000
 
 instructions: |
   Generate professional cover letters based on structured inputs.
