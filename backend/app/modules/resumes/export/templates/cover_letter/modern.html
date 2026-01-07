@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+</head>
+
+<body>
+    <div class="cover-letter-container modern-template">
+        <main class="cover-letter-content">
+            {{ content|safe }}
+        </main>
+
+        {% if include_metadata %}
+        <footer class="cover-letter-footer">
+            <p class="generated-date">Generated on {{ generated_at }}</p>
+        </footer>
+        {% endif %}
+    </div>
+</body>
+
+</html>

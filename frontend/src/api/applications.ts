@@ -1,5 +1,6 @@
 import client from './client';
 import type { Application, ApplicationListResponse, CreateApplicationRequest } from '@/types/application';
+import type { ResumeExportRequest } from '@/types/resume';
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document';
 
 export const applicationApi = {
@@ -56,5 +57,27 @@ export const applicationApi = {
     updateCoverLetter: async (applicationId: string, data: DocumentUpdatePayload) => {
         const result = await client.patch<Application, Application>(`/applications/${applicationId}/cover-letter`, data);
         return result;
-    }
+    },
+
+    exportTailoredResumePdf: async (applicationId: string, options?: ResumeExportRequest) => {
+        const result = await client.post<Blob, Blob>(`/applications/${applicationId}/resume/export`, {
+            template: options?.template || 'modern',
+            font_size: options?.font_size || 12,
+            include_metadata: options?.include_metadata ?? false
+        }, {
+            responseType: 'blob'
+        });
+        return result;
+    },
+
+    exportCoverLetterPdf: async (applicationId: string, options?: ResumeExportRequest) => {
+        const result = await client.post<Blob, Blob>(`/applications/${applicationId}/cover-letter/export`, {
+            template: options?.template || 'modern',
+            font_size: options?.font_size || 12,
+            include_metadata: options?.include_metadata ?? false
+        }, {
+            responseType: 'blob'
+        });
+        return result;
+    },
 };

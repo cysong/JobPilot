@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 import { useApplication, useApplicationMutations } from '@/features/applications/hooks/useApplications';
-import { resumeApi } from '@/api/resumes';
+import { applicationApi } from '@/api/applications';
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,20 +19,56 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/authStore';
+
+const toSafeFilename = (value: string) => {
+    const cleaned = value.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
+    return cleaned || 'document'
+}
 
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
     const { retryCoverLetter } = useApplicationMutations();
+    const { user } = useAuthStore();
     const { toast } = useToast();
 
-    const handleDownloadPdf = async (resumeId: string, title: string) => {
+    const buildFilename = (label: string) => {
+        const jobTitle = application?.job?.title || 'Job';
+        const userName = user?.full_name || 'User';
+        return `${toSafeFilename(`${userName}_${label}_${jobTitle}`)}.pdf`;
+
+    };
+
+    const handleDownloadResumePdf = async () => {
+        if (!application) return;
         try {
-            const blob = await resumeApi.exportResume(resumeId);
+            const blob = await applicationApi.exportTailoredResumePdf(application.id);
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${title.replace(/\s+/g, '_')}_Resume.pdf`;
+            a.download = buildFilename('Resume');
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Failed to download PDF',
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleDownloadCoverLetterPdf = async () => {
+        if (!application) return;
+        try {
+            const blob = await applicationApi.exportCoverLetterPdf(application.id);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = buildFilename('CoverLetter');
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -167,10 +203,7 @@ export default function ApplicationDetailPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
-                                            handleDownloadPdf(
-                                                application.resume_document_id!,
-                                                application.job?.title || 'Resume'
-                                            )
+                                            handleDownloadResumePdf()
                                         }
                                     >
                                         <Download className="h-3.5 w-3.5 mr-2" />
@@ -194,12 +227,22 @@ export default function ApplicationDetailPage() {
                                 </div>
                             </div>
                             {application.cover_letter_document_id && (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link to={`/applications/${application.id}/cover-letter`}>
-                                        <FileText className="h-3.5 w-3.5 mr-2" />
-                                        Edit
-                                    </Link>
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link to={`/applications/${application.id}/cover-letter`}>
+                                            <FileText className="h-3.5 w-3.5 mr-2" />
+                                            Edit
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleDownloadCoverLetterPdf}
+                                    >
+                                        <Download className="h-3.5 w-3.5 mr-2" />
+                                        PDF
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </CardContent>

@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.exceptions import BadRequestError, NotFoundError, JobPilotException
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.applications.schemas import ApplicationCreateRequest
@@ -165,6 +165,112 @@ class ApplicationService:
         application.cover_letter_document = new_doc
 
         return application
+
+    @staticmethod
+    def _sanitize_filename(value: str) -> str:
+        cleaned = "".join(
+            c if c.isascii() and (c.isalnum() or c in ("_", "-")) else "-"
+            for c in value.strip()
+        )
+        cleaned = cleaned.strip("-")
+        return cleaned or "document"
+
+    @staticmethod
+    def _build_download_filename(user: User, job_title: str | None, label: str) -> str:
+        user_part = ApplicationService._sanitize_filename(user.full_name or "User")
+        job_part = ApplicationService._sanitize_filename(job_title or "Job")
+        label_part = ApplicationService._sanitize_filename(label)
+        return f"{user_part}_{label_part}_{job_part}.pdf"
+
+    @staticmethod
+    async def export_tailored_resume_to_pdf(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        template: Optional[str] = None,
+        font_size: int = 12,
+        include_metadata: bool = False,
+    ) -> tuple[bytes, str, str]:
+        """Export tailored resume to PDF."""
+        from app.modules.resumes.export import DocumentExportService
+
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+        if not application.resume_document_id:
+            raise NotFoundError("Tailored resume not generated yet")
+
+        resume_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
+        if not resume_doc:
+            raise NotFoundError("Resume document not found")
+
+        job_title = application.job.title if application.job else None
+
+        try:
+            pdf_bytes, _, template_used = DocumentExportService.export_to_pdf(
+                document_type="resume",
+                content=resume_doc.content,
+                title="Tailored Resume",
+                template=template,
+                font_size=font_size,
+                include_metadata=include_metadata,
+            )
+        except ValueError as exc:
+            raise BadRequestError(str(exc))
+        except Exception as exc:  # pragma: no cover - defensive
+            raise JobPilotException(str(exc))
+
+        filename = ApplicationService._build_download_filename(
+            user=user,
+            job_title=job_title,
+            label="Resume",
+        )
+        return pdf_bytes, filename, template_used
+
+    @staticmethod
+    async def export_cover_letter_to_pdf(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        template: Optional[str] = None,
+        font_size: int = 12,
+        include_metadata: bool = False,
+    ) -> tuple[bytes, str, str]:
+        """Export cover letter to PDF."""
+        from app.modules.resumes.export import DocumentExportService
+
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+        if not application.cover_letter_document_id:
+            raise NotFoundError("Cover letter not generated yet")
+
+        cover_letter_doc = await DocumentRepository.get_by_id(db, application.cover_letter_document_id)
+        if not cover_letter_doc:
+            raise NotFoundError("Cover letter document not found")
+
+        job_title = application.job.title if application.job else None
+
+        try:
+            pdf_bytes, _, template_used = DocumentExportService.export_to_pdf(
+                document_type="cover_letter",
+                content=cover_letter_doc.content,
+                title="Cover Letter",
+                template=template,
+                font_size=font_size,
+                include_metadata=include_metadata,
+            )
+        except ValueError as exc:
+            raise BadRequestError(str(exc))
+        except Exception as exc:  # pragma: no cover - defensive
+            raise JobPilotException(str(exc))
+
+        filename = ApplicationService._build_download_filename(
+            user=user,
+            job_title=job_title,
+            label="CoverLetter",
+        )
+        return pdf_bytes, filename, template_used
 
     @staticmethod
     async def create_application(

@@ -2,6 +2,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +13,7 @@ from app.modules.applications.schemas import (
     ApplicationListResponse,
 )
 from app.modules.applications.service import ApplicationService
+from app.modules.resumes.schemas import ResumeExportRequest
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
@@ -81,6 +83,62 @@ async def update_cover_letter(
 ):
     """Update cover letter content (new document version)."""
     return await ApplicationService.update_cover_letter_content(db, application_id, current_user, payload)
+
+
+
+
+@router.post("/{application_id}/resume/export", response_class=Response)
+async def export_tailored_resume_to_pdf(
+    application_id: str,
+    export_request: ResumeExportRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Export tailored resume to PDF."""
+    pdf_bytes, filename, template_used = await ApplicationService.export_tailored_resume_to_pdf(
+        db=db,
+        application_id=application_id,
+        user=current_user,
+        template=export_request.template,
+        font_size=export_request.font_size,
+        include_metadata=export_request.include_metadata,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Template-Used": template_used,
+        },
+    )
+
+
+@router.post("/{application_id}/cover-letter/export", response_class=Response)
+async def export_cover_letter_to_pdf(
+    application_id: str,
+    export_request: ResumeExportRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Export cover letter to PDF."""
+    pdf_bytes, filename, template_used = await ApplicationService.export_cover_letter_to_pdf(
+        db=db,
+        application_id=application_id,
+        user=current_user,
+        template=export_request.template,
+        font_size=export_request.font_size,
+        include_metadata=export_request.include_metadata,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Template-Used": template_used,
+        },
+    )
 
 
 @router.get("/{application_id}", response_model=ApplicationDetail)

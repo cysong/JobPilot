@@ -1,0 +1,50 @@
+/* Base styles for cover letter templates */
+@page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+}
+
+body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #1f2937;
+}
+
+.cover-letter-container {
+    width: 100%;
+}
+
+.cover-letter-content p {
+    margin: 0 0 12pt 0;
+}
+
+.cover-letter-content p:last-child {
+    margin-bottom: 0;
+}
+
+.cover-letter-content ul,
+.cover-letter-content ol {
+    list-style: none;
+    margin: 0 0 12pt 0;
+    padding: 0;
+}
+
+.cover-letter-content li {
+    margin: 0 0 8pt 0;
+}
+
+.cover-letter-content h1,
+.cover-letter-content h2,
+.cover-letter-content h3,
+.cover-letter-content h4 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 0 0 12pt 0;
+}
+
+.cover-letter-footer {
+    margin-top: 18pt;
+    font-size: 10pt;
+    color: #6b7280;
+}
