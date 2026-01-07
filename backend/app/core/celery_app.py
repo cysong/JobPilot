@@ -20,11 +20,14 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     worker_disable_rate_limits=True,
-    broker_connection_timeout=3,            # 连接 Redis 最多等 3 秒
-    broker_connection_retry_on_startup=False,  # 启动时连不上就直接报错
+    broker_connection_timeout=3,            # Connection timeout to Redis (3 seconds)
+    broker_connection_retry_on_startup=False,  # Error will be raised if connection fails
+    broker_connection_max_retries=100,
     broker_transport_options={
         "connect_timeout": 3,
         "socket_timeout": 5,
+        "retry_on_timeout": True,
+        "health_check_interval": 10,
     },
     result_backend_transport_options={
         "connect_timeout": 3,
