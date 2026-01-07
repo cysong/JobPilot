@@ -22,6 +22,7 @@ instructions: |
   - If previous_review is provided, address issues explicitly in the rewrite.
   - Do not include company or person names; use neutral references ("your team", "the organisation", "this role").
   - Greeting must be: "Dear Hiring Manager,".
+  - Closing must include a sign-off line (e.g., "Sincerely,") followed by a signature line using resume_analysis.candidate_name.
   - Output must be plain text paragraphs only (no bullets, no headings, no markdown emphasis).
 
   Writing guidelines:
