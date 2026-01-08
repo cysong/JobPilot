@@ -1,31 +1,46 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, Sparkles, Briefcase } from "lucide-react";
+import { Sparkles, Briefcase, ChevronDown, ChevronUp, X } from "lucide-react";
 
-import { useJobs, useJobMatches } from "@/features/jobs/hooks/useJobs";
+import { useJobs, useJobMatches, useJobFilterOptions } from "@/features/jobs/hooks/useJobs";
 import type { JobFiltersRequest } from "@/types/job";
 import { JobCard } from "@/features/jobs/components/JobCard";
-import { JobFilters } from "@/features/jobs/components/JobFilters";
+import { FilterDropdown } from "@/features/jobs/components/FilterDropdown";
 import { JobSearch } from "@/features/jobs/components/JobSearch";
 import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function JobListingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get view mode from URL (default: recommended)
   const viewMode = searchParams.get("view") || "recommended";
   const currentPage = parseInt(searchParams.get("page") || "1");
+
+  // Get active filters
+  const locationCities = searchParams.getAll("location_cities");
+  const workTypes = searchParams.getAll("work_types");
+  const companies = searchParams.getAll("companies");
+  const activeFilterCount = locationCities.length + workTypes.length + companies.length;
+
+  // Fetch filter options
+  const { data: filterOptions } = useJobFilterOptions();
+
+  // Track previous filter count to detect 0 -> >0 transition
+  const prevFilterCount = useRef(0);
+
+  // Auto-show filters only when transitioning from no filters to having filters
+  useEffect(() => {
+    // Only auto-show when filters go from 0 to > 0 (first filter added)
+    // This allows users to manually hide the panel even when filters are active
+    if (prevFilterCount.current === 0 && activeFilterCount > 0) {
+      setShowFilters(true);
+    }
+    prevFilterCount.current = activeFilterCount;
+  }, [activeFilterCount]);
 
   // Recommended view: fetch matched jobs
   const matchFilters = {
@@ -69,6 +84,28 @@ export default function JobListingPage() {
     setSearchParams(newParams);
   };
 
+  // Handle filter selection change
+  const handleFilterChange = (
+    filterKey: 'location_cities' | 'work_types' | 'companies',
+    values: string[]
+  ) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete(filterKey);
+    values.forEach((v) => newParams.append(filterKey, v));
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  // Handle clear all filters
+  const handleClearAllFilters = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("location_cities");
+    newParams.delete("work_types");
+    newParams.delete("companies");
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   // Scroll to top on page change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -97,48 +134,91 @@ export default function JobListingPage() {
 
           {/* Search Bar - only show in 'all' view */}
           {!isRecommendedView && (
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <JobSearch />
+            <>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <JobSearch />
+                </div>
+
+                {/* Filter Toggle Button */}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  {showFilters ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="bg-indigo-600 text-white text-xs rounded-full px-2 py-0.5">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
               </div>
 
-              {/* Mobile Filter Toggle */}
-              <Sheet
-                open={isMobileFiltersOpen}
-                onOpenChange={setIsMobileFiltersOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="lg:hidden">
-                    <Filter className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-                  <SheetHeader>
-                    <SheetTitle>Filters</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-6">
-                    <JobFilters />
+              {/* Inline Filters - show when toggled or when filters are active */}
+              {showFilters && filterOptions && (
+                <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Filter Dropdowns */}
+                    <FilterDropdown
+                      label="Location"
+                      options={filterOptions.location_cities}
+                      selectedValues={locationCities}
+                      onSelectionChange={(values) => handleFilterChange('location_cities', values)}
+                      searchPlaceholder="Search locations..."
+                      emptyText="No locations found"
+                    />
+
+                    <FilterDropdown
+                      label="Work Type"
+                      options={filterOptions.work_types}
+                      selectedValues={workTypes}
+                      onSelectionChange={(values) => handleFilterChange('work_types', values)}
+                      searchPlaceholder="Search work types..."
+                      emptyText="No work types found"
+                    />
+
+                    <FilterDropdown
+                      label="Company"
+                      options={filterOptions.companies}
+                      selectedValues={companies}
+                      onSelectionChange={(values) => handleFilterChange('companies', values)}
+                      searchPlaceholder="Search companies..."
+                      emptyText="No companies found"
+                    />
+
+                    {/* Clear All Button */}
+                    {activeFilterCount > 0 && (
+                      <>
+                        <div className="hidden sm:block flex-1" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearAllFilters}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear All
+                        </Button>
+                      </>
+                    )}
                   </div>
-                </SheetContent>
-              </Sheet>
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
       <div className="px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Desktop Filters Sidebar - only show in 'all' view */}
-          {!isRecommendedView && (
-            <div className="hidden lg:block lg:col-span-1">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 sticky top-40">
-                <JobFilters />
-              </div>
-            </div>
-          )}
-
-          {/* Job List */}
-          <div className={isRecommendedView ? "lg:col-span-4" : "lg:col-span-3"}>
+        {/* Job List - Full width */}
+        <div className="max-w-7xl mx-auto">
+          <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-slate-900">
                 {isLoading ? (
