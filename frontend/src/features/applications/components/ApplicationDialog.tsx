@@ -37,7 +37,7 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
     const { data: matchDetail } = useQuery({
         queryKey: ['job-match-detail', jobId],
         queryFn: () => jobsApi.getJobMatchDetail(jobId),
-        enabled: !!jobId,
+        enabled: open && !!jobId,
         retry: false,
     })
 

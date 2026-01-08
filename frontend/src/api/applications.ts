@@ -15,16 +15,8 @@ export const applicationApi = {
     },
 
     getByJobId: async (jobId: number) => {
-        try {
-            const result = await client.get<Application, Application>(`/jobs/${jobId}/application`);
-            return result;
-        } catch (error: any) {
-            // Return null if application not found (404)
-            if (error.response?.status === 404) {
-                return null;
-            }
-            throw error;
-        }
+        const result = await client.get<Application, Application>(`/jobs/${jobId}/application`);
+        return result || null;
     },
 
     list: async (page = 1, size = 20) => {

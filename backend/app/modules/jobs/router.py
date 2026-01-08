@@ -83,7 +83,7 @@ async def list_my_matches(
     return results
 
 
-@router.get("/matches/{job_id}", response_model=UserJobMatchDetailResponse)
+@router.get("/matches/{job_id}", response_model=UserJobMatchDetailResponse | None)
 async def get_my_match_detail(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -96,7 +96,7 @@ async def get_my_match_detail(
         job_id=job_id,
     )
     if not match:
-        raise NotFoundError("Match not found")
+        return None
 
     job = await JobRepository.get_by_id(db, job_id)
     job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
@@ -277,7 +277,7 @@ async def delete_job_analysis(
     }
 
 
-@router.get("/{job_id}/application", response_model=ApplicationDetail)
+@router.get("/{job_id}/application", response_model=ApplicationDetail | None)
 async def get_job_application(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -285,6 +285,4 @@ async def get_job_application(
 ):
     """Get current user's application for this job."""
     application = await ApplicationService.get_application_by_job_id(db, current_user, job_id)
-    if not application:
-        raise NotFoundError("Application not found for this job")
     return application
