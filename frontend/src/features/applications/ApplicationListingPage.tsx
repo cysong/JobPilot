@@ -1,9 +1,7 @@
 import { format } from 'date-fns'
 import { Link } from 'react-router-dom'
 import {
-    FileText,
     ExternalLink,
-    Download,
     RefreshCw,
     Building2,
     Calendar
@@ -11,36 +9,13 @@ import {
 
 import { useApplications, useApplicationMutations } from '@/features/applications/hooks/useApplications'
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge'
-import { resumeApi } from '@/api/resumes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useToast } from '@/components/ui/use-toast'
 
 export default function ApplicationListingPage() {
     const { data, isLoading, isError } = useApplications()
     const { retryCoverLetter } = useApplicationMutations()
-    const { toast } = useToast()
-
-    const handleDownloadPdf = async (resumeId: string, title: string) => {
-        try {
-            const blob = await resumeApi.exportResume(resumeId)
-            const url = window.URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `${title.replace(/\s+/g, '_')}_Resume.pdf`
-            document.body.appendChild(a)
-            a.click()
-            window.URL.revokeObjectURL(url)
-            document.body.removeChild(a)
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Failed to download PDF',
-                variant: 'destructive'
-            })
-        }
-    }
 
     if (isLoading) {
         return (
@@ -120,25 +95,6 @@ export default function ApplicationListingPage() {
                                             View Job
                                         </Link>
                                     </Button>
-
-                                    {app.status === 'Ready' && app.resume_document_id && (
-                                        <>
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/applications/${app.id}/resume`}>
-                                                    <FileText className="h-3.5 w-3.5 mr-2" />
-                                                    Edit Resume
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleDownloadPdf(app.resume_document_id!, app.job?.title || 'Resume')}
-                                            >
-                                                <Download className="h-3.5 w-3.5 mr-2" />
-                                                PDF
-                                            </Button>
-                                        </>
-                                    )}
 
                                     {app.status === 'Failed' && (
                                         <Button

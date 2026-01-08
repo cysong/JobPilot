@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -8,6 +9,7 @@ import {
     Download,
     ExternalLink,
     RefreshCw,
+    Loader2,
 } from 'lucide-react';
 
 import { useApplication, useApplicationMutations } from '@/features/applications/hooks/useApplications';
@@ -32,6 +34,8 @@ export default function ApplicationDetailPage() {
     const { retryCoverLetter } = useApplicationMutations();
     const { user } = useAuthStore();
     const { toast } = useToast();
+    const [isDownloadingResume, setIsDownloadingResume] = useState(false);
+    const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
 
     const buildFilename = (label: string) => {
         const jobTitle = application?.job?.title || 'Job';
@@ -42,6 +46,7 @@ export default function ApplicationDetailPage() {
 
     const handleDownloadResumePdf = async () => {
         if (!application) return;
+        setIsDownloadingResume(true);
         try {
             const blob = await applicationApi.exportTailoredResumePdf(application.id);
             const url = window.URL.createObjectURL(blob);
@@ -58,11 +63,14 @@ export default function ApplicationDetailPage() {
                 description: 'Failed to download PDF',
                 variant: 'destructive',
             });
+        } finally {
+            setIsDownloadingResume(false);
         }
     };
 
     const handleDownloadCoverLetterPdf = async () => {
         if (!application) return;
+        setIsDownloadingCoverLetter(true);
         try {
             const blob = await applicationApi.exportCoverLetterPdf(application.id);
             const url = window.URL.createObjectURL(blob);
@@ -79,6 +87,8 @@ export default function ApplicationDetailPage() {
                 description: 'Failed to download PDF',
                 variant: 'destructive',
             });
+        } finally {
+            setIsDownloadingCoverLetter(false);
         }
     };
 
@@ -180,69 +190,99 @@ export default function ApplicationDetailPage() {
                     <CardContent className="space-y-4">
                         {/* Resume */}
                         <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                    <FileText className="h-5 w-5 text-indigo-600" />
-                                </div>
-                                <div>
-                                    <div className="font-medium text-slate-900">Resume</div>
-                                    <div className="text-sm text-slate-500">
-                                        {application.resume_document_id ? 'Ready' : 'Processing...'}
+                            {application.resume_document_id ? (
+                                <Link
+                                    to={`/applications/${application.id}/resume`}
+                                    className="flex items-center gap-3 group"
+                                >
+                                    <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <FileText className="h-5 w-5 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-900 group-hover:text-indigo-700">
+                                            Resume
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            Ready
+                                        </div>
+                                    </div>
+                                </Link>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <FileText className="h-5 w-5 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-900">Resume</div>
+                                        <div className="text-sm text-slate-500">
+                                            Processing...
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                             {application.resume_document_id && (
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link to={`/applications/${application.id}/resume`}>
-                                            <FileText className="h-3.5 w-3.5 mr-2" />
-                                            Edit
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            handleDownloadResumePdf()
-                                        }
-                                    >
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleDownloadResumePdf}
+                                    disabled={isDownloadingResume}
+                                >
+                                    {isDownloadingResume ? (
+                                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                                    ) : (
                                         <Download className="h-3.5 w-3.5 mr-2" />
-                                        PDF
-                                    </Button>
-                                </div>
+                                    )}
+                                    PDF
+                                </Button>
                             )}
                         </div>
 
                         {/* Cover Letter */}
                         <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                    <FileText className="h-5 w-5 text-indigo-600" />
-                                </div>
-                                <div>
-                                    <div className="font-medium text-slate-900">Cover Letter</div>
-                                    <div className="text-sm text-slate-500">
-                                        {application.cover_letter_document_id ? 'Ready' : 'Processing...'}
+                            {application.cover_letter_document_id ? (
+                                <Link
+                                    to={`/applications/${application.id}/cover-letter`}
+                                    className="flex items-center gap-3 group"
+                                >
+                                    <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <FileText className="h-5 w-5 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-900 group-hover:text-indigo-700">
+                                            Cover Letter
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            Ready
+                                        </div>
+                                    </div>
+                                </Link>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <FileText className="h-5 w-5 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-slate-900">Cover Letter</div>
+                                        <div className="text-sm text-slate-500">
+                                            Processing...
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                             {application.cover_letter_document_id && (
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link to={`/applications/${application.id}/cover-letter`}>
-                                            <FileText className="h-3.5 w-3.5 mr-2" />
-                                            Edit
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleDownloadCoverLetterPdf}
-                                    >
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleDownloadCoverLetterPdf}
+                                    disabled={isDownloadingCoverLetter}
+                                >
+                                    {isDownloadingCoverLetter ? (
+                                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                                    ) : (
                                         <Download className="h-3.5 w-3.5 mr-2" />
-                                        PDF
-                                    </Button>
-                                </div>
+                                    )}
+                                    PDF
+                                </Button>
                             )}
                         </div>
                     </CardContent>
