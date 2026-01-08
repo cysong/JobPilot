@@ -76,16 +76,33 @@ export default function JobListingPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header / Search Bar */}
+      {/* Header with Tabs and Search */}
       <div className="px-6">
         <div className="bg-white border-b rounded-lg shadow-sm border-slate-200 sticky top-[65px] z-30 px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <JobSearch />
-            </div>
+          {/* View Mode Tabs - at the top */}
+          <div className="mb-4">
+            <Tabs value={viewMode} onValueChange={handleViewChange}>
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="recommended" className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Recommended
+                </TabsTrigger>
+                <TabsTrigger value="all" className="gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  All Jobs
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-            {/* Mobile Filter Toggle - only show in 'all' view */}
-            {!isRecommendedView && (
+          {/* Search Bar - only show in 'all' view */}
+          {!isRecommendedView && (
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <JobSearch />
+              </div>
+
+              {/* Mobile Filter Toggle */}
               <Sheet
                 open={isMobileFiltersOpen}
                 onOpenChange={setIsMobileFiltersOpen}
@@ -104,24 +121,8 @@ export default function JobListingPage() {
                   </div>
                 </SheetContent>
               </Sheet>
-            )}
-          </div>
-
-          {/* View Mode Tabs */}
-          <div className="mt-4">
-            <Tabs value={viewMode} onValueChange={handleViewChange}>
-              <TabsList className="grid w-full max-w-md grid-cols-2">
-                <TabsTrigger value="recommended" className="gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Recommended
-                </TabsTrigger>
-                <TabsTrigger value="all" className="gap-2">
-                  <Briefcase className="h-4 w-4" />
-                  All Jobs
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
