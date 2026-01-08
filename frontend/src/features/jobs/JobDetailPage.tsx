@@ -231,7 +231,7 @@ export default function JobDetailPage() {
                 <img
                   src={job.company_logo}
                   alt={job.advertiser_name || "Company Logo"}
-                  className="absolute top-6 right-6 h-20 w-20 object-contain rounded-lg z-10"
+                  className="absolute top-6 right-6 h-20 w-auto max-w-[100px] object-contain rounded-lg z-10"
                 />
               )}
 

@@ -30,7 +30,7 @@ export function JobCard({ job, matchData }: JobCardProps) {
           <img
             src={job.company_logo}
             alt={`${job.advertiser_name} logo`}
-            className="absolute top-4 right-4 h-20 w-20 object-contain rounded-md z-10"
+            className="absolute top-4 right-4 h-20 w-auto max-w-[100px] object-contain rounded-md z-10"
           />
         )}
 
