@@ -9,6 +9,7 @@ import type {
   JobFiltersRequest,
   JobFiltersOptions,
   UserJobMatch,
+  UserJobMatchDetail,
   JobMatchFiltersRequest
 } from '@/types/job'
 
@@ -109,5 +110,15 @@ export const jobsApi = {
       `/jobs/matches?${params.toString()}`
     )
     return result
-  }
+  },
+
+  /**
+   * Get match detail for a specific job
+   */
+  getJobMatchDetail: async (jobId: number): Promise<UserJobMatchDetail> => {
+    const result = await apiClient.get<UserJobMatchDetail, UserJobMatchDetail>(
+      `/jobs/matches/${jobId}`
+    )
+    return result
+  },
 }

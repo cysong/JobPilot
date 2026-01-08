@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useResumes } from '@/features/resumes/hooks/useResumes'
 import { useApplicationMutations } from '@/features/applications/hooks/useApplications'
+import { useQuery } from '@tanstack/react-query'
+import { jobsApi } from '@/api/jobs'
 import {
     Dialog,
     DialogContent,
@@ -32,6 +34,12 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
     const [selectedResumeId, setSelectedResumeId] = useState<string>('')
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes()
     const { createApplication } = useApplicationMutations()
+    const { data: matchDetail } = useQuery({
+        queryKey: ['job-match-detail', jobId],
+        queryFn: () => jobsApi.getJobMatchDetail(jobId),
+        enabled: !!jobId,
+        retry: false,
+    })
 
     const handleSubmit = () => {
         if (!selectedResumeId) return
@@ -52,6 +60,18 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
     }
 
     const resumes = resumesData?.items || []
+    const recommendedResumeId = matchDetail?.recommended_resume?.id
+
+    useEffect(() => {
+        const recommendedId = matchDetail?.recommended_resume?.id
+        if (!recommendedId) return
+        if (selectedResumeId) return
+        if (!resumes.length) return
+
+        const recommended = resumes.find(r => r.id === recommendedId)
+        if (!recommended || recommended.is_draft) return
+        setSelectedResumeId(recommendedId)
+    }, [matchDetail?.recommended_resume?.id, resumes, selectedResumeId])
 
     // Check if selected resume is a draft
     const selectedResume = resumes.find(r => r.id === selectedResumeId)
@@ -105,6 +125,11 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                                         >
                                             <span className="flex items-center gap-2">
                                                 {resume.title}
+                                                {recommendedResumeId === resume.id && (
+                                                    <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                                                        Recommended
+                                                    </span>
+                                                )}
                                                 {resume.is_draft && (
                                                     <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
                                                         Draft

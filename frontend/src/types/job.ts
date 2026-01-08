@@ -222,6 +222,14 @@ export interface UserJobMatch {
 }
 
 /**
+ * Detailed match info for a specific job
+ */
+export interface UserJobMatchDetail {
+  id: string
+  recommended_resume: ResumeBriefInfo | null
+}
+
+/**
  * Request params for job matches API
  */
 export interface JobMatchFiltersRequest {
