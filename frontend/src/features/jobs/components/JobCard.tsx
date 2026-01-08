@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 import { Link, useSearchParams } from 'react-router-dom'
 
-import type { Job } from '@/types/job'
+import type { Job, JobBriefInfo, UserJobMatch } from '@/types/job'
 import { Badge } from '@/components/ui/badge'
 import {
     Card,
@@ -13,19 +13,35 @@ import {
 } from '@/components/ui/card'
 
 interface JobCardProps {
-    job: Job
+    job: Job | JobBriefInfo // Accept both full Job and JobBriefInfo
+    matchData?: UserJobMatch // Optional match data for recommended view
 }
 
-export function JobCard({ job }: JobCardProps) {
+export function JobCard({ job, matchData }: JobCardProps) {
     const [searchParams] = useSearchParams()
 
     // Preserve current search params when navigating to detail page
     const detailUrl = `/jobs/${job.id}?${searchParams.toString()}`
+
     return (
         <Card className="hover:shadow-md transition-shadow border-slate-200">
             <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-start gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1">
+                        {/* Match score - show if available */}
+                        {matchData && (
+                            <div className="flex items-center gap-3 text-sm mb-2">
+                                <span className="font-semibold text-indigo-600">
+                                    {Math.round(matchData.skill_match_score)}% Match
+                                </span>
+                                {matchData.resume_match_score !== null && (
+                                    <span className="text-slate-500 text-xs">
+                                        Resume: {Math.round(matchData.resume_match_score)}%
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         <Link
                             to={detailUrl}
                             className="font-semibold text-lg text-slate-900 hover:text-indigo-600 line-clamp-2"

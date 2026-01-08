@@ -177,3 +177,55 @@ export interface JobAnalysis {
   created_at: string
   updated_at: string
 }
+
+/**
+ * Brief job info for match list
+ */
+export interface JobBriefInfo {
+  id: number
+  title: string
+  advertiser_name: string | null
+  location_label: string | null
+  work_types_label: string | null
+  salary_label: string | null
+  listed_at: string | null
+
+  // Additional fields for UI completeness
+  company_logo: string | null
+  abstract: string | null
+  classification: string | null
+  sub_classification: string | null
+}
+
+/**
+ * Brief resume info for matches
+ */
+export interface ResumeBriefInfo {
+  id: string
+  title: string
+}
+
+/**
+ * User job match response from backend
+ */
+export interface UserJobMatch {
+  id: string
+  job: JobBriefInfo
+  skill_match_score: number // 0-100
+  resume_match_score: number | null // 0-100
+  ai_match_score: number | null // 0-100
+  recommended_resume: ResumeBriefInfo | null
+  skill_match_details: Record<string, any>
+  ai_analysis: Record<string, any> | null
+  calculated_at: string
+  ai_analyzed_at: string | null
+}
+
+/**
+ * Request params for job matches API
+ */
+export interface JobMatchFiltersRequest {
+  min_score?: number // Minimum skill match score (0-100)
+  limit?: number
+  offset?: number
+}

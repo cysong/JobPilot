@@ -3,7 +3,7 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { jobsApi } from '@/api/jobs'
-import type { JobFiltersRequest } from '@/types/job'
+import type { JobFiltersRequest, JobMatchFiltersRequest } from '@/types/job'
 
 /**
  * Hook to fetch paginated job list with filters
@@ -48,5 +48,16 @@ export const useJobFilterOptions = () => {
     queryKey: ['job-filter-options'],
     queryFn: () => jobsApi.getFilterOptions(),
     staleTime: 1000 * 60 * 30, // 30 minutes (filter options don't change often)
+  })
+}
+
+/**
+ * Hook to fetch matched jobs for current user
+ */
+export const useJobMatches = (filters: JobMatchFiltersRequest) => {
+  return useQuery({
+    queryKey: ['job-matches', filters],
+    queryFn: () => jobsApi.getJobMatches(filters),
+    staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }

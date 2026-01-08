@@ -7,7 +7,9 @@ import type {
   JobDetail,
   JobListResponse,
   JobFiltersRequest,
-  JobFiltersOptions
+  JobFiltersOptions,
+  UserJobMatch,
+  JobMatchFiltersRequest
 } from '@/types/job'
 
 export const jobsApi = {
@@ -84,6 +86,28 @@ export const jobsApi = {
    */
   getFilterOptions: async (): Promise<JobFiltersOptions> => {
     const result = await apiClient.get<JobFiltersOptions, JobFiltersOptions>('/jobs/filters')
+    return result
+  },
+
+  /**
+   * Get matched jobs for current user
+   */
+  getJobMatches: async (filters: JobMatchFiltersRequest): Promise<UserJobMatch[]> => {
+    const params = new URLSearchParams()
+
+    if (filters.min_score !== undefined) {
+      params.append('min_score', filters.min_score.toString())
+    }
+    if (filters.limit !== undefined) {
+      params.append('limit', filters.limit.toString())
+    }
+    if (filters.offset !== undefined) {
+      params.append('offset', filters.offset.toString())
+    }
+
+    const result = await apiClient.get<UserJobMatch[], UserJobMatch[]>(
+      `/jobs/matches?${params.toString()}`
+    )
     return result
   }
 }

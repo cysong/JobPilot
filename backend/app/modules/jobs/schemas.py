@@ -218,6 +218,12 @@ class JobBriefInfo(BaseModel):
     salary_label: Optional[str]
     listed_at: Optional[datetime]
 
+    # Additional fields for UI completeness
+    company_logo: Optional[str] = None
+    abstract: Optional[str] = None
+    classification: Optional[str] = None
+    sub_classification: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
 
