@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Save, Download } from 'lucide-react'
+import { ArrowLeft, Save, Download, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,7 @@ export function DocumentEditPage<TData = any>({
   const navigate = useNavigate()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit')
+  const [isExporting, setIsExporting] = useState(false)
 
   // Use documentId prop if provided, otherwise fall back to URL param
   const id = documentId || urlId
@@ -268,6 +269,7 @@ export function DocumentEditPage<TData = any>({
   // Export PDF
   const handleExportPdf = async () => {
     if (!useExportPdf || !document || !id) return
+    setIsExporting(true)
     try {
       await useExportPdf(id, document.title)
     } catch {
@@ -276,6 +278,8 @@ export function DocumentEditPage<TData = any>({
         description: 'Failed to export PDF',
         variant: 'destructive'
       })
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -352,8 +356,12 @@ export function DocumentEditPage<TData = any>({
           {config.slots?.actionsBefore}
 
           {config.ui?.showExportPdf && !isCreating && useExportPdf && (
-            <Button variant="outline" onClick={handleExportPdf}>
-              <Download className="w-4 h-4 mr-2" />
+            <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
               Export PDF
             </Button>
           )}
@@ -362,8 +370,12 @@ export function DocumentEditPage<TData = any>({
             onClick={form.handleSubmit(handleSubmit)}
             disabled={!isContentDirty || updateMutation?.isPending || createMutation?.isPending}
           >
-            <Save className="w-4 h-4 mr-2" />
-            {updateMutation?.isPending || createMutation?.isPending ? 'Saving...' : 'Save'}
+            {updateMutation?.isPending || createMutation?.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Save
           </Button>
 
           {config.slots?.actionsAfter}
