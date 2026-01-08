@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Trash2, Download } from 'lucide-react'
+import { FileText, Trash2, Download, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ResumeListItem } from '@/types/resume'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { resumeApi } from '@/api/resumes'
 
@@ -23,8 +23,13 @@ interface ResumeCardProps {
 }
 
 export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
+    const [isDownloading, setIsDownloading] = useState(false)
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+
     const handleDownload = async (e: React.MouseEvent) => {
         e.preventDefault()
+        e.stopPropagation()
+        setIsDownloading(true)
         try {
             const blob = await resumeApi.exportResume(resume.id)
             const url = window.URL.createObjectURL(blob)
@@ -37,6 +42,8 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
             document.body.removeChild(a)
         } catch (error) {
             console.error('Failed to download resume', error)
+        } finally {
+            setIsDownloading(false)
         }
     }
 
@@ -46,23 +53,32 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
             className="block bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative"
         >
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600" onClick={handleDownload}>
-                    <Download className="w-4 h-4" />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                >
+                    {isDownloading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Download className="w-4 h-4" />
+                    )}
                 </Button>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-red-600"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                            }}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                    </AlertDialogTrigger>
+                <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-400 hover:text-red-600"
+                        onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setIsDeleteOpen(true)
+                        }}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
                     <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                         <AlertDialogHeader>
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -77,6 +93,7 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     onDelete(resume.id)
+                                    setIsDeleteOpen(false)
                                 }}
                                 className="bg-red-600 hover:bg-red-700"
                             >
