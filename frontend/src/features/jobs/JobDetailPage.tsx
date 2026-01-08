@@ -225,29 +225,29 @@ export default function JobDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Job Header Card */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="flex justify-between items-start gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                    {job.title}
-                  </h1>
-                  <div className="flex items-center gap-2 text-slate-600 mb-4">
-                    <Building2 className="h-5 w-5 text-indigo-600" />
-                    <span className="font-medium text-lg">
-                      {job.advertiser_name}
-                    </span>
-                  </div>
+            <div className="relative bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              {/* Company logo - absolute positioned at Card level, independent of all content */}
+              {job.company_logo && (
+                <img
+                  src={job.company_logo}
+                  alt={job.advertiser_name || "Company Logo"}
+                  className="absolute top-6 right-6 h-20 w-20 object-contain rounded-lg z-10"
+                />
+              )}
+
+              <div className="pr-28">
+                <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                  {job.title}
+                </h1>
+                <div className="flex items-center gap-2 text-slate-600 mb-4">
+                  <Building2 className="h-5 w-5 text-indigo-600" />
+                  <span className="font-medium text-lg">
+                    {job.advertiser_name}
+                  </span>
                 </div>
-                {job.company_logo && (
-                  <img
-                    src={job.company_logo}
-                    alt={job.advertiser_name || "Company Logo"}
-                    className="h-16 w-16 object-contain rounded-lg"
-                  />
-                )}
               </div>
 
-              <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-slate-600 mt-2">
+              <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-slate-600 mt-2 pr-28">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 text-slate-400" />
                   <span>{job.location_label}</span>
@@ -263,7 +263,7 @@ export default function JobDetailPage() {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-6">
+              <div className="flex flex-wrap gap-2 mt-6 pr-28">
                 <Badge variant="secondary">{job.classification}</Badge>
                 {job.sub_classification && (
                   <Badge variant="outline">{job.sub_classification}</Badge>
