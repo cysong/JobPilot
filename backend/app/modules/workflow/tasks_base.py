@@ -7,6 +7,8 @@ import time
 from typing import Any
 
 from celery import Task
+from celery.exceptions import Ignore, Retry
+from celery.utils.time import get_exponential_backoff_interval
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
@@ -47,8 +49,10 @@ class AsyncBaseTask(Task):
                         if self.auto_commit:
                             await session.commit()
                         return retval
-                    except Exception:
+                    except Exception as exc:
                         await session.rollback()
+                        # Manual autoretry support for async tasks
+                        self._handle_async_autoretry(exc)
                         raise
                     finally:
                         self._db_session = None
@@ -65,13 +69,70 @@ class AsyncBaseTask(Task):
                     if self.auto_commit:
                         await session.commit()
                     return result
-                except Exception:
+                except Exception as exc:
                     await session.rollback()
+                    # Manual autoretry support for async tasks (Celery's autoretry_for doesn't work with async)
+                    # This follows Celery's design by reusing self.retry() method and configuration
+                    self._handle_async_autoretry(exc)
                     raise
                 finally:
                     self._db_session = None
 
         return get_worker_loop().run_until_complete(_execute())
+
+    def _handle_async_autoretry(self, exc: Exception) -> None:
+        """
+        Handle autoretry logic for async tasks.
+
+        Celery's built-in autoretry_for doesn't work with async tasks because:
+        1. The autoretry wrapper is synchronous and wraps the run method
+        2. Calling an async function returns a coroutine without executing it
+        3. Exceptions are only raised when the coroutine is awaited
+        4. By that time, we're outside the autoretry wrapper's try-except
+
+        This method replicates Celery's autoretry logic by:
+        - Using task's autoretry_for/dont_autoretry_for configuration
+        - Calling self.retry() to leverage Celery's retry mechanism
+        - Using get_exponential_backoff_interval() for backoff calculation
+
+        References:
+        - https://github.com/celery/celery/blob/main/celery/app/autoretry.py
+        - https://github.com/celery/celery/issues/7874
+        """
+        # Ignore and Retry exceptions should never be autoretried
+        if isinstance(exc, (Ignore, Retry)):
+            return
+
+        # Get autoretry configuration from task attributes
+        autoretry_for = getattr(self, 'autoretry_for', ())
+        dont_autoretry_for = getattr(self, 'dont_autoretry_for', ())
+
+        # Check if exception should be excluded from autoretry
+        if dont_autoretry_for and isinstance(exc, dont_autoretry_for):
+            return
+
+        # Check if exception matches autoretry_for
+        if not autoretry_for or not isinstance(exc, autoretry_for):
+            return
+
+        # Build retry kwargs following Celery's autoretry behavior
+        retry_kwargs = getattr(self, 'retry_kwargs', {}).copy()
+
+        # Calculate exponential backoff if configured
+        retry_backoff = getattr(self, 'retry_backoff', False)
+        if retry_backoff:
+            retry_backoff_max = int(getattr(self, 'retry_backoff_max', 600))
+            retry_jitter = getattr(self, 'retry_jitter', True)
+            retry_kwargs['countdown'] = get_exponential_backoff_interval(
+                factor=int(max(1.0, float(retry_backoff))),
+                retries=self.request.retries,
+                maximum=retry_backoff_max,
+                full_jitter=retry_jitter
+            )
+
+        # Call Celery's retry method, which will raise Retry exception
+        # The throw=True (default) causes it to raise, which stops propagation
+        raise self.retry(exc=exc, **retry_kwargs)
 
     @property
     def db(self) -> AsyncSession:
@@ -108,14 +169,17 @@ class DBTrackingTask(AsyncBaseTask):
         db_task_id = kwargs.get("task_id")
         if db_task_id:
             try:
+                # Use current retry count from Celery request (0 for first attempt, increments on retry)
+                current_retry_count = getattr(self.request, "retries", 0)
                 get_worker_loop().run_until_complete(
-                    self._update_status(db_task_id, "RUNNING", retry_count=0)
+                    self._update_status(db_task_id, "RUNNING", retry_count=current_retry_count)
                 )
                 logger.info(
                     f"Task started: {self.name}",
                     extra={
                         "task_id": db_task_id,
                         "celery_task_id": task_id,
+                        "retry_count": current_retry_count,
                     }
                 )
             except Exception as exc:
@@ -193,36 +257,26 @@ class DBTrackingTask(AsyncBaseTask):
         return super().on_failure(exc, task_id, args, kwargs, einfo)
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
-        """Called when the task is being retried. Mark as RUNNING (update retry count)."""
+        """
+        Called when the task is being retried.
+
+        Note: We only log here, not update DB. The retry_count will be updated
+        in before_start hook when the retried task actually starts execution.
+        This avoids duplicate DB writes for the same retry.
+        """
         db_task_id = kwargs.get("task_id")
         retry_count = getattr(self.request, "retries", 0) + 1  # Next retry number
         if db_task_id:
-            try:
-                get_worker_loop().run_until_complete(
-                    self._update_status(db_task_id, "RUNNING", retry_count=retry_count)
-                )
-                logger.warning(
-                    f"Task retry {retry_count} triggered: {self.name}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "retry_count": retry_count,
-                        "max_retries": self.max_retries,
-                        "error": str(exc),
-                    }
-                )
-            except Exception as update_exc:
-                # Critical: Don't let status update failures interrupt the retry mechanism
-                logger.error(
-                    f"Failed to update retry count (retry will continue): {update_exc}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "retry_count": retry_count,
-                        "original_error": str(exc),
-                    },
-                    exc_info=True
-                )
+            logger.warning(
+                f"Task retry {retry_count} triggered: {self.name}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "retry_count": retry_count,
+                    "max_retries": self.max_retries,
+                    "error": str(exc),
+                }
+            )
         return super().on_retry(exc, task_id, args, kwargs, einfo)
 
     async def _update_status(self, task_id: str, status: str, retry_count: int = None):
