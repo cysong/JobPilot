@@ -14,6 +14,6 @@ if __name__ == "__main__":
     # Run Celery worker with solo pool (Windows compatible)
     celery_app.worker_main(argv=[
         "worker",
-        "--loglevel=info",
+        "--loglevel=debug",
         "--pool=solo",
     ])

@@ -14,5 +14,5 @@ if __name__ == "__main__":
     # Run Celery beat scheduler
     celery_app.start(argv=[
         "beat",
-        "--loglevel=info",
+        "--loglevel=debug",
     ])
