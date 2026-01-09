@@ -46,8 +46,8 @@ export default function TaskMonitorPage() {
     statsQuery.refetch()
   }
 
-  const handleRetry = (taskId: string) => {
-    retryMutation.mutate(taskId)
+  const handleRetry = async (taskId: string) => {
+    await retryMutation.mutateAsync(taskId)
   }
 
   return (
