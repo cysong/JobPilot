@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -24,6 +24,13 @@ import { useApplicationByJob } from "@/features/applications/hooks/useApplicatio
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -35,7 +42,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/utils/cn";
+
+const LANGUAGE_STORAGE_KEY = "job_detail_language";
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
@@ -48,6 +56,24 @@ export default function JobDetailPage() {
     isLoading,
     isError,
   } = useJobDetail(jobIdNum);
+
+  const hasCn = Boolean(job?.content_cn?.trim() || job?.analysis?.cn_content?.trim());
+
+  useEffect(() => {
+    const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (storedLanguage === "zh" && hasCn) {
+      setLanguage("zh");
+      return;
+    }
+    setLanguage("en");
+  }, [jobIdNum, hasCn]);
+
+  const handleLanguageChange = (value: string) => {
+    if (value === "zh" && !hasCn) return;
+    const nextLanguage = value === "zh" ? "zh" : "en";
+    setLanguage(nextLanguage);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+  };
 
   // Query for existing application
   const {
@@ -102,7 +128,6 @@ export default function JobDetailPage() {
     );
   }
 
-  const hasCn = Boolean(job.content_cn?.trim() || job.analysis?.cn_content?.trim());
   const descriptionHtml =
     language === "zh" && hasCn
       ? job.content_cn || job.analysis?.cn_content || job.content
@@ -400,44 +425,20 @@ export default function JobDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-slate-900">Job Description</h2>
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant={language === "en" ? "default" : "outline"}
-                    className={cn(
-                      "h-9",
-                      language === "en"
-                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                        : "text-slate-700"
-                    )}
-                    onClick={() => setLanguage("en")}
-                  >
-                    English
-                  </Button>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant={language === "zh" ? "default" : "outline"}
-                          className={cn(
-                            "h-9",
-                            language === "zh" && hasCn
-                              ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                              : "text-slate-700"
-                          )}
-                          onClick={() => hasCn && setLanguage("zh")}
-                          disabled={!hasCn}
-                        >
-                          中文
-                        </Button>
-                      </TooltipTrigger>
-                      {!hasCn && (
-                        <TooltipContent>
-                          <p className="text-sm text-slate-600">暂无中文版本可显示</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Select value={language} onValueChange={handleLanguageChange}>
+                    <SelectTrigger className="h-9 w-[140px]">
+                      <SelectValue placeholder="Language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="zh" disabled={!hasCn}>
+                        {"\u4e2d\u6587"}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!hasCn && (
+                    <span className="text-xs text-slate-500">Chinese not available</span>
+                  )}
                 </div>
               </div>
 
@@ -491,3 +492,5 @@ export default function JobDetailPage() {
     </div>
   );
 }
+
+
