@@ -10,7 +10,7 @@ from app.shared.enums import TaskType
 from agent_configs.schemas import AnalyzedResume
 
 
-@celery_app.task(bind=True, base=DBTrackingTask)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def analyze_resume_task(
     self,
     resume_id: str,

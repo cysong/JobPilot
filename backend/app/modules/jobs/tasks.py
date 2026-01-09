@@ -15,7 +15,7 @@ from agent_configs.schemas import AnalyzedJob, TranslatedText
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(base=DBTrackingTask, bind=True, max_retries=3)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def analyze_job_task(
     self,
     job_id: int,

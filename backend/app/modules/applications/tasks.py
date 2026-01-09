@@ -30,7 +30,7 @@ def setup_periodic_tasks(sender, **kwargs):
     )
 
 
-@celery_app.task(base=AsyncBaseTask)
+@celery_app.task(base=AsyncBaseTask, bind=True)
 async def run_outbox_consumer(self):
     """Periodic task to drain application outbox events."""
     from app.modules.applications.outbox_consumer import process_outbox_batch
@@ -85,7 +85,7 @@ async def update_tailoring_progress(
     await db.commit()
 
 
-@celery_app.task(bind=True, base=DBTrackingTask)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def application_initialization_task(
     self,
     application_id: str,
@@ -196,7 +196,7 @@ async def application_initialization_task(
     }
 
 
-@celery_app.task(bind=True, base=DBTrackingTask)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def resume_tailoring_task(
     self,
     application_id: str,
@@ -237,7 +237,7 @@ async def resume_tailoring_task(
     return result
 
 
-@celery_app.task(bind=True, base=DBTrackingTask)
+@celery_app.task(base=DBTrackingTask, bind=True)
 async def cover_letter_generation_task(
     self,
     application_id: str,
