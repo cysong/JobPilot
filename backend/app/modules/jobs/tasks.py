@@ -90,8 +90,13 @@ async def poll_unanalyzed_jobs(self) -> dict:
             entity_id=str(analysis.job_id),
             input_data={"job_id": analysis.job_id}
         )
+        # Clear needs_reanalysis flag immediately after task submission
+        # This prevents duplicate task creation in subsequent poll cycles
+        analysis.needs_reanalysis = False
         reanalysis_created += 1
 
+    # Commit the flag updates
+    await self.db.commit()
     total_created += reanalysis_created
 
     remaining = settings.MAX_JOBS_PER_POLL - reanalysis_created
