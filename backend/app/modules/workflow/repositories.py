@@ -42,7 +42,7 @@ class TaskRepository:
             priority=priority,
             status=TaskStatus.PENDING,
             input_data=input_data,
-            depends_on=depends_on,
+            depends_on=depends_on or [],
             step=step,
             total_steps=total_steps,
         )

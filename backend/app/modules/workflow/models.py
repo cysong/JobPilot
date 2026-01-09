@@ -59,7 +59,7 @@ class TaskExecution(Base, TimestampMixin):
     execution_time_ms: Mapped[Optional[int]
                               ] = mapped_column(Integer, nullable=True)
     worker_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    depends_on: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    depends_on: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     step: Mapped[int] = mapped_column(Integer, nullable=False)
     total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
     started_at: Mapped[Optional[datetime]] = mapped_column(
