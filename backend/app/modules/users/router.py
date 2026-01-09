@@ -5,10 +5,11 @@ This module contains API endpoints for user skill management.
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.users import service
@@ -68,10 +69,7 @@ async def create_user_skill(
         )
         return skill
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise BadRequestError(str(e))
 
 
 @router.put("/{skill_id}", response_model=UserSkillResponse)
@@ -95,10 +93,7 @@ async def update_user_skill(
         )
         return skill
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise NotFoundError(str(e))
 
 
 @router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,10 +111,7 @@ async def delete_user_skill(
     deleted = await service.delete_user_skill(db, current_user.id, skill_id)
 
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Skill with ID {skill_id} not found"
-        )
+        raise NotFoundError(f"Skill with ID {skill_id} not found")
 
 
 @router.post("/sync", response_model=SkillSyncResponse)

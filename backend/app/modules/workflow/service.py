@@ -9,9 +9,10 @@ from typing import Any, Iterable, Optional
 from uuid import uuid4
 
 from celery import chain
-from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import BadRequestError, JobPilotException, NotFoundError
 
 from app.modules.admin.schemas import (
     BatchRetryResponse,
@@ -397,7 +398,7 @@ class TaskService:
         """Get single task detail including AI calls."""
         task = await db.get(TaskExecution, task_id)
         if not task:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Task not found")
+            raise NotFoundError("Task not found")
 
         ai_calls = await db.execute(
             select(AICall).where(AICall.task_id == task_id).order_by(AICall.created_at.desc())
@@ -451,7 +452,7 @@ class TaskService:
         """
         original = await db.get(TaskExecution, task_id)
         if not original:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Task not found")
+            raise NotFoundError("Task not found")
 
         # Fetch workflow tasks in order
         workflow_tasks = (
@@ -462,19 +463,19 @@ class TaskService:
             )
         ).scalars().all()
         if not workflow_tasks:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No tasks found for workflow")
+            raise NotFoundError("No tasks found for workflow")
 
         # Find first non-success task and retry everything from there
         start_idx = next((idx for idx, t in enumerate(workflow_tasks) if t.status != TaskStatus.SUCCESS), None)
         if start_idx is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="All tasks already succeeded")
+            raise BadRequestError("All tasks already succeeded")
 
         to_retry = workflow_tasks[start_idx:]
         signatures = []
         for t in to_retry:
             task_type_enum = TaskType.from_value(t.task_type)
             if not task_type_enum:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Unsupported task type {t.task_type} for retry")
+                raise BadRequestError(f"Unsupported task type {t.task_type} for retry")
             info: TaskTypeInfo = task_type_enum.value
 
             # Reset state for retry
@@ -508,7 +509,7 @@ class TaskService:
 
         # Submit chain and backfill celery ids
         if not signatures:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="No tasks to retry")
+            raise BadRequestError("No tasks to retry")
 
         if len(signatures) == 1:
             result = signatures[0].apply_async()
@@ -546,13 +547,13 @@ class TaskService:
                     )
                 )
                 success += 1
-            except HTTPException as exc:
+            except JobPilotException as exc:
                 results.append(
                     BatchRetryResult(
                         original_task_id=tid,
                         new_task_id=None,
                         status="failed",
-                        error=exc.detail,
+                        error=exc.message,
                     )
                 )
                 failed += 1
