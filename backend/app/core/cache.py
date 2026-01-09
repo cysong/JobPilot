@@ -3,13 +3,16 @@ Custom Redis backend for fastapi-cache2 compatible with redis>=5.0
 
 This replaces the built-in RedisBackend which depends on deprecated aioredis package
 """
-from typing import Tuple
+from typing import Tuple, Optional, Any, get_args, get_origin, get_type_hints
 from redis.asyncio import Redis
 from fastapi_cache.backends import Backend
 import inspect
 import json
 from functools import wraps
 from typing import Any, Callable, Awaitable
+from pydantic import BaseModel, TypeAdapter
+from pydantic.errors import PydanticUserError
+from fastapi.encoders import jsonable_encoder
 
 from fastapi_cache import FastAPICache
 
@@ -31,6 +34,8 @@ def jcache(
             raise ValueError("jcache requires a key_template")
 
         sig = inspect.signature(func)
+        resolved_return = _resolve_return_annotation(func, sig)
+        adapter = _resolve_adapter(resolved_return)
 
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -44,13 +49,21 @@ def jcache(
 
             cached = await backend.get(key)
             if cached is not None:
-                return json.loads(cached)
+                cached_data = json.loads(cached)
+                if adapter is not None:
+                    return adapter.validate_python(cached_data)
+                return cached_data
 
             result = await func(*args, **kwargs)
 
+            if adapter is not None:
+                payload = adapter.dump_python(result, mode="json")
+            else:
+                payload = jsonable_encoder(result)
+
             await backend.set(
                 key,
-                json.dumps(result),
+                json.dumps(payload),
                 expire=ttl,
             )
             return result
@@ -111,6 +124,44 @@ def build_cache_key(raw_key: str, namespace: str = "") -> str:
     if prefix:
         key = f"{prefix}:{key}"
     return key
+
+
+def _resolve_return_annotation(
+    func: Callable[..., Awaitable[Any]],
+    sig: inspect.Signature,
+) -> Any:
+    try:
+        return get_type_hints(func).get("return", sig.return_annotation)
+    except Exception:
+        return sig.return_annotation
+
+
+def _resolve_adapter(annotation: Any) -> Optional[TypeAdapter[Any]]:
+    if annotation is inspect.Signature.empty or annotation is None:
+        return None
+    _rebuild_models(annotation)
+    try:
+        return TypeAdapter(annotation)
+    except PydanticUserError:
+        try:
+            _rebuild_models(annotation)
+            return TypeAdapter(annotation)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def _rebuild_models(annotation: Any) -> None:
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        annotation.model_rebuild()
+        return
+    origin = get_origin(annotation)
+    if origin is None:
+        return
+    for arg in get_args(annotation):
+        if isinstance(arg, type) and issubclass(arg, BaseModel):
+            arg.model_rebuild()
 
 class RedisBackend(Backend):
     """Redis backend using redis.asyncio (compatible with Python 3.11+)"""
