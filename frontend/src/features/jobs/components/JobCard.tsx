@@ -62,7 +62,7 @@ export function JobCard({ job, matchData }: JobCardProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4 pt-2 pr-28 space-y-3">
+        <CardContent className="p-4 pt-2 space-y-3">
           <div className="flex flex-wrap gap-y-2 gap-x-4 text-sm text-slate-500">
             <div className="flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5" />

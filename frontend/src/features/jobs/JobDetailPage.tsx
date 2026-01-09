@@ -178,25 +178,37 @@ export default function JobDetailPage() {
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {application.status === "Failed" && application.last_error && (
-                          <div className="max-w-xs">
-                            <p className="font-semibold text-red-500">Error:</p>
-                            <p className="text-sm">{application.last_error}</p>
-                          </div>
-                        )}
+                        {application.status === "Failed" &&
+                          application.last_error && (
+                            <div className="max-w-xs">
+                              <p className="font-semibold text-red-500">
+                                Error:
+                              </p>
+                              <p className="text-sm">
+                                {application.last_error}
+                              </p>
+                            </div>
+                          )}
                         {application.status === "Tailoring" && (
                           <div className="max-w-xs">
-                            <p className="text-sm">Customizing your resume and generating cover letter...</p>
+                            <p className="text-sm">
+                              Customizing your resume and generating cover
+                              letter...
+                            </p>
                           </div>
                         )}
                         {application.status === "Pending" && (
                           <div className="max-w-xs">
-                            <p className="text-sm">Waiting to start processing...</p>
+                            <p className="text-sm">
+                              Waiting to start processing...
+                            </p>
                           </div>
                         )}
                         {application.status === "Ready" && (
                           <div className="max-w-xs">
-                            <p className="text-sm">Application materials are ready!</p>
+                            <p className="text-sm">
+                              Application materials are ready!
+                            </p>
                           </div>
                         )}
                       </TooltipContent>
@@ -272,7 +284,7 @@ export default function JobDetailPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-slate-600 mt-2 pr-28">
+              <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-slate-600 mt-2">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 text-slate-400" />
                   <span>{job.location_label}</span>
@@ -288,7 +300,7 @@ export default function JobDetailPage() {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-6 pr-28">
+              <div className="flex flex-wrap gap-2 mt-6">
                 <Badge variant="secondary">{job.classification}</Badge>
                 {job.sub_classification && (
                   <Badge variant="outline">{job.sub_classification}</Badge>
@@ -297,8 +309,8 @@ export default function JobDetailPage() {
                   Posted{" "}
                   {job.listed_at
                     ? formatDistanceToNow(new Date(job.listed_at), {
-                      addSuffix: true,
-                    })
+                        addSuffix: true,
+                      })
                     : "recently"}
                 </span>
               </div>
@@ -316,7 +328,9 @@ export default function JobDetailPage() {
                     <BrainCircuit className="h-6 w-6" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">AI Insight</h2>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      AI Insight
+                    </h2>
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
                       Powered by JobPilot AI
                     </p>
@@ -333,7 +347,10 @@ export default function JobDetailPage() {
                       </h3>
                       <div className="space-y-2">
                         {job.analysis.hiring_priorities.map((priority, i) => (
-                          <div key={i} className="flex gap-2.5 items-start text-sm text-slate-700">
+                          <div
+                            key={i}
+                            className="flex gap-2.5 items-start text-sm text-slate-700"
+                          >
                             <div className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
                             <span>{priority}</span>
                           </div>
@@ -350,12 +367,17 @@ export default function JobDetailPage() {
                         Core Responsibilities
                       </h3>
                       <ul className="space-y-2">
-                        {job.analysis.key_responsibilities.slice(0, 5).map((resp, i) => (
-                          <li key={i} className="flex gap-2 items-start text-sm text-slate-600">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                            <span className="line-clamp-2">{resp}</span>
-                          </li>
-                        ))}
+                        {job.analysis.key_responsibilities
+                          .slice(0, 5)
+                          .map((resp, i) => (
+                            <li
+                              key={i}
+                              className="flex gap-2 items-start text-sm text-slate-600"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                              <span className="line-clamp-2">{resp}</span>
+                            </li>
+                          ))}
                       </ul>
                     </div>
 
@@ -369,7 +391,11 @@ export default function JobDetailPage() {
                           </h3>
                           <div className="flex flex-wrap gap-1.5">
                             {job.analysis.tech_stack.map((tech, i) => (
-                              <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200">
+                              <Badge
+                                key={i}
+                                variant="secondary"
+                                className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                              >
                                 {tech}
                               </Badge>
                             ))}
@@ -385,7 +411,11 @@ export default function JobDetailPage() {
                           </h3>
                           <div className="flex flex-wrap gap-1.5">
                             {job.analysis.required_skills.map((skill, i) => (
-                              <Badge key={i} variant="outline" className="text-slate-600 border-slate-200">
+                              <Badge
+                                key={i}
+                                variant="outline"
+                                className="text-slate-600 border-slate-200"
+                              >
                                 {skill}
                               </Badge>
                             ))}
@@ -396,20 +426,30 @@ export default function JobDetailPage() {
                   </div>
 
                   {/* Culture & Soft Skills */}
-                  {(job.analysis.company_culture_keywords.length > 0 || job.analysis.soft_skills.length > 0) && (
+                  {(job.analysis.company_culture_keywords.length > 0 ||
+                    job.analysis.soft_skills.length > 0) && (
                     <div className="pt-4 border-t border-slate-100">
                       <h3 className="flex items-center gap-2 font-semibold text-slate-900 text-sm mb-3">
                         <Users className="h-4 w-4 text-indigo-600" />
                         Culture & Capabilities
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {job.analysis.company_culture_keywords.map((culture, i) => (
-                          <Badge key={`culture-${i}`} className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-100">
-                            {culture}
-                          </Badge>
-                        ))}
+                        {job.analysis.company_culture_keywords.map(
+                          (culture, i) => (
+                            <Badge
+                              key={`culture-${i}`}
+                              className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-100"
+                            >
+                              {culture}
+                            </Badge>
+                          )
+                        )}
                         {job.analysis.soft_skills.map((soft, i) => (
-                          <Badge key={`soft-${i}`} variant="secondary" className="bg-slate-50 text-slate-600">
+                          <Badge
+                            key={`soft-${i}`}
+                            variant="secondary"
+                            className="bg-slate-50 text-slate-600"
+                          >
                             {soft}
                           </Badge>
                         ))}
@@ -423,7 +463,9 @@ export default function JobDetailPage() {
             {/* Job Description */}
             <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-slate-900">Job Description</h2>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Job Description
+                </h2>
                 <div className="flex items-center gap-2">
                   <Select value={language} onValueChange={handleLanguageChange}>
                     <SelectTrigger className="h-9 w-[140px]">
@@ -437,7 +479,9 @@ export default function JobDetailPage() {
                     </SelectContent>
                   </Select>
                   {!hasCn && (
-                    <span className="text-xs text-slate-500">Chinese not available</span>
+                    <span className="text-xs text-slate-500">
+                      Chinese not available
+                    </span>
                   )}
                 </div>
               </div>
