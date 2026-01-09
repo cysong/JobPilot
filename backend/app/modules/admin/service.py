@@ -13,12 +13,14 @@ from app.modules.jobs.models import SeekJob
 from app.modules.matching.models import UserJobMatch
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskStatus
+from app.core.cache import jcache
 
 
 class AdminService:
     """Service methods for admin dashboard metrics."""
 
     @staticmethod
+    @jcache("admin:dashboard:stats", ttl=3600)
     async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
         """Aggregate high-level metrics for dashboard."""
         now = datetime.now(timezone.utc)
