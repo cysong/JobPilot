@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import type { TaskListItem } from '../types'
+import { ApiError } from '@/types/api'
 
 interface TaskCardProps {
   item: TaskListItem
@@ -20,10 +21,16 @@ export function TaskCard({ item, onRetry }: TaskCardProps) {
     setIsRetrying(true)
     try {
       await onRetry(item.id)
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error && error.message
+            ? error.message
+            : 'Failed to retry task. Please try again.'
       toast({
         title: 'Retry failed',
-        description: 'Failed to retry task. Please try again.',
+        description: message,
         variant: 'destructive',
       })
     } finally {
