@@ -2,6 +2,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Pagination } from '@/components/ui/pagination'
 import type { TaskListItem } from '../types'
 
 interface Props {
@@ -16,8 +17,6 @@ interface Props {
 
 export function TaskList({ items, isLoading, onRetry, page, pageSize, total, onPageChange }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const hasPrev = page > 1
-  const hasNext = page < totalPages
 
   return (
     <Card className="shadow-sm border-slate-200">
@@ -56,18 +55,11 @@ export function TaskList({ items, isLoading, onRetry, page, pageSize, total, onP
               )}
             </div>
           ))}
-        <div className="flex items-center justify-between pt-2 text-sm text-slate-600">
-          <span>
+        <div className="space-y-2 pt-2">
+          <div className="text-sm text-slate-600">
             Page {page} / {totalPages} | Total {total}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={!hasPrev} onClick={() => hasPrev && onPageChange(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={!hasNext} onClick={() => hasNext && onPageChange(page + 1)}>
-              Next
-            </Button>
           </div>
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
         </div>
       </CardContent>
     </Card>
