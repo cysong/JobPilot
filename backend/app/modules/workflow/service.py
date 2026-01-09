@@ -90,19 +90,23 @@ class TaskService:
         module = import_module(module_path)
         celery_task = getattr(module, func_name)
 
-        celery_options: dict[str, Any] = {}
-        if info.max_retries is not None:
-            celery_options["max_retries"] = info.max_retries
-        if info.timeout_seconds is not None:
-            celery_options["time_limit"] = info.timeout_seconds
-        celery_options.update(celery_kwargs)
-
         task_kwargs = {
             "task_id": task_id,
             **(input_data or {}),
         }
 
-        async_result = celery_task.apply_async(kwargs=task_kwargs, **celery_options)
+        # Create signature to properly set task options
+        sig = celery_task.signature(kwargs=task_kwargs)
+
+        # Set retry and timeout configurations via signature.set()
+        if info.max_retries is not None:
+            sig.set(max_retries=info.max_retries)
+        if info.timeout_seconds is not None:
+            sig.set(time_limit=info.timeout_seconds)
+        if celery_kwargs:
+            sig.set(**celery_kwargs)
+
+        async_result = sig.apply_async()
         task.celery_task_id = async_result.id
         await db.commit()
 
