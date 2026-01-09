@@ -1,6 +1,8 @@
 """Celery task to enqueue matching for newly analyzed jobs."""
 from __future__ import annotations
 
+import logging
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -14,15 +16,20 @@ from app.modules.workflow.service import TaskService
 from app.shared.enums import TaskType
 from app.modules.workflow import AsyncBaseTask
 
+logger = logging.getLogger(__name__)
+
 
 @celery_app.task(base=AsyncBaseTask, bind=True, ignore_result=True)
 async def pull_unmatched_jobs(self) -> dict:
     """Every 5 minutes: find new job analyses since last run and enqueue matching."""
+    start_time = time.perf_counter()
     last_exec = await _get_last_execution_time(self.db)
     since = last_exec or datetime.now(timezone.utc) - timedelta(days=30)
 
     new_analyses = await JobAnalysisRepository.get_updated_since(self.db, since=since)
     if not new_analyses:
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.info(f"pull_unmatched_jobs completed: new_jobs=0, time={elapsed_ms}ms")
         return {"status": "no_new_job_analysis"}
 
     dispatched_ids = []
@@ -39,6 +46,10 @@ async def pull_unmatched_jobs(self) -> dict:
         )
         dispatched_ids.append(analysis.id)
     await self.db.commit()
+
+    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+    logger.info(f"pull_unmatched_jobs completed: new_jobs={len(dispatched_ids)}, time={elapsed_ms}ms")
+
     return {"status": "dispatched", "job_analysis_ids": dispatched_ids}
 
 

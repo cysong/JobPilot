@@ -1,4 +1,6 @@
 """Celery tasks for job analysis."""
+import logging
+import time
 from uuid import uuid4
 
 from app.core.celery_app import celery_app
@@ -9,6 +11,8 @@ from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.workflow import DBTrackingTask, AsyncBaseTask, TaskService
 from app.shared.enums import TaskType
 from agent_configs.schemas import AnalyzedJob, TranslatedText
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(base=DBTrackingTask, bind=True, max_retries=3)
@@ -70,6 +74,7 @@ async def poll_unanalyzed_jobs(self) -> dict:
     Periodic task: find jobs needing analysis and create tasks.
     Priority: re-analysis first, then missing analyses.
     """
+    start_time = time.perf_counter()
     total_created = 0
     reanalysis_created = 0
 
@@ -104,8 +109,12 @@ async def poll_unanalyzed_jobs(self) -> dict:
             )
             total_created += 1
 
+    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+    new_analysis = total_created - reanalysis_created
+    logger.info(f"poll_unanalyzed_jobs completed: reanalysis={reanalysis_created}, new={new_analysis}, total={total_created}, time={elapsed_ms}ms")
+
     return {
         "tasks_created": total_created,
         "reanalysis_count": reanalysis_created,
-        "new_analysis_count": total_created - reanalysis_created,
+        "new_analysis_count": new_analysis,
     }
