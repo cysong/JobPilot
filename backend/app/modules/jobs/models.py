@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from app.shared.base_model import Base, TimestampMixin
@@ -24,6 +24,9 @@ class SeekJob(Base):
     JobPilot system only reads from this table, never writes.
     """
     __tablename__ = "seek_jobs"
+    __table_args__ = (
+        UniqueConstraint("source", "source_id", name="uq_seek_jobs_source_source_id"),
+    )
 
     # Primary key
     id: Mapped[int] = mapped_column(
@@ -32,8 +35,7 @@ class SeekJob(Base):
     # Core fields
     source: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True, index=True)
-    source_id: Mapped[str] = mapped_column(
-        String(200), unique=True, index=True)
+    source_id: Mapped[str] = mapped_column(String(200), index=True)
     title: Mapped[str] = mapped_column(String(500), index=True)
     abstract: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
