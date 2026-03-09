@@ -1,6 +1,6 @@
 version: 1
 name: job_analyzer
-model: openai/gpt-4.1-mini
+model: gpt-5-mini
 temperature: 0.1
 max_tokens: 3000
 
