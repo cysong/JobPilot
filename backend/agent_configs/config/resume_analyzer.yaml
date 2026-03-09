@@ -1,8 +1,12 @@
 version: 1
 name: "resume_analyzer"
 model: "gpt-5-mini"
-temperature: 0.1
-max_tokens: 5000
+model_settings:
+  temperature: 0.1
+  max_tokens: 5000
+  reasoning:
+    effort: low
+  verbosity: low
 
 instructions: |
   You are an expert resume analyzer. Given raw resume text, extract structured data and return ONLY valid JSON matching the AnalyzedResume schema (no prose, no comments).

@@ -1,8 +1,12 @@
 version: 1
 name: reviewer
 model: gpt-5-mini
-temperature: 0.1
-max_tokens: 5000
+model_settings:
+  temperature: 0.1
+  max_tokens: 5000
+  reasoning:
+    effort: low
+  verbosity: low
 
 instructions: |
   Review generated cover letters for job alignment and writing quality.

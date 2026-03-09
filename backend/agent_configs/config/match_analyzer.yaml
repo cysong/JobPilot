@@ -1,8 +1,12 @@
 version: 1
 name: "match_analyzer"
 model: "gpt-5-mini"
-temperature: 0.1
-max_tokens: 5000
+model_settings:
+  temperature: 0.1
+  max_tokens: 4000
+  reasoning:
+    effort: low
+  verbosity: low
 
 instructions: |
   You are a matching reviewer. Given job analysis, resume analysis, and user skills, produce a concise JSON assessment.

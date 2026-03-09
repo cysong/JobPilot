@@ -82,14 +82,17 @@ class AgentLoader:
             "handoffs": config.get("handoffs") or [],
         }
 
-        # Map tuning params into ModelSettings (Agent constructor doesn't accept them directly)
-        model_settings_data: dict[str, Any] = {}
-        for optional_key in ("temperature", "max_tokens", "top_p"):
-            if optional_key in config:
-                model_settings_data[optional_key] = config[optional_key]
+        # Read model settings from unified nested config.
+        # No backward compatibility: top-level temperature/max_tokens/top_p is not supported.
+        model_settings_data = config.get("model_settings", {})
+        if model_settings_data is None:
+            model_settings_data = {}
+        if not isinstance(model_settings_data, dict):
+            raise ValueError(
+                f"Invalid model_settings for agent '{agent_id}': expected object/dict"
+            )
         if model_settings_data:
-            agent_kwargs["model_settings"] = ModelSettings(
-                **model_settings_data)
+            agent_kwargs["model_settings"] = ModelSettings(**model_settings_data)
 
         agent = Agent(**agent_kwargs)
         setattr(agent, "agent_id", agent_id)

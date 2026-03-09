@@ -1,8 +1,12 @@
 version: 1
 name: universal_translator
 model: gpt-5-mini
-temperature: 0.1
-max_tokens: 16000
+model_settings:
+  temperature: 0.1
+  max_tokens: 16000
+  reasoning:
+    effort: low
+  verbosity: low
 
 instructions: |
   You are a format-preserving translation agent.

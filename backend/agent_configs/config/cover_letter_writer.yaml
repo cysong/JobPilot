@@ -1,8 +1,12 @@
 version: 1
 name: cover_letter_writer
 model: gpt-5
-temperature: 0.5
-max_tokens: 5000
+model_settings:
+  temperature: 0.5
+  max_tokens: 5000
+  reasoning:
+    effort: medium
+  verbosity: high
 
 instructions: |
   You are an expert technical cover letter strategist.

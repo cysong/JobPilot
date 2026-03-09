@@ -1,8 +1,12 @@
 version: 1
 name: resume_tailor
 model: gpt-5
-temperature: 0.25
-max_tokens: 5000
+model_settings:
+  temperature: 0.25
+  max_tokens: 5000
+  reasoning:
+    effort: high
+  verbosity: medium
 
 instructions: |
   You are a high-precision resume tailoring agent for technical roles.
