@@ -4,6 +4,7 @@
 
 export interface Job {
   id: number
+  source: string | null
   source_id: string
   title: string
   abstract: string | null
@@ -128,6 +129,7 @@ export interface JobFiltersRequest {
   location_cities?: string[]
   work_types?: string[]
   companies?: string[]
+  sources?: string[]
 
   // Date range
   listed_after?: string
@@ -146,6 +148,7 @@ export interface JobFiltersOptions {
   location_cities: string[]
   work_types: string[]
   companies: string[]
+  sources: string[]
 }
 
 export interface JobAnalysis {
@@ -183,6 +186,7 @@ export interface JobAnalysis {
  */
 export interface JobBriefInfo {
   id: number
+  source: string | null
   title: string
   advertiser_name: string | null
   location_label: string | null

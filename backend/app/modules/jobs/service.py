@@ -71,6 +71,10 @@ class JobService:
                 )
             )
 
+        # Apply source filter
+        if filters.sources:
+            query = query.where(SeekJob.source.in_(filters.sources))
+
         # Apply date range filter
         if filters.listed_after:
             query = query.where(SeekJob.listed_at >= filters.listed_after)
@@ -200,10 +204,27 @@ class JobService:
             advertiser_result = await db.execute(advertiser_query)
             companies = [adv for adv in advertiser_result.scalars().all() if adv]
 
+        # Get distinct sources
+        sources_query = (
+            select(distinct(SeekJob.source))
+            .where(
+                and_(
+                    SeekJob.source.isnot(None),
+                    SeekJob.source != "",
+                    SeekJob.is_expired == False,
+                )
+            )
+            .order_by(SeekJob.source)
+            .limit(50)
+        )
+        sources_result = await db.execute(sources_query)
+        sources = [source for source in sources_result.scalars().all() if source]
+
         return JobFiltersOptions(
             location_cities=cities,
             work_types=work_types,
-            companies=companies
+            companies=companies,
+            sources=sources,
         )
 
     @staticmethod

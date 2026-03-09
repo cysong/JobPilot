@@ -24,7 +24,9 @@ export default function JobListingPage() {
   const locationCities = searchParams.getAll("location_cities");
   const workTypes = searchParams.getAll("work_types");
   const companies = searchParams.getAll("companies");
-  const activeFilterCount = locationCities.length + workTypes.length + companies.length;
+  const sources = searchParams.getAll("sources");
+  const activeFilterCount =
+    locationCities.length + workTypes.length + companies.length + sources.length;
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
@@ -60,6 +62,7 @@ export default function JobListingPage() {
     location_cities: searchParams.getAll("location_cities"),
     work_types: searchParams.getAll("work_types"),
     companies: searchParams.getAll("companies"),
+    sources: searchParams.getAll("sources"),
   };
   const jobsQuery = useJobs(jobFilters);
 
@@ -86,7 +89,7 @@ export default function JobListingPage() {
 
   // Handle filter selection change
   const handleFilterChange = (
-    filterKey: 'location_cities' | 'work_types' | 'companies',
+    filterKey: 'location_cities' | 'work_types' | 'companies' | 'sources',
     values: string[]
   ) => {
     const newParams = new URLSearchParams(searchParams);
@@ -102,6 +105,7 @@ export default function JobListingPage() {
     newParams.delete("location_cities");
     newParams.delete("work_types");
     newParams.delete("companies");
+    newParams.delete("sources");
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
@@ -165,6 +169,15 @@ export default function JobListingPage() {
                 <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex flex-wrap items-center gap-3">
                     {/* Filter Dropdowns */}
+                    <FilterDropdown
+                      label="Source"
+                      options={filterOptions.sources}
+                      selectedValues={sources}
+                      onSelectionChange={(values) => handleFilterChange('sources', values)}
+                      searchPlaceholder="Search sources..."
+                      emptyText="No sources found"
+                    />
+
                     <FilterDropdown
                       label="Location"
                       options={filterOptions.location_cities}

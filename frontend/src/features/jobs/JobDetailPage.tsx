@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/tooltip";
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
+const formatSourceLabel = (source: string | null | undefined): string =>
+  source ? source.toUpperCase() : "UNKNOWN";
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
@@ -240,7 +242,7 @@ export default function JobDetailPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    View on Seek
+                    Open Original Posting
                     <ExternalLink className="h-4 w-4 ml-2" />
                   </a>
                 </Button>
@@ -301,7 +303,10 @@ export default function JobDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-6">
-                <Badge variant="secondary">{job.classification}</Badge>
+                <Badge variant="outline">{formatSourceLabel(job.source)}</Badge>
+                {job.classification && (
+                  <Badge variant="secondary">{job.classification}</Badge>
+                )}
                 {job.sub_classification && (
                   <Badge variant="outline">{job.sub_classification}</Badge>
                 )}
@@ -512,8 +517,9 @@ export default function JobDetailPage() {
                   About the Company
                 </h3>
                 <p className="text-sm text-slate-600 mb-4">
-                  {job.company_name || job.advertiser_name} is a leading company
-                  in the {job.classification} sector.
+                  {job.classification
+                    ? `${job.company_name || job.advertiser_name} is a leading company in the ${job.classification} sector.`
+                    : `${job.company_name || job.advertiser_name} is a leading company.`}
                 </p>
                 <Button variant="outline" className="w-full">
                   View Company Profile

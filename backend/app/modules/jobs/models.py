@@ -30,6 +30,8 @@ class SeekJob(Base):
         Integer, primary_key=True, autoincrement=True)
 
     # Core fields
+    source: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, index=True)
     source_id: Mapped[str] = mapped_column(
         String(200), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500), index=True)

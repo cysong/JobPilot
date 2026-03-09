@@ -54,6 +54,13 @@ export const jobsApi = {
       })
     }
 
+    // Add sources filter
+    if (filters.sources && filters.sources.length > 0) {
+      filters.sources.forEach(source => {
+        params.append('sources', source)
+      })
+    }
+
     // Add date range filters
     if (filters.listed_after) {
       params.append('listed_after', filters.listed_after)

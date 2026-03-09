@@ -17,6 +17,9 @@ interface JobCardProps {
     matchData?: UserJobMatch // Optional match data for recommended view
 }
 
+const formatSourceLabel = (source: string | null | undefined): string =>
+  source ? source.toUpperCase() : "UNKNOWN";
+
 export function JobCard({ job, matchData }: JobCardProps) {
     const [searchParams] = useSearchParams()
 
@@ -86,9 +89,14 @@ export function JobCard({ job, matchData }: JobCardProps) {
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            <Badge variant="secondary" className="font-normal text-xs">
-              {job.classification}
+            <Badge variant="outline" className="font-normal text-xs text-slate-500">
+              {formatSourceLabel(job.source)}
             </Badge>
+            {job.classification && (
+              <Badge variant="secondary" className="font-normal text-xs">
+                {job.classification}
+              </Badge>
+            )}
             {job.sub_classification && (
               <Badge
                 variant="outline"

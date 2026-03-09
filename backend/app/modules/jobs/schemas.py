@@ -12,6 +12,7 @@ from app.shared.pagination import PaginatedResponse
 class JobBase(BaseModel):
     """Base Job schema with essential fields for list display"""
     id: int
+    source: Optional[str] = None
     source_id: str
     title: str
     abstract: Optional[str] = None
@@ -136,6 +137,7 @@ class JobFiltersRequest(BaseModel):
     location_cities: Optional[list[str]] = Field(None, description="Filter by location cities")
     work_types: Optional[list[str]] = Field(None, description="Filter by work types")
     companies: Optional[list[str]] = Field(None, description="Filter by company names")
+    sources: Optional[list[str]] = Field(None, description="Filter by job sources")
 
     # Date range
     listed_after: Optional[datetime] = Field(None, description="Filter jobs listed after this date")
@@ -151,6 +153,7 @@ class JobFiltersOptions(BaseModel):
     location_cities: list[str] = Field(default_factory=list, description="Available location cities")
     work_types: list[str] = Field(default_factory=list, description="Available work types")
     companies: list[str] = Field(default_factory=list, description="Available companies")
+    sources: list[str] = Field(default_factory=list, description="Available job sources")
 
 
 # ============================================
@@ -211,6 +214,7 @@ class JobBriefInfo(BaseModel):
     """Minimal job info for match list."""
 
     id: int
+    source: Optional[str]
     title: str
     advertiser_name: Optional[str]
     location_label: Optional[str]
