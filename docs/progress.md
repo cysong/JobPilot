@@ -5,11 +5,32 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2025-12-18
+**Last Updated:** 2026-03-10
 
 ---
 
 ## Work Log
+
+
+
+### 2026-03-10 - Job Source Expansion (Seek + LinkedIn)
+
+**Completed Tasks:**
+- Added `source` field support across job backend model/schema/service/router for list/detail/filter APIs.
+- Added `sources` filter support in `GET /api/v1/jobs` and filter options in `GET /api/v1/jobs/filters`.
+- Updated frontend job types and API query builder to include `source/sources`.
+- Added Source filter in job listing page (URL state + filter count + dropdown integration).
+- Updated job detail CTA text from platform-specific wording to generic `Open Original Posting`.
+- Added source badges to Job card and Job detail header.
+- Improved UI fallback behavior: hide classification/sub-classification display when corresponding fields are empty.
+
+
+### 2026-01-08 - Application PDF Export for Tailored Resume & Cover Letter
+
+**Completed Tasks:**
+- Added application-level PDF export endpoints for tailored resume and cover letter.
+- Implemented safe, job-aware filenames for application document downloads.
+- Added cover letter PDF template + CSS and wired frontend download buttons for application documents.
 
 
 ### 2026-01-06 - Document Draft Restore Prompt Fix
@@ -519,6 +540,8 @@ cd backend
 ## Next Steps
 
 ### Stage 3: Application Module
+- **Backend/Frontend**:
+  - Verify application resume/cover letter PDF downloads and cover letter template rendering
 - **Backend**:
   - Design Application model (user_id, job_id, resume_id, status)
   - Create API endpoints for applying to jobs
