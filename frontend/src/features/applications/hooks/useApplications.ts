@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
-import type { CreateApplicationRequest } from '@/types/application'
+import type { CreateApplicationRequest, RetryApplicationRequest } from '@/types/application'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 import { useToast } from '@/components/ui/use-toast'
-import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/types/api'
 
 export const useApplications = (page = 1, size = 20) => {
@@ -64,7 +63,6 @@ export const useUpdateCoverLetterContent = () => {
 export const useApplicationMutations = () => {
     const queryClient = useQueryClient()
     const { toast } = useToast()
-    const navigate = useNavigate()
 
     const createApplication = useMutation({
         mutationFn: (data: CreateApplicationRequest) => applicationApi.create(data),
@@ -88,14 +86,15 @@ export const useApplicationMutations = () => {
     })
 
     const retryCoverLetter = useMutation({
-        mutationFn: (id: string) => applicationApi.retryCoverLetter(id),
+        mutationFn: ({ id, payload }: { id: string; payload?: RetryApplicationRequest }) =>
+            applicationApi.retryCoverLetter(id, payload),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['applications'] })
             queryClient.invalidateQueries({ queryKey: ['applications', data.id] })
-            toast({ title: 'Success', description: 'Cover letter generation retried' })
+            toast({ title: 'Success', description: 'Resume and cover letter regeneration started' })
         },
         onError: () => {
-            toast({ title: 'Error', description: 'Failed to retry cover letter', variant: 'destructive' })
+            toast({ title: 'Error', description: 'Failed to retry generation', variant: 'destructive' })
         }
     })
 

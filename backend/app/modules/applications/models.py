@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
-from app.shared.enums import ApplicationStatus
+from app.shared.enums import ApplicationStatus, TailoringLevel
 
 
 def _uuid() -> str:
@@ -77,7 +77,11 @@ class Application(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    tailoring_level: Mapped[str] = mapped_column(String(50), default="light")
+    tailoring_level: Mapped[TailoringLevel] = mapped_column(
+        SQLEnum(TailoringLevel, native_enum=False),
+        default=TailoringLevel.LIGHT,
+        nullable=False,
+    )
     tailoring_progress: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(

@@ -23,6 +23,14 @@ class ApplicationStatus(str, Enum):
     FAILED = "Failed"                # Application failed
 
 
+class TailoringLevel(str, Enum):
+    """Resume tailoring intensity levels."""
+
+    LIGHT = "light"
+    MODERATE = "moderate"
+    DEEP = "deep"
+
+
 class TaskTypeInfo(NamedTuple):
     """
     Task type metadata container.
@@ -203,4 +211,3 @@ class EntityType(str, Enum):
     JOB = "job"
     RESUME = "resume"
     APPLICATION = "application"
-

@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.shared.enums import ApplicationStatus
+from app.shared.enums import ApplicationStatus, TailoringLevel
 from app.modules.jobs.schemas import JobBase
 from app.shared.pagination import PaginatedResponse
 
@@ -14,7 +14,21 @@ class ApplicationCreateRequest(BaseModel):
 
     job_id: int = Field(..., description="Job ID to apply for")
     resume_template_id: str = Field(..., description="Resume template ID selected by user")
-    tailoring_level: str = Field(default="light", description="Tailoring level (resume-focused)")
+    tailoring_level: TailoringLevel = Field(
+        default=TailoringLevel.LIGHT,
+        description="Tailoring level (resume-focused)",
+    )
+
+
+class ApplicationRetryRequest(BaseModel):
+    """Request payload for retrying generation with optional new inputs."""
+
+    resume_template_id: Optional[str] = Field(
+        default=None, description="Optional resume template ID to use for retry"
+    )
+    tailoring_level: Optional[TailoringLevel] = Field(
+        default=None, description="Optional tailoring level override for retry"
+    )
 
 
 class ApplicationResponse(BaseModel):
@@ -26,7 +40,7 @@ class ApplicationResponse(BaseModel):
     resume_document_id: Optional[str] = None
     cover_letter_document_id: Optional[str] = None
     status: ApplicationStatus
-    tailoring_level: str
+    tailoring_level: TailoringLevel
     last_error: Optional[str] = None
     created_at: datetime
     updated_at: datetime

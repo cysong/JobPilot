@@ -10,15 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, NotFoundError, JobPilotException
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
-from app.modules.applications.schemas import ApplicationCreateRequest
+from app.modules.applications.schemas import ApplicationCreateRequest, ApplicationRetryRequest
 from app.modules.auth.models import User
 from app.modules.jobs.service import JobService
 from app.modules.resumes.models import Document, Resume
 from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
-from app.shared.enums import ApplicationStatus
+from app.shared.enums import ApplicationStatus, EntityType, TailoringLevel, TaskType
 from app.shared.pagination import PaginatedResponse, PaginationParams
+from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 
 
 class ApplicationService:
@@ -303,7 +304,7 @@ class ApplicationService:
             source_resume_id=payload.resume_template_id,
             resume_document_id=working_document.id,
             status=ApplicationStatus.PENDING,
-            tailoring_level=payload.tailoring_level or "light",
+            tailoring_level=payload.tailoring_level,
             tailoring_progress={"steps": {}, "current_step": "created"}
         )
         await ApplicationRepository.create(db, application=application)
@@ -312,7 +313,7 @@ class ApplicationService:
             db=db,
             application=application,
             user_id=user.id,
-            tailoring_level=payload.tailoring_level or "light"
+            tailoring_level=payload.tailoring_level
         )
 
         await db.commit()
@@ -348,23 +349,56 @@ class ApplicationService:
 
     @staticmethod
     async def retry_application_tailor(
-        db: AsyncSession, application_id: str, user: User
+        db: AsyncSession, application_id: str, user: User, payload: ApplicationRetryRequest
     ) -> Application:
         """Retry application workflow."""
         application = await ApplicationService.get_application_by_id(db, application_id, user)
         if not application:
             raise NotFoundError("Application not found")
+        selected_tailoring_level = payload.tailoring_level or application.tailoring_level
+
+        target_resume_id = payload.resume_template_id or application.source_resume_id
+        resume_template = await ResumeService.get_resume_by_id(db, target_resume_id, user.id)
+        if not resume_template:
+            raise NotFoundError("Resume template not found")
+        if resume_template.is_draft:
+            raise BadRequestError("Draft resume cannot be used as template")
+
+        previous_resume_document: Optional[Document] = None
+        if application.resume_document_id:
+            previous_resume_document = await DocumentRepository.get_by_id(
+                db, application.resume_document_id
+            )
+            if not previous_resume_document:
+                raise NotFoundError("Current application resume document not found")
+
+        # Keep a full document history on retry:
+        # create a new working document from selected template, and link it to previous document.
+        retry_working_document = await ApplicationService._copy_resume_for_application(
+            db=db,
+            template_resume=resume_template,
+            user_id=user.id,
+            parent_document=previous_resume_document,
+            change_comments="Retry: Copied template for application tailoring",
+        )
+        application.source_resume_id = resume_template.id
+        application.resume_document_id = retry_working_document.id
 
         await ApplicationRepository.mark_pending(db, application)
-        
-        # Reset progress
-        application.tailoring_progress = {"steps": {}, "current_step": "retrying", "message": "Restarting workflow"}
+        application.tailoring_level = selected_tailoring_level
 
-        await ApplicationService._submit_initialization_task(
+        # Reset progress
+        application.tailoring_progress = {
+            "steps": {},
+            "current_step": "retrying",
+            "message": "Restarting tailoring and cover letter generation",
+        }
+
+        await ApplicationService._submit_generation_tasks(
             db=db,
             application=application,
             user_id=user.id,
-            tailoring_level=application.tailoring_level,
+            tailoring_level=selected_tailoring_level,
             is_retry=True
         )
 
@@ -377,13 +411,10 @@ class ApplicationService:
         db: AsyncSession, 
         application: Application, 
         user_id: int, 
-        tailoring_level: str,
+        tailoring_level: TailoringLevel,
         is_retry: bool = False
     ) -> None:
         """Helper to submit the initialization orchestrator task."""
-        from app.modules.workflow.service import TaskService
-        from app.shared.enums import TaskType, EntityType
-
         await TaskService.submit_task(
             db=db,
             task_type=TaskType.APPLICATION_INITIALIZATION,
@@ -400,23 +431,70 @@ class ApplicationService:
         )
 
     @staticmethod
+    async def _submit_generation_tasks(
+        db: AsyncSession,
+        application: Application,
+        user_id: int,
+        tailoring_level: TailoringLevel,
+        is_retry: bool = False,
+    ) -> None:
+        """Submit only resume tailoring and cover letter generation tasks."""
+        await TaskService.submit_sequential_tasks(
+            db=db,
+            entity_type=EntityType.APPLICATION.value,
+            entity_id=application.id,
+            user_id=user_id,
+            tasks=[
+                TaskSubmissionSpec(
+                    task_type=TaskType.RESUME_TAILORING,
+                    input_data={
+                        "application_id": application.id,
+                        "resume_id": application.source_resume_id,
+                        "job_id": application.job_id,
+                        "tailoring_level": tailoring_level,
+                        "is_retry": is_retry,
+                    },
+                ),
+                TaskSubmissionSpec(
+                    task_type=TaskType.COVER_LETTER_GENERATION,
+                    input_data={
+                        "application_id": application.id,
+                        "job_id": application.job_id,
+                        "is_retry": is_retry,
+                    },
+                ),
+            ],
+        )
+
+    @staticmethod
     async def _copy_resume_for_application(
-        db: AsyncSession, template_resume: Resume, user_id: int
+        db: AsyncSession,
+        template_resume: Resume,
+        user_id: int,
+        parent_document: Optional[Document] = None,
+        change_comments: str = "Copied for application tailoring",
     ) -> Document:
         """Copy resume template into a new working document for application tailoring."""
         from app.modules.resumes.repository import DocumentRepository
-        
+
         source_doc = template_resume.document
         new_doc_id = str(uuid4())
+        if parent_document:
+            root_id = parent_document.root_id
+            parent_id = parent_document.id
+        else:
+            root_id = new_doc_id
+            parent_id = source_doc.id
+
         new_document = Document(
             id=new_doc_id,
-            root_id=new_doc_id,
-            parent_id=source_doc.id,
+            root_id=root_id,
+            parent_id=parent_id,
             format=source_doc.format,
             content=source_doc.content,
             content_hash=DocumentRepository._calculate_content_hash(
                 source_doc.content),
-            change_comments="Copied for application tailoring",
+            change_comments=change_comments,
             extra_metadata=source_doc.extra_metadata or {},
             created_by=user_id,
         )

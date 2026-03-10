@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertCircle } from 'lucide-react'
+import type { TailoringLevel } from '@/types/application'
 
 interface ApplicationDialogProps {
     open: boolean
@@ -32,6 +33,7 @@ interface ApplicationDialogProps {
 
 export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: ApplicationDialogProps) {
     const [selectedResumeId, setSelectedResumeId] = useState<string>('')
+    const [tailoringLevel, setTailoringLevel] = useState<TailoringLevel>('light')
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes()
     const { createApplication } = useApplicationMutations()
     const { data: matchDetail } = useQuery({
@@ -48,12 +50,13 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
             {
                 job_id: jobId,
                 resume_template_id: selectedResumeId,
-                tailoring_level: 'light'
+                tailoring_level: tailoringLevel
             },
             {
                 onSuccess: () => {
                     onOpenChange(false)
                     setSelectedResumeId('')
+                    setTailoringLevel('light')
                 }
             }
         )
@@ -61,6 +64,11 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
 
     const resumes = resumesData?.items || []
     const recommendedResumeId = matchDetail?.recommended_resume?.id
+
+    useEffect(() => {
+        if (!open) return
+        setTailoringLevel('light')
+    }, [open])
 
     useEffect(() => {
         const recommendedId = matchDetail?.recommended_resume?.id
@@ -139,6 +147,22 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                                         </SelectItem>
                                     ))
                                 )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="tailoring-level">Tailoring Level</Label>
+                        <Select
+                            value={tailoringLevel}
+                            onValueChange={(value) => setTailoringLevel(value as TailoringLevel)}
+                        >
+                            <SelectTrigger id="tailoring-level">
+                                <SelectValue placeholder="Select tailoring level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="light">Light</SelectItem>
+                                <SelectItem value="moderate">Moderate</SelectItem>
+                                <SelectItem value="deep">Deep</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

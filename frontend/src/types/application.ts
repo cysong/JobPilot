@@ -9,6 +9,8 @@ export type ApplicationStatus =
     | 'Rejected'
     | 'Failed';
 
+export type TailoringLevel = 'light' | 'moderate' | 'deep'
+
 export interface Application {
     id: string;
     user_id: string;
@@ -17,7 +19,7 @@ export interface Application {
     source_resume_id: string;
     resume_document_id?: string;
     cover_letter_document_id?: string;
-    tailoring_level: string;
+    tailoring_level: TailoringLevel;
     last_error?: string;
     created_at: string;
     updated_at: string;
@@ -35,7 +37,12 @@ export interface Application {
 export interface CreateApplicationRequest {
     job_id: number;
     resume_template_id: string;
-    tailoring_level: 'light';
+    tailoring_level: TailoringLevel;
+}
+
+export interface RetryApplicationRequest {
+    resume_template_id?: string;
+    tailoring_level?: TailoringLevel;
 }
 
 export interface ApplicationListResponse {

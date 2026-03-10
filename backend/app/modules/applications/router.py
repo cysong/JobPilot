@@ -1,7 +1,7 @@
 """Application APIs for creating and managing job applications."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Body
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from app.modules.applications.schemas import (
     ApplicationCreateRequest,
     ApplicationDetail,
     ApplicationListResponse,
+    ApplicationRetryRequest,
 )
 from app.modules.applications.service import ApplicationService
 from app.modules.resumes.schemas import ResumeExportRequest
@@ -159,10 +160,13 @@ async def retry_application_tailor(
     application_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    payload: ApplicationRetryRequest = Body(default_factory=ApplicationRetryRequest),
 ):
     """
     Retry cover letter generation for a failed/stuck application.
     Restart the entire workflow.
     """
-    application = await ApplicationService.retry_application_tailor(db, application_id, current_user)
+    application = await ApplicationService.retry_application_tailor(
+        db, application_id, current_user, payload
+    )
     return application

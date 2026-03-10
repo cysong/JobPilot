@@ -100,7 +100,7 @@ export default function ApplicationListingPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => retryCoverLetter.mutate(app.id)}
+                                            onClick={() => retryCoverLetter.mutate({ id: app.id })}
                                             disabled={retryCoverLetter.isPending}
                                         >
                                             <RefreshCw className={`h-3.5 w-3.5 mr-2 ${retryCoverLetter.isPending ? 'animate-spin' : ''}`} />

@@ -1,5 +1,10 @@
 import client from './client';
-import type { Application, ApplicationListResponse, CreateApplicationRequest } from '@/types/application';
+import type {
+    Application,
+    ApplicationListResponse,
+    CreateApplicationRequest,
+    RetryApplicationRequest,
+} from '@/types/application';
 import type { ResumeExportRequest } from '@/types/resume';
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document';
 
@@ -26,8 +31,8 @@ export const applicationApi = {
         return result;
     },
 
-    retryCoverLetter: async (id: string) => {
-        const result = await client.post<Application, Application>(`/applications/${id}/retry`);
+    retryCoverLetter: async (id: string, data?: RetryApplicationRequest) => {
+        const result = await client.post<Application, Application>(`/applications/${id}/retry`, data || {});
         return result;
     },
 
