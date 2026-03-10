@@ -77,6 +77,9 @@ class TaskRepository:
     ) -> None:
         task.status = TaskStatus.RUNNING
         task.started_at = datetime.utcnow()
+        task.completed_at = None
+        task.execution_time_ms = None
+        task.error_message = None
         task.celery_task_id = celery_task_id
         task.worker_id = worker_id or celery_task_id
         if retry_count is not None:
@@ -94,6 +97,7 @@ class TaskRepository:
     ) -> None:
         task.status = TaskStatus.SUCCESS
         task.output_data = output_data
+        task.error_message = None
         task.completed_at = datetime.utcnow()
         task.execution_time_ms = execution_time_ms
         if retry_count is not None:
@@ -124,7 +128,7 @@ class AICallRepository:
         db: AsyncSession,
         *,
         task_id: str,
-        user_id: int,
+        user_id: Optional[int],
         agent_id: str,
         agent_version: str,
         model: str,
