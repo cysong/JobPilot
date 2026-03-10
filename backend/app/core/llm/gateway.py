@@ -1,6 +1,7 @@
 """Unified gateway for executing Agents with logging."""
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any, Optional
 
@@ -11,7 +12,7 @@ from agents.run_config import RunConfig
 
 from app.core.database import async_session_factory
 from app.core.llm.agent_loader import AgentLoader
-from app.core.llm.config import MODEL_PRICING
+from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
 from app.core.llm.types import GatewayContext
 from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
@@ -110,11 +111,20 @@ class AgentGateway:
         Returns:
             Tuple of (final_output, usage)
         """
-        result = await Runner.run(
-            agent,
-            input_data,
-            run_config=RUN_CONFIG_REASONING_IDS_OMIT,
-        )
+        run_kwargs: dict[str, Any] = {
+            "run_config": RUN_CONFIG_REASONING_IDS_OMIT,
+        }
+        if llm_gateway_settings.AGENT_MAX_TURNS > 0:
+            run_kwargs["max_turns"] = llm_gateway_settings.AGENT_MAX_TURNS
+
+        call_coro = Runner.run(agent, input_data, **run_kwargs)
+        if llm_gateway_settings.AGENT_DEFAULT_TIMEOUT > 0:
+            result = await asyncio.wait_for(
+                call_coro,
+                timeout=llm_gateway_settings.AGENT_DEFAULT_TIMEOUT,
+            )
+        else:
+            result = await call_coro
         usage = getattr(
             getattr(result, "context_wrapper", None), "usage", None)
         final_output = getattr(result, "final_output", None)
@@ -172,6 +182,7 @@ class AgentGateway:
         context: GatewayContext,
     ) -> None:
         """Log failed agent call."""
+        error_details = self._extract_error_details(error)
         logger.error(
             "agent_call_failed",
             agent_id=agent_id,
@@ -179,8 +190,19 @@ class AgentGateway:
             model=getattr(agent, "model", None),
             status=error_type,
             error=str(error),
+            error_class=error_details["error_class"],
+            error_message=error_details["error_message"],
+            error_args=error_details["error_args"],
+            cause_class=error_details["cause_class"],
+            cause_message=error_details["cause_message"],
+            context_class=error_details["context_class"],
+            context_message=error_details["context_message"],
+            turn_limit_hit=error_details["turn_limit_hit"],
+            schema_related=error_details["schema_related"],
+            max_turns_setting=llm_gateway_settings.AGENT_MAX_TURNS,
             latency_ms=latency_ms,
             operation=context.get("operation"),
+            exc_info=True,
         )
 
     async def _record_ai_call(
@@ -213,6 +235,7 @@ class AgentGateway:
             "ratelimit": AICallStatus.FAILED,
             "timeout": AICallStatus.FAILED,
             "auth_error": AICallStatus.FAILED,
+            "max_turns": AICallStatus.FAILED,
         }
         ai_call_status = status_map.get(status, AICallStatus.FAILED)
 
@@ -269,6 +292,7 @@ class AgentGateway:
     def _classify_error(error: Exception) -> str:
         """Classify error type for metrics."""
         error_name = type(error).__name__
+        error_message = str(error).lower()
 
         if "RateLimit" in error_name:
             return "ratelimit"
@@ -276,7 +300,33 @@ class AgentGateway:
             return "timeout"
         if "Authentication" in error_name or "Auth" in error_name:
             return "auth_error"
+        if "max turns exceeded" in error_message or "max_turns" in error_message:
+            return "max_turns"
         return "error"
+
+    @staticmethod
+    def _extract_error_details(error: Exception) -> dict[str, Any]:
+        """Extract structured error details to simplify root-cause analysis."""
+        cause = error.__cause__
+        context = error.__context__
+        error_message = str(error)
+        error_message_lower = error_message.lower()
+        cause_message = str(cause) if cause else ""
+        context_message = str(context) if context else ""
+        joined = f"{error_message_lower} {cause_message.lower()} {context_message.lower()}"
+        schema_keywords = ("schema", "validation", "pydantic", "json", "output_type")
+
+        return {
+            "error_class": type(error).__name__,
+            "error_message": error_message,
+            "error_args": [str(arg) for arg in error.args[:5]],
+            "cause_class": type(cause).__name__ if cause else None,
+            "cause_message": cause_message or None,
+            "context_class": type(context).__name__ if context else None,
+            "context_message": context_message or None,
+            "turn_limit_hit": "max turns exceeded" in joined or "max_turns" in joined,
+            "schema_related": any(keyword in joined for keyword in schema_keywords),
+        }
 
     @staticmethod
     def _calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:

@@ -10,8 +10,9 @@ class LLMGatewaySettings(BaseSettings):
     # Agent config directory
     AGENT_CONFIG_DIR: str = "agent_configs/config"
 
-    # Default timeouts
-    AGENT_DEFAULT_TIMEOUT: int = 60
+    # Gateway safeguards
+    AGENT_DEFAULT_TIMEOUT: int = 180
+    AGENT_MAX_TURNS: int = 6
 
     # Cache settings
     ENABLE_JD_CACHE: bool = True
