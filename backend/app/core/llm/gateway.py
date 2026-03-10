@@ -9,6 +9,7 @@ from agents import Agent, Runner
 from agents import Usage
 from agents.run_config import RunConfig
 
+from app.core.database import async_session_factory
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING
 from app.core.llm.types import GatewayContext
@@ -198,12 +199,11 @@ class AgentGateway:
 
         Creates an ai_call record for tracking and analytics.
         """
-        db = context.get("db")
         task_id = context.get("task_id")
         user_id = context.get("user_id")
 
-        # Skip recording if missing required context
-        if not db or not task_id:
+        # Skip recording if missing required task context
+        if not task_id:
             return
 
         # Map status string to AICallStatus enum
@@ -229,29 +229,41 @@ class AgentGateway:
         version = getattr(agent, "config_version", None)
         agent_version_str = str(version) if version is not None else ""
 
-        await AICallRepository.create(
-            db,
-            task_id=task_id,
-            user_id=user_id,
-            agent_id=agent_id,
-            agent_version=agent_version_str,
-            model=getattr(agent, "model", ""),
-            status=ai_call_status,
-            latency_ms=latency_ms,
-            input_tokens=getattr(usage, "input_tokens",
-                                 None) if usage else None,
-            output_tokens=getattr(usage, "output_tokens",
-                                  None) if usage else None,
-            total_tokens=getattr(usage, "total_tokens",
-                                 None) if usage else None,
-            requests=getattr(usage, "requests", None) if usage else None,
-            estimated_cost=estimated_cost,
-            error_message=error_message,
-            meta={
-                "operation": context.get("operation"),
-                "agent_id": agent_id,
-            },
-        )
+        try:
+            # Persist usage records in an independent transaction so task rollbacks
+            # don't erase observability data on failures/retries.
+            async with async_session_factory() as db:
+                await AICallRepository.create(
+                    db,
+                    task_id=task_id,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    agent_version=agent_version_str,
+                    model=getattr(agent, "model", ""),
+                    status=ai_call_status,
+                    latency_ms=latency_ms,
+                    input_tokens=getattr(usage, "input_tokens",
+                                         None) if usage else None,
+                    output_tokens=getattr(usage, "output_tokens",
+                                          None) if usage else None,
+                    total_tokens=getattr(usage, "total_tokens",
+                                         None) if usage else None,
+                    requests=getattr(usage, "requests", None) if usage else None,
+                    estimated_cost=estimated_cost,
+                    error_message=error_message,
+                    meta={
+                        "operation": context.get("operation"),
+                        "agent_id": agent_id,
+                    },
+                )
+                await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "ai_call_record_failed",
+                task_id=task_id,
+                agent_id=agent_id,
+                error=str(exc),
+            )
 
     @staticmethod
     def _classify_error(error: Exception) -> str:
