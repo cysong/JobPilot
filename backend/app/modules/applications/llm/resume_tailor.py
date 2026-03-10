@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -168,12 +169,17 @@ def _build_tailoring_prompt(
     clipped_source = _clip_source_resume(source_content)
     selected_skills = _select_skills_for_prompt(user_skills, job_analysis)
 
-    job_json = job_analysis.model_dump_json(indent=2)
-    normalized_skills = [
-        {"name": skill["name"], "proficiency": skill.get("proficiency")}
-        for skill in selected_skills
-    ]
-    user_skills_json = json.dumps(normalized_skills, ensure_ascii=True, indent=2)
+    job_payload = _prune_empty_values(job_analysis.model_dump())
+    job_json = json.dumps(job_payload, ensure_ascii=True, separators=(",", ":"))
+    normalized_skills = _prune_empty_values(
+        [
+            {"name": skill["name"], "proficiency": skill.get("proficiency")}
+            for skill in selected_skills
+        ]
+    )
+    user_skills_json = json.dumps(
+        normalized_skills, ensure_ascii=True, separators=(",", ":")
+    )
 
     prompt = (
         f"tailoring_level: {tailoring_level}\n"
@@ -285,3 +291,34 @@ def _proficiency_score(value: object) -> int:
         "beginner": 1,
     }
     return mapping.get(normalized, 0)
+
+
+def _prune_empty_values(value: Any) -> Any:
+    """Recursively remove empty fields to reduce prompt payload size."""
+    if isinstance(value, dict):
+        pruned: dict[str, Any] = {}
+        for key, item in value.items():
+            cleaned = _prune_empty_values(item)
+            if cleaned is None:
+                continue
+            if cleaned == "":
+                continue
+            if isinstance(cleaned, (list, dict)) and not cleaned:
+                continue
+            pruned[key] = cleaned
+        return pruned
+
+    if isinstance(value, list):
+        pruned_list = []
+        for item in value:
+            cleaned = _prune_empty_values(item)
+            if cleaned is None:
+                continue
+            if cleaned == "":
+                continue
+            if isinstance(cleaned, (list, dict)) and not cleaned:
+                continue
+            pruned_list.append(cleaned)
+        return pruned_list
+
+    return value
