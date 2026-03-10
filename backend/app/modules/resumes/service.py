@@ -510,7 +510,7 @@ class ResumeService:
         Task sequence:
         1. RESUME_ANALYSIS - Analyzes resume, outputs skills_updated/skills_deleted/is_draft
         2. SKILL_AGGREGATION - Conditionally aggregates skills (checks RESUME_ANALYSIS output)
-        3. USER_JOB_MATCHING - Matches user with recent jobs (depends on skill aggregation)
+        USER_JOB_MATCHING is temporarily disabled to stop creating new matching jobs.
         """
         return await TaskService.submit_sequential_tasks(
             db=db,
@@ -530,11 +530,11 @@ class ResumeService:
                         "user_id": user_id,
                         "resume_id": resume_id,
                     },
-                ),
-                TaskSubmissionSpec(
-                    task_type=TaskType.USER_JOB_MATCHING,
-                    entity_id=str(user_id),  # Convert int to str for entity_id
-                    input_data={"user_id": user_id, "days": 30},  # Remove resume_id - not accepted by task
-                ),
+                )
+                # TaskSubmissionSpec(
+                #     task_type=TaskType.USER_JOB_MATCHING,
+                #     entity_id=str(user_id),  # Convert int to str for entity_id
+                #     input_data={"user_id": user_id, "days": 30},  # Remove resume_id - not accepted by task
+                # ),
             ],
         )
