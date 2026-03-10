@@ -85,6 +85,21 @@ async def update_tailoring_progress(
     await db.commit()
 
 
+async def mark_application_failed(
+    db: AsyncSession,
+    application_id: str,
+    error: str,
+) -> None:
+    """Mark application as failed from application-specific workflow tasks."""
+    app = await ApplicationRepository.get_by_id(db, application_id)
+    if not app:
+        logger.warning(f"Application {application_id} not found for failure update")
+        return
+
+    await ApplicationRepository.mark_failed(db, app, error)
+    await db.commit()
+
+
 @celery_app.task(base=DBTrackingTask, bind=True)
 async def application_initialization_task(
     self,
@@ -104,96 +119,111 @@ async def application_initialization_task(
     """
     db = self.db
 
-    # Adjust logging and progress message based on retry status
-    if is_retry:
-        logger.info(f"Retrying application workflow for app_id={application_id}")
-        progress_msg = "Retrying workflow from source resume..."
-    else:
-        logger.info(f"Initializing application workflow for app_id={application_id}")
-        progress_msg = "Planning workflow steps..."
+    try:
+        # Adjust logging and progress message based on retry status
+        if is_retry:
+            logger.info(f"Retrying application workflow for app_id={application_id}")
+            progress_msg = "Retrying workflow from source resume..."
+        else:
+            logger.info(f"Initializing application workflow for app_id={application_id}")
+            progress_msg = "Planning workflow steps..."
 
-    await update_tailoring_progress(
-        db, application_id, "initialization", progress_msg, "in_progress"
-    )
-
-    tasks_to_submit: list[TaskSubmissionSpec] = []
-    
-    # 1. Check Job Analysis
-    job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
-    # TODO: Check version mismatch if strictly required, similar to original logic
-    if not job_analysis:
-        logger.info(f"Job {job_id} analysis missing, adding analysis task.")
-        tasks_to_submit.append(TaskSubmissionSpec(
-            task_type=TaskType.JOB_ANALYSIS,
-            input_data={"job_id": job_id},
-        ))
-    else:
         await update_tailoring_progress(
-            db, application_id, "job_analysis", "Using cached job analysis", "skipped"
+            db, application_id, "initialization", progress_msg, "in_progress"
         )
 
-    # 2. Check Resume Analysis
-    # Note: resume_id here is the SOURCE resume ID.
-    resume = await ResumeRepository.get_with_document(db, resume_id)
-    if not resume:
-        raise ValueError(f"Source resume {resume_id} not found")
+        tasks_to_submit: list[TaskSubmissionSpec] = []
+        
+        # 1. Check Job Analysis
+        job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
+        # TODO: Check version mismatch if strictly required, similar to original logic
+        if not job_analysis:
+            logger.info(f"Job {job_id} analysis missing, adding analysis task.")
+            tasks_to_submit.append(TaskSubmissionSpec(
+                task_type=TaskType.JOB_ANALYSIS,
+                input_data={"job_id": job_id},
+            ))
+        else:
+            await update_tailoring_progress(
+                db, application_id, "job_analysis", "Using cached job analysis", "skipped"
+            )
 
-    if not resume.analysis_result:
-        logger.info(f"Resume {resume_id} analysis missing, adding analysis task.")
+        # 2. Check Resume Analysis
+        # Note: resume_id here is the SOURCE resume ID.
+        resume = await ResumeRepository.get_with_document(db, resume_id)
+        if not resume:
+            raise ValueError(f"Source resume {resume_id} not found")
+
+        if not resume.analysis_result:
+            logger.info(f"Resume {resume_id} analysis missing, adding analysis task.")
+            tasks_to_submit.append(TaskSubmissionSpec(
+                task_type=TaskType.RESUME_ANALYSIS,
+                input_data={"resume_id": resume_id},
+            ))
+        else:
+            await update_tailoring_progress(
+                db, application_id, "resume_analysis", "Using cached resume analysis", "skipped"
+            )
+
+        # 3. Resume Tailoring (Always run)
         tasks_to_submit.append(TaskSubmissionSpec(
-            task_type=TaskType.RESUME_ANALYSIS,
-            input_data={"resume_id": resume_id},
+            task_type=TaskType.RESUME_TAILORING,
+            input_data={
+                "application_id": application_id,
+                "resume_id": resume_id,
+                "job_id": job_id,
+                "tailoring_level": tailoring_level,
+                "is_retry": is_retry
+            }
         ))
-    else:
-        await update_tailoring_progress(
-            db, application_id, "resume_analysis", "Using cached resume analysis", "skipped"
+
+        # 4. Cover Letter Generation (Always run)
+        tasks_to_submit.append(TaskSubmissionSpec(
+            task_type=TaskType.COVER_LETTER_GENERATION,
+            input_data={
+                "application_id": application_id,
+                "job_id": job_id,
+                "is_retry": is_retry
+            }
+        ))
+
+        # Submit the chain
+        from app.shared.enums import EntityType
+        
+        created_tasks = await TaskService.submit_sequential_tasks(
+            db=db,
+            entity_type=EntityType.APPLICATION.value,
+            entity_id=application_id,
+            user_id=resume.user_id,
+            tasks=tasks_to_submit
         )
-
-    # 3. Resume Tailoring (Always run)
-    tasks_to_submit.append(TaskSubmissionSpec(
-        task_type=TaskType.RESUME_TAILORING,
-        input_data={
-            "application_id": application_id,
-            "resume_id": resume_id,
-            "job_id": job_id,
-            "tailoring_level": tailoring_level,
-            "is_retry": is_retry
+        
+        task_ids = [t.id for t in created_tasks]
+        await update_tailoring_progress(
+            db, application_id, "initialization", f"Workflow planned: {len(created_tasks)} steps", "completed"
+        )
+        
+        return {
+            "output_data": {
+                "workflow_id": created_tasks[0].workflow_id,
+                "task_chain": task_ids,
+                "tasks_count": len(created_tasks)
+            }
         }
-    ))
-
-    # 4. Cover Letter Generation (Always run)
-    tasks_to_submit.append(TaskSubmissionSpec(
-        task_type=TaskType.COVER_LETTER_GENERATION,
-        input_data={
-            "application_id": application_id,
-            "job_id": job_id,
-            "is_retry": is_retry
-        }
-    ))
-
-    # Submit the chain
-    from app.shared.enums import EntityType
-    
-    created_tasks = await TaskService.submit_sequential_tasks(
-        db=db,
-        entity_type=EntityType.APPLICATION.value,
-        entity_id=application_id,
-        user_id=resume.user_id,
-        tasks=tasks_to_submit
-    )
-    
-    task_ids = [t.id for t in created_tasks]
-    await update_tailoring_progress(
-        db, application_id, "initialization", f"Workflow planned: {len(created_tasks)} steps", "completed"
-    )
-    
-    return {
-        "output_data": {
-            "workflow_id": created_tasks[0].workflow_id,
-            "task_chain": task_ids,
-            "tasks_count": len(created_tasks)
-        }
-    }
+    except Exception as exc:
+        await update_tailoring_progress(
+            db,
+            application_id,
+            "initialization",
+            f"Initialization failed: {str(exc)[:180]}",
+            "failed",
+        )
+        await mark_application_failed(
+            db,
+            application_id,
+            f"Initialization failed: {str(exc)}",
+        )
+        raise
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
@@ -244,6 +274,11 @@ async def resume_tailoring_task(
             f"Resume tailoring failed: {str(exc)[:180]}",
             "failed",
         )
+        await mark_application_failed(
+            self.db,
+            application_id,
+            f"Resume tailoring failed: {str(exc)}",
+        )
         raise
 
 
@@ -291,5 +326,10 @@ async def cover_letter_generation_task(
             "cover_letter_generation",
             f"Cover letter generation failed: {str(exc)[:180]}",
             "failed",
+        )
+        await mark_application_failed(
+            self.db,
+            application_id,
+            f"Cover letter generation failed: {str(exc)}",
         )
         raise
