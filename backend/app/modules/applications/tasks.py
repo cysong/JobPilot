@@ -221,20 +221,30 @@ async def resume_tailoring_task(
 
     from app.modules.applications.llm.resume_tailor import run_resume_tailoring
 
-    result = await run_resume_tailoring(
-        db=self.db,
-        application_id=application_id,
-        resume_id=resume_id,
-        job_id=job_id,
-        tailoring_level=tailoring_level,
-        task_id=task_id,
-        is_retry=is_retry
-    )
-    
-    await update_tailoring_progress(
-        self.db, application_id, "resume_tailoring", "Resume tailored successfully", "completed"
-    )
-    return result
+    try:
+        result = await run_resume_tailoring(
+            db=self.db,
+            application_id=application_id,
+            resume_id=resume_id,
+            job_id=job_id,
+            tailoring_level=tailoring_level,
+            task_id=task_id,
+            is_retry=is_retry
+        )
+
+        await update_tailoring_progress(
+            self.db, application_id, "resume_tailoring", "Resume tailored successfully", "completed"
+        )
+        return result
+    except Exception as exc:
+        await update_tailoring_progress(
+            self.db,
+            application_id,
+            "resume_tailoring",
+            f"Resume tailoring failed: {str(exc)[:180]}",
+            "failed",
+        )
+        raise
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
@@ -260,17 +270,26 @@ async def cover_letter_generation_task(
     from app.modules.applications.llm.cover_letter_task import run_cover_letter_task
     from app.modules.applications.repositories.application_repo import ApplicationRepository
 
-    application = await ApplicationRepository.get_with_dependencies(self.db, application_id)
+    try:
+        application = await ApplicationRepository.get_with_dependencies(self.db, application_id)
 
-    result = await run_cover_letter_task(
-        db=self.db,
-        application=application,
-        task_id=task_id,
-        is_retry=is_retry,
-    )
-    
-    await update_tailoring_progress(
-        self.db, application_id, "cover_letter_generation", "Cover letter generated", "completed"
-    )
-    
-    return result
+        result = await run_cover_letter_task(
+            db=self.db,
+            application=application,
+            task_id=task_id,
+            is_retry=is_retry,
+        )
+
+        await update_tailoring_progress(
+            self.db, application_id, "cover_letter_generation", "Cover letter generated", "completed"
+        )
+        return result
+    except Exception as exc:
+        await update_tailoring_progress(
+            self.db,
+            application_id,
+            "cover_letter_generation",
+            f"Cover letter generation failed: {str(exc)[:180]}",
+            "failed",
+        )
+        raise
