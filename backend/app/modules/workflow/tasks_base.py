@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from typing import Any
 
@@ -194,6 +195,34 @@ class DBTrackingTask(AsyncBaseTask):
         self._start_time = time.perf_counter()
         return super().__call__(*args, **kwargs)
 
+    @staticmethod
+    def _run_db_coro(coro: Any) -> None:
+        """
+        Execute a coroutine for DB state updates from sync Celery hooks.
+
+        Celery hooks can be called while the worker loop is already running.
+        In that case, running the coroutine in a short-lived thread avoids
+        "This event loop is already running" runtime errors.
+        """
+        loop = get_worker_loop()
+        if loop.is_running():
+            err: list[Exception] = []
+
+            def _runner() -> None:
+                try:
+                    asyncio.run(coro)
+                except Exception as exc:  # noqa: BLE001
+                    err.append(exc)
+
+            thread = threading.Thread(target=_runner, daemon=True)
+            thread.start()
+            thread.join()
+            if err:
+                raise err[0]
+            return
+
+        loop.run_until_complete(coro)
+
     def before_start(self, task_id, args, kwargs):
         """Called before the task starts. Mark as RUNNING."""
         db_task_id = kwargs.get("task_id")
@@ -201,7 +230,7 @@ class DBTrackingTask(AsyncBaseTask):
             try:
                 # Use current retry count from Celery request (0 for first attempt, increments on retry)
                 current_retry_count = getattr(self.request, "retries", 0)
-                get_worker_loop().run_until_complete(
+                self._run_db_coro(
                     self._update_status(db_task_id, "RUNNING", retry_count=current_retry_count)
                 )
                 logger.info(
@@ -232,7 +261,7 @@ class DBTrackingTask(AsyncBaseTask):
             output_data = retval.get("output_data", {}) if isinstance(retval, dict) else {}
 
             try:
-                get_worker_loop().run_until_complete(
+                self._run_db_coro(
                     self._mark_success(db_task_id, output_data, elapsed_ms)
                 )
                 logger.info(
@@ -260,7 +289,7 @@ class DBTrackingTask(AsyncBaseTask):
         db_task_id = kwargs.get("task_id")
         if db_task_id:
             try:
-                get_worker_loop().run_until_complete(
+                self._run_db_coro(
                     self._mark_failed(db_task_id, str(exc))
                 )
                 logger.error(
