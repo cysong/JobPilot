@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import json
 import logging
-import textwrap
+import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_configs.schemas import AnalyzedJob, TailoredResume
 from app.core.llm.gateway import AgentGateway
-from app.core.llm.types import GatewayContext
+from app.modules.applications.config import app_module_settings
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.repository import JobAnalysisRepository
 from app.modules.resumes.repository import DocumentRepository, ResumeRepository
@@ -165,21 +165,119 @@ def _build_tailoring_prompt(
     user_skills: list[dict],
 ) -> str:
     """Construct prompt for resume tailoring."""
+    clipped_source = _clip_source_resume(source_content)
+    selected_skills = _select_skills_for_prompt(user_skills, job_analysis)
 
     job_json = job_analysis.model_dump_json(indent=2)
     normalized_skills = [
-        {
-            "name": skill.get("skill_name", "").strip(),
-            "proficiency": skill.get("proficiency"),
-        }
-        for skill in user_skills
-        if skill.get("skill_name", "").strip()
+        {"name": skill["name"], "proficiency": skill.get("proficiency")}
+        for skill in selected_skills
     ]
     user_skills_json = json.dumps(normalized_skills, ensure_ascii=True, indent=2)
-    
-    return (
+
+    prompt = (
         f"tailoring_level: {tailoring_level}\n"
         f"job_analysis: {job_json}\n\n"
         f"user_skills: {user_skills_json}\n\n"
-        f"source_resume_markdown: |\n{source_content}\n"
+        f"source_resume_markdown: |\n{clipped_source}\n"
     )
+
+    # Final guardrail for very large payloads.
+    max_prompt_chars = app_module_settings.RESUME_TAILOR_MAX_PROMPT_CHARS
+    if max_prompt_chars > 0 and len(prompt) > max_prompt_chars:
+        overflow = len(prompt) - max_prompt_chars
+        trimmed_len = max(1, len(clipped_source) - overflow - 256)
+        clipped_source = clipped_source[:trimmed_len]
+        prompt = (
+            f"tailoring_level: {tailoring_level}\n"
+            f"job_analysis: {job_json}\n\n"
+            f"user_skills: {user_skills_json}\n\n"
+            f"source_resume_markdown: |\n{clipped_source}\n"
+        )
+        logger.warning(
+            "resume_tailor_prompt_trimmed",
+            original_prompt_chars=len(prompt) + overflow,
+            final_prompt_chars=len(prompt),
+        )
+
+    return prompt
+
+
+def _clip_source_resume(source_content: str) -> str:
+    max_chars = app_module_settings.RESUME_TAILOR_MAX_SOURCE_CHARS
+    if max_chars <= 0 or len(source_content) <= max_chars:
+        return source_content
+
+    clipped = source_content[:max_chars]
+    logger.warning(
+        "resume_tailor_source_clipped",
+        original_chars=len(source_content),
+        clipped_chars=len(clipped),
+    )
+    return clipped
+
+
+def _select_skills_for_prompt(user_skills: list[dict], job_analysis: AnalyzedJob) -> list[dict]:
+    max_skills = app_module_settings.RESUME_TAILOR_MAX_SKILLS
+    if max_skills <= 0:
+        max_skills = 40
+
+    jd_terms = _extract_jd_terms(job_analysis)
+    scored: list[tuple[int, int, dict]] = []
+    for idx, skill in enumerate(user_skills):
+        raw_name = (skill.get("skill_name") or "").strip()
+        if not raw_name:
+            continue
+
+        name_norm = _normalize_skill(raw_name)
+        is_jd_match = 1 if name_norm in jd_terms else 0
+        proficiency_score = _proficiency_score(skill.get("proficiency"))
+        score = is_jd_match * 100 + proficiency_score
+        scored.append(
+            (
+                -score,
+                idx,
+                {
+                    "name": raw_name,
+                    "proficiency": skill.get("proficiency"),
+                },
+            )
+        )
+
+    scored.sort(key=lambda item: (item[0], item[1]))
+    selected = [item[2] for item in scored[:max_skills]]
+    if len(scored) > max_skills:
+        logger.info(
+            "resume_tailor_skills_clipped",
+            total_skills=len(scored),
+            selected_skills=len(selected),
+        )
+    return selected
+
+
+def _extract_jd_terms(job_analysis: AnalyzedJob) -> set[str]:
+    candidates = (
+        (job_analysis.required_skills or [])
+        + (job_analysis.preferred_skills or [])
+        + (job_analysis.tech_stack or [])
+    )
+    return {_normalize_skill(str(item)) for item in candidates if str(item).strip()}
+
+
+def _normalize_skill(value: str) -> str:
+    lowered = value.lower().strip()
+    lowered = re.sub(r"[^a-z0-9+#.\-/ ]+", "", lowered)
+    return re.sub(r"\s+", " ", lowered)
+
+
+def _proficiency_score(value: object) -> int:
+    if value is None:
+        return 0
+    normalized = str(value).lower().strip()
+    mapping = {
+        "expert": 4,
+        "advanced": 3,
+        "intermediate": 2,
+        "beginner": 1,
+    }
+    return mapping.get(normalized, 0)
