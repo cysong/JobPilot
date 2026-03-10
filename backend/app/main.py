@@ -13,8 +13,11 @@ from app.core.cache import RedisBackend
 from app.core.config import settings
 from app.core.custom_route import CustomAPIRoute
 from app.core.exceptions import JobPilotException
+from app.core.logging_config import configure_logging
 from app.core.response_codes import ResponseCode
 from fastapi_cache import FastAPICache
+
+configure_logging("api")
 
 
 @asynccontextmanager

@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
+    LOG_MAX_BYTES: int = 10_485_760  # 10 MB per file
+    LOG_BACKUP_COUNT: int = 10
+
     # Cache
     CACHE_ENABLED: bool = True
 

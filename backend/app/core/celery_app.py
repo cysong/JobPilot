@@ -37,6 +37,8 @@ celery_app.conf.update(
         "connect_timeout": 3,
         "socket_timeout": 5,
     },
+    # Keep the application's logging config (file handlers + formatters)
+    worker_hijack_root_logger=False,
 )
 
 # Discover tasks from application modules
