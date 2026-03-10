@@ -196,8 +196,10 @@ def _build_tailoring_prompt(
         )
         logger.warning(
             "resume_tailor_prompt_trimmed",
-            original_prompt_chars=len(prompt) + overflow,
-            final_prompt_chars=len(prompt),
+            extra={
+                "original_prompt_chars": len(prompt) + overflow,
+                "final_prompt_chars": len(prompt),
+            },
         )
 
     return prompt
@@ -249,8 +251,10 @@ def _select_skills_for_prompt(user_skills: list[dict], job_analysis: AnalyzedJob
     if len(scored) > max_skills:
         logger.info(
             "resume_tailor_skills_clipped",
-            total_skills=len(scored),
-            selected_skills=len(selected),
+            extra={
+                "total_skills": len(scored),
+                "selected_skills": len(selected),
+            },
         )
     return selected
 
