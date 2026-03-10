@@ -277,15 +277,13 @@ class ResumeService:
         if was_formal:
             await TaskService.submit_task(
                 db=db,
-                spec=TaskSubmissionSpec(
-                    task_type=TaskType.SKILL_AGGREGATION,
-                    entity_id=resume_id,
-                    user_id=user_id,
-                    input_data={
-                        "user_id": user_id,
-                        "resume_id": resume_id,
-                    },
-                ),
+                task_type=TaskType.SKILL_AGGREGATION,
+                entity_id=resume_id,
+                user_id=user_id,
+                input_data={
+                    "user_id": user_id,
+                    "resume_id": resume_id,
+                },
             )
             await db.commit()
 
