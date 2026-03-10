@@ -114,8 +114,11 @@ class AgentGateway:
         run_kwargs: dict[str, Any] = {
             "run_config": RUN_CONFIG_REASONING_IDS_OMIT,
         }
-        if llm_gateway_settings.AGENT_MAX_TURNS > 0:
-            run_kwargs["max_turns"] = llm_gateway_settings.AGENT_MAX_TURNS
+        max_turns = getattr(agent, "max_turns", None)
+        if not isinstance(max_turns, int) or max_turns <= 0:
+            max_turns = llm_gateway_settings.AGENT_MAX_TURNS
+        if max_turns > 0:
+            run_kwargs["max_turns"] = max_turns
 
         call_coro = Runner.run(agent, input_data, **run_kwargs)
         if llm_gateway_settings.AGENT_DEFAULT_TIMEOUT > 0:

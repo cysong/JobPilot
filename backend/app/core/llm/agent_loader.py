@@ -97,6 +97,7 @@ class AgentLoader:
         agent = Agent(**agent_kwargs)
         setattr(agent, "agent_id", agent_id)
         setattr(agent, "config_version", config.get("version"))
+        setattr(agent, "max_turns", self._resolve_max_turns(config, agent_id))
 
         # Store in cache if enabled
         if settings.CACHE_ENABLED:
@@ -185,3 +186,14 @@ class AgentLoader:
             raise ValueError(
                 f"Unknown output_type '{output_type_name}' in agent config")
         return schema
+
+    def _resolve_max_turns(self, config: dict[str, Any], agent_id: str) -> int | None:
+        """Resolve optional per-agent max_turns override from YAML."""
+        max_turns = config.get("max_turns")
+        if max_turns is None:
+            return None
+        if not isinstance(max_turns, int) or max_turns <= 0:
+            raise ValueError(
+                f"Invalid max_turns for agent '{agent_id}': expected positive integer"
+            )
+        return max_turns

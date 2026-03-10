@@ -1,6 +1,7 @@
 version: 1
 name: resume_tailor
 model: gpt-5
+max_turns: 3
 model_settings:
   max_tokens: 5000
   reasoning:
