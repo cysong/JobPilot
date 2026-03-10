@@ -12,6 +12,7 @@ from celery import chain
 from sqlalchemy import and_, or_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import BadRequestError, JobPilotException, NotFoundError
 
 from app.modules.admin.schemas import (
@@ -276,6 +277,107 @@ class TaskService:
         )
 
     @staticmethod
+    def _get_broker_task_ids() -> set[str]:
+        """
+        Collect task IDs currently visible in broker/worker snapshots.
+
+        We inspect active/reserved/scheduled queues and extract Celery task IDs.
+        """
+        from app.core.celery_app import celery_app
+
+        inspector = celery_app.control.inspect()
+        active = inspector.active() or {}
+        reserved = inspector.reserved() or {}
+        scheduled = inspector.scheduled() or {}
+
+        task_ids: set[str] = set()
+
+        def _extract_task_id(item: Any) -> str | None:
+            if not isinstance(item, dict):
+                return None
+
+            direct_id = item.get("id")
+            if isinstance(direct_id, str) and direct_id:
+                return direct_id
+
+            request = item.get("request")
+            if isinstance(request, dict):
+                request_id = request.get("id")
+                if isinstance(request_id, str) and request_id:
+                    return request_id
+
+            return None
+
+        for snapshot in (active, reserved, scheduled):
+            for items in snapshot.values():
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    task_id = _extract_task_id(item)
+                    if task_id:
+                        task_ids.add(task_id)
+
+        return task_ids
+
+    @staticmethod
+    def _is_task_stale(task: TaskExecution, now: datetime) -> bool:
+        """Return True when pending/running task exceeds stale timeout."""
+        timeout = timedelta(minutes=settings.TASK_RETRY_STALE_TIMEOUT_MINUTES)
+
+        if task.status == TaskStatus.PENDING:
+            reference_time = task.created_at
+        elif task.status == TaskStatus.RUNNING:
+            reference_time = task.started_at or task.created_at
+        else:
+            return False
+
+        if reference_time is None:
+            return False
+        if reference_time.tzinfo is None:
+            reference_time = reference_time.replace(tzinfo=timezone.utc)
+
+        return reference_time <= (now - timeout)
+
+    @staticmethod
+    def _can_retry_anchor_task(
+        task: TaskExecution,
+        *,
+        now: datetime,
+        broker_task_ids: set[str],
+    ) -> tuple[bool, str]:
+        """
+        Decide if the workflow anchor task can be manually retried.
+
+        Allowed:
+        - FAILED tasks
+        - PENDING/RUNNING tasks that are stale and no longer present in broker snapshot
+        """
+        if task.status == TaskStatus.FAILED:
+            return True, "failed"
+
+        if task.status in {TaskStatus.PENDING, TaskStatus.RUNNING}:
+            if not TaskService._is_task_stale(task, now):
+                return (
+                    False,
+                    f"Task {task.id} is {task.status.value} but not stale enough for retry "
+                    f"(threshold: {settings.TASK_RETRY_STALE_TIMEOUT_MINUTES} minutes).",
+                )
+
+            if task.celery_task_id and task.celery_task_id in broker_task_ids:
+                return (
+                    False,
+                    f"Task {task.id} is still present in broker queues/active workers "
+                    f"(celery_task_id={task.celery_task_id}).",
+                )
+
+            return True, "stale_no_broker_presence"
+
+        return (
+            False,
+            f"Task {task.id} in status {task.status.value} is not eligible for manual retry.",
+        )
+
+    @staticmethod
     async def get_tasks(
         db: AsyncSession,
         *,
@@ -328,7 +430,7 @@ class TaskService:
             ai_cost_map = {task_id: cost for task_id, cost in cost_rows.all()}
 
         now = datetime.now(timezone.utc)
-        timeout_threshold = now - timedelta(minutes=10)
+        timeout_threshold = now - timedelta(minutes=settings.TASK_RETRY_STALE_TIMEOUT_MINUTES)
 
         items = []
         for task in rows:
@@ -469,6 +571,15 @@ class TaskService:
         start_idx = next((idx for idx, t in enumerate(workflow_tasks) if t.status != TaskStatus.SUCCESS), None)
         if start_idx is None:
             raise BadRequestError("All tasks already succeeded")
+        anchor_task = workflow_tasks[start_idx]
+        broker_task_ids = TaskService._get_broker_task_ids()
+        retryable, reason = TaskService._can_retry_anchor_task(
+            anchor_task,
+            now=datetime.now(timezone.utc),
+            broker_task_ids=broker_task_ids,
+        )
+        if not retryable:
+            raise BadRequestError(reason)
 
         to_retry = workflow_tasks[start_idx:]
         signatures = []
@@ -542,7 +653,7 @@ class TaskService:
                 results.append(
                     BatchRetryResult(
                         original_task_id=tid,
-                        new_task_id=retry_resp.new_task_id,
+                        new_task_id=(retry_resp.retried_task_ids[0] if retry_resp.retried_task_ids else None),
                         status="success",
                     )
                 )

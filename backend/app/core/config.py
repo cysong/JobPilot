@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Workflow task retry
+    TASK_RETRY_STALE_TIMEOUT_MINUTES: int = 10
+
     # Document Export (Resume, Cover Letter, etc.)
     # Default PDF template for all document types
     EXPORT_DEFAULT_TEMPLATE: str = "modern"

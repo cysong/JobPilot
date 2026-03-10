@@ -7,6 +7,7 @@ from typing import Any, Optional
 import structlog
 from agents import Agent, Runner
 from agents import Usage
+from agents.run_config import RunConfig
 
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING
@@ -15,6 +16,7 @@ from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
 
 logger = structlog.get_logger()
+RUN_CONFIG_REASONING_IDS_OMIT = RunConfig(reasoning_item_id_policy="omit")
 
 
 class AgentGateway:
@@ -107,7 +109,11 @@ class AgentGateway:
         Returns:
             Tuple of (final_output, usage)
         """
-        result = await Runner.run(agent, input_data)
+        result = await Runner.run(
+            agent,
+            input_data,
+            run_config=RUN_CONFIG_REASONING_IDS_OMIT,
+        )
         usage = getattr(
             getattr(result, "context_wrapper", None), "usage", None)
         final_output = getattr(result, "final_output", None)
