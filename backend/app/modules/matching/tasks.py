@@ -165,7 +165,7 @@ async def analyze_match_with_ai_task(
         )
         await self.db.commit()
     except Exception as exc:  # noqa: BLE001
-        if self.request.retries < self.max_retries:
+        if self._should_retry_exception(exc) and self.request.retries < self.max_retries:
             raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
         raise
 

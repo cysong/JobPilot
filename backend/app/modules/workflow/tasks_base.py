@@ -9,6 +9,14 @@ from typing import Any
 from celery import Task
 from celery.exceptions import Ignore, Retry
 from celery.utils.time import get_exponential_backoff_interval
+from openai import (
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
@@ -28,6 +36,15 @@ class AsyncBaseTask(Task):
 
     # Native Celery retry configuration
     autoretry_for = (Exception,)    # Retry on any exception
+    dont_autoretry_for = (
+        ValueError,
+        BadRequestError,           # 400: invalid params/content for the request
+        AuthenticationError,       # 401: API key / auth config issue
+        PermissionDeniedError,     # 403: key lacks permission
+        NotFoundError,             # 404: model/resource not found
+        ConflictError,             # 409: conflicting request state
+        UnprocessableEntityError,  # 422: semantic validation failure
+    )
     max_retries = 3                  # Maximum retry attempts (default)
     retry_backoff = True             # Exponential backoff between retries
     retry_backoff_max = 600          # Max backoff time (10 minutes)
@@ -103,6 +120,9 @@ class AsyncBaseTask(Task):
         if isinstance(exc, (Ignore, Retry)):
             return
 
+        if not self._should_retry_exception(exc):
+            return
+
         # Get autoretry configuration from task attributes
         autoretry_for = getattr(self, 'autoretry_for', ())
         dont_autoretry_for = getattr(self, 'dont_autoretry_for', ())
@@ -133,6 +153,16 @@ class AsyncBaseTask(Task):
         # Call Celery's retry method, which will raise Retry exception
         # The throw=True (default) causes it to raise, which stops propagation
         raise self.retry(exc=exc, **retry_kwargs)
+
+    def _should_retry_exception(self, exc: Exception) -> bool:
+        """
+        Return True when an exception is likely transient.
+
+        Current policy:
+        - Retry transient infra/API failures (timeouts, connection, 5xx, 429).
+        - Do not retry deterministic request/data errors (validation, auth, missing data).
+        """
+        return not isinstance(exc, getattr(self, "dont_autoretry_for", ()))
 
     @property
     def db(self) -> AsyncSession:
