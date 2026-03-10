@@ -78,7 +78,12 @@ class Application(Base, TimestampMixin):
         index=True,
     )
     tailoring_level: Mapped[TailoringLevel] = mapped_column(
-        SQLEnum(TailoringLevel, native_enum=False),
+        SQLEnum(
+            TailoringLevel,
+            native_enum=False,
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            validate_strings=True,
+        ),
         default=TailoringLevel.LIGHT,
         nullable=False,
     )
