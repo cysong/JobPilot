@@ -173,10 +173,6 @@ class TailoredResume(BaseModel):
     __version__ = "v1.0.0"
 
     content: str = Field(..., description="Tailored resume content in markdown")
-    notes: list[str] = Field(
-        default_factory=list,
-        description="Optional bullet notes describing how the resume was tailored",
-    )
 
 
 class TranslatedText(BaseModel):

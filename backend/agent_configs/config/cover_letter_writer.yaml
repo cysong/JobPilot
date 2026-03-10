@@ -4,8 +4,8 @@ model: gpt-5
 model_settings:
   max_tokens: 5000
   reasoning:
-    effort: medium
-  verbosity: high
+    effort: low
+  verbosity: low
 
 instructions: |
   You are an expert technical cover letter strategist.
