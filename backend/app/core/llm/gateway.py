@@ -119,10 +119,16 @@ class AgentGateway:
 
         call_coro = Runner.run(agent, input_data, **run_kwargs)
         if llm_gateway_settings.AGENT_DEFAULT_TIMEOUT > 0:
-            result = await asyncio.wait_for(
-                call_coro,
-                timeout=llm_gateway_settings.AGENT_DEFAULT_TIMEOUT,
-            )
+            timeout_seconds = llm_gateway_settings.AGENT_DEFAULT_TIMEOUT
+            try:
+                result = await asyncio.wait_for(
+                    call_coro,
+                    timeout=timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise TimeoutError(
+                    f"Agent call timed out after {timeout_seconds}s"
+                ) from exc
         else:
             result = await call_coro
         usage = getattr(
