@@ -2,7 +2,6 @@ version: 1
 name: cover_letter_writer
 model: gpt-5
 model_settings:
-  temperature: 0.5
   max_tokens: 5000
   reasoning:
     effort: medium
