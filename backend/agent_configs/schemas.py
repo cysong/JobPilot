@@ -147,9 +147,7 @@ class CoverLetterDraft(BaseModel):
     # Schema version (class-level constant)
     __version__ = "v1.0.0"
 
-    opening: str
-    body_paragraphs: list[str]
-    closing: str
+    content: str = Field(..., description="Complete cover letter in markdown/plain text")
     word_count: int
 
 
