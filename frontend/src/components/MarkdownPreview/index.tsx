@@ -1,5 +1,6 @@
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 
@@ -32,7 +33,7 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   return (
     <div className="prose prose-slate max-w-none min-h-full p-8">
       <Markdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
         components={{
           h1: ({ children }) => <h1 className="text-2xl font-bold mb-4">{children}</h1>,
