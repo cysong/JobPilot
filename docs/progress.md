@@ -5,11 +5,132 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-10
+**Last Updated:** 2026-03-11
 
 ---
 
 ## Work Log
+
+### 2026-03-11 - Applications Listing: Search + Status Filter + Pagination Params
+
+**Completed Tasks:**
+- Extended `GET /api/v1/applications` to support query params:
+  - `keyword`
+  - `status`
+  - `page`
+  - `page_size`
+- Added backend filtering in application repository:
+  - Keyword search on job title/company fields
+  - Exact status filter
+  - Kept pagination + created-at descending sort
+- Updated frontend applications API/hook typing to use filter object:
+  - `ApplicationListRequest` with `keyword/status/page/page_size`
+- Refactored Applications listing page to URL-param-driven behavior:
+  - Search input bound to `keyword`
+  - Status dropdown bound to `status`
+  - Pagination bound to `page`
+  - `page_size` preserved in URL/query
+  - Reset/Clear filters UX
+- Improved empty-state copy for filtered results ("no matches" vs "no applications yet").
+
+### 2026-03-11 - Applications Listing UX: Keep Filters Stable During Refetch
+
+**Completed Tasks:**
+- Updated applications query hook to keep previous page data during filter/pagination refetch (`placeholderData: keepPreviousData`).
+- Refactored applications listing page loading behavior so search/filter controls remain mounted while results refresh.
+- Added lightweight in-page refetch indicator (`Updating results...`) instead of full-page loading replacement.
+
+### 2026-03-11 - Application Detail Header Alignment Fix
+
+**Completed Tasks:**
+- Removed negative left margin on the header back button in application detail page (`-ml-2` -> removed) to align header operation content with the job card visual width.
+
+### 2026-03-11 - Tailoring Level Enum Validation + Configurable Retry Flow
+
+**Completed Tasks:**
+- Added strict tailoring level enum support (`light`, `moderate`, `deep`) in application domain schemas/models.
+- Added DB migration with `applications.tailoring_level` check constraint and invalid historical value normalization.
+- Extended retry API to accept optional payload:
+  - `resume_template_id` (switch source resume template on retry)
+  - `tailoring_level` (override tailoring level on retry)
+- Updated retry backend orchestration to rerun only:
+  - `resume_tailoring`
+  - `cover_letter_generation`
+- Added frontend tailoring level selection in application creation dialog (default `light`).
+- Added application detail retry dialog allowing users to reselect template and tailoring level before retry.
+- Fixed retry document-chain handling:
+  - On retry, backend now creates a new working document from selected template.
+  - New working document links to previous application resume document as `parent_id`.
+  - `root_id` is preserved from previous chain and `application.resume_document_id` is updated to the new working document before rerunning tasks.
+
+### 2026-03-11 - Cover Letter Pipeline Simplification (Writer-Only)
+
+**Completed Tasks:**
+- Removed reviewer loop from cover letter generation; pipeline now uses `cover_letter_writer` only.
+- Removed `tailoring_level` from cover-letter task prompt input (resume tailoring still keeps `tailoring_level`).
+- Updated cover letter schema to return full document text directly (`content`) with `word_count`.
+- Updated `cover_letter_writer` prompt to produce complete markdown/plain text and perform internal self-check.
+- Added per-agent override `max_turns: 2` for `cover_letter_writer`.
+- Optimized writer prompt payload with compact JSON and empty-field pruning.
+
+### 2026-03-11 - Resume Tailor Prompt Optimization for ATS + Interview Shortlist
+
+**Completed Tasks:**
+- Rewrote `resume_tailor` agent instructions to optimize for both ATS pass likelihood and recruiter interview shortlist outcomes.
+- Strengthened hard constraints to preserve immutable facts and structure while allowing wording-level refinement in project/work bullets.
+- Added explicit JD-resume overlap strategy and prioritization order:
+  - Summary -> Skills -> top experience bullets.
+- Elevated Summary requirements with concrete rules:
+  - role/seniority positioning,
+  - top JD technical strengths with evidence,
+  - JD-relevant soft trait with evidence.
+- Added final self-check rules to reduce unsupported claims and factual drift.
+
+### 2026-03-11 - Resume Tailor Prompt Compaction & Per-Agent max_turns Override
+
+**Completed Tasks:**
+- Optimized resume tailoring prompt payload construction:
+  - `job_analysis` now uses compact JSON (no indentation).
+  - `user_skills` now uses compact JSON (no indentation).
+  - Added empty-field pruning for prompt payloads (removes `None`, empty strings, empty lists/dicts).
+- Added per-agent `max_turns` override support in LLM agent loading/runtime:
+  - New optional YAML field: `max_turns`.
+  - Default behavior remains global `LLM_AGENT_MAX_TURNS`.
+  - Agent-level `max_turns` now overrides global default when configured.
+- Configured `resume_tailor` with `max_turns: 3` for single-round, no-tool tailoring behavior.
+
+### 2026-03-10 - Celery Task State Consistency & Failure Visibility Fix
+
+**Completed Tasks:**
+- Fixed async hook DB updates in `DBTrackingTask` to avoid `This event loop is already running` by executing hook coroutines safely even when worker loop is active.
+- Improved task state transitions:
+  - `mark_running` now clears stale completion/error fields.
+  - `mark_success` now clears stale error fields.
+- Added explicit failure progress updates for application pipeline tasks:
+  - `resume_tailoring_task` and `cover_letter_generation_task` now set progress step to `failed` on exception.
+- Decoupled AI call metrics persistence from task transaction rollback:
+  - `AgentGateway._record_ai_call` now writes via an independent DB session/transaction.
+
+### 2026-03-10 - Unified Backend Text Log Persistence (API + Celery)
+
+**Completed Tasks:**
+- Added unified logging initializer with rotating file handlers and plain-text formatter:
+  - `backend/app/core/logging_config.py`
+- Added configurable logging settings in backend config:
+  - `LOG_LEVEL`, `LOG_DIR`, `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`
+- Wired logging initialization into process entry points:
+  - `backend/app/main.py` (API -> `logs/api.log`)
+  - `backend/run_celery_worker.py` (worker -> `logs/celery-worker.log`)
+  - `backend/run_celery_beat.py` (beat -> `logs/celery-beat.log`)
+- Ensured Celery keeps application logging configuration:
+  - `worker_hijack_root_logger=False` in `backend/app/core/celery_app.py`
+- Updated environment template with logging variables:
+  - `backend/.env.example`
+
+**Notes:**
+- `ai-calls.log` was intentionally not added; AI logs are written with task logs.
+- Output format is text-only (no JSON logging).
+- API and task logs use different text formats to avoid noisy placeholder fields in API logs.
 
 
 
@@ -23,6 +144,46 @@
 - Updated job detail CTA text from platform-specific wording to generic `Open Original Posting`.
 - Added source badges to Job card and Job detail header.
 - Improved UI fallback behavior: hide classification/sub-classification display when corresponding fields are empty.
+
+### 2026-03-10 - LLM Upgrade (GPT-5 / GPT-5-mini) for Resume & Cover Letter Quality
+
+**Completed Tasks:**
+- Upgraded agent models from GPT-4.1 family to GPT-5 family:
+  - `resume_tailor` -> `gpt-5`
+  - `cover_letter_writer` -> `gpt-5`
+  - `reviewer` -> `gpt-5-mini`
+  - `resume_analyzer`, `job_analyzer`, `match_analyzer`, `universal_translator` -> `gpt-5-mini`
+- Optimized `resume_tailor` prompt for higher-fidelity tailoring with explicit hard constraints and self-check flow:
+  - preserve immutable facts/structure
+  - strengthen JD alignment without hallucination
+  - evidence-grounded `notes` output guidance
+- Optimized `cover_letter_writer` prompt with quality rubric + self-check:
+  - stronger evidence density and role relevance
+  - stricter anti-template / anti-generic style constraints
+  - explicit JSON-only output rules for `CoverLetterDraft`
+- Optimized `reviewer` prompt with deterministic gating rules and actionable issue format:
+  - score thresholds for `needs_revision`
+  - concrete fix-oriented issue requirements
+- Updated backend model pricing config to include `gpt-5` and `gpt-5-mini` so AI cost tracking remains accurate.
+
+### 2026-03-10 - LLM Reasoning Control Support (Agent YAML + Loader)
+
+**Completed Tasks:**
+- Refactored agent configuration format to unified nested `model_settings` in all YAML agents.
+- Extended `AgentLoader` to read and pass `model_settings` directly into `ModelSettings(...)`.
+- Intentionally removed old top-level tuning compatibility (`temperature/max_tokens/top_p` on root level).
+- Added reasoning and verbosity controls per agent:
+  - High reasoning: `resume_tailor`
+  - Medium reasoning: `cover_letter_writer`
+  - Low reasoning: `reviewer`, analyzers, translator
+- Standardized runtime behavior so GPT-5/GPT-5-mini can use reasoning-depth controls from config.
+
+### 2026-03-10 - Resume Deletion Task Submission Bug Fix
+
+**Completed Tasks:**
+- Fixed `delete_resume` formal-resume branch to call `TaskService.submit_task(...)` with the correct signature.
+- Removed incorrect `spec=TaskSubmissionSpec(...)` usage that could raise runtime `TypeError` and block skill aggregation task dispatch.
+- Verified no remaining `submit_task(spec=...)` usage in backend modules.
 
 
 ### 2026-01-08 - Application PDF Export for Tailored Resume & Cover Letter
