@@ -170,22 +170,24 @@ export default function ApplicationDetailPage() {
     };
 
     return (
-      <div className="min-h-screen bg-slate-50 pb-12">
+        <div className="min-h-screen bg-slate-50 pb-12">
         {/* Header */}
-        <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
-          <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="-ml-2 text-slate-600"
-            >
-              <Link to="/applications">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Applications
-              </Link>
-            </Button>
-            <ApplicationStatusBadge status={application.status} />
+        <div className="sticky top-0 z-20 bg-slate-50">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="bg-white border rounded-lg border-slate-200 h-16 px-4 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="text-slate-600"
+              >
+                <Link to="/applications">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Applications
+                </Link>
+              </Button>
+              <ApplicationStatusBadge status={application.status} />
+            </div>
           </div>
         </div>
 
