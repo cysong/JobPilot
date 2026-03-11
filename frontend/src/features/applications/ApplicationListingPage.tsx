@@ -88,9 +88,6 @@ export default function ApplicationListingPage() {
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-slate-900">My Applications</h1>
-                {isFetching && (
-                    <span className="text-sm text-slate-500">Updating results...</span>
-                )}
             </div>
 
             <div className="bg-white rounded-lg border border-slate-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -139,6 +136,10 @@ export default function ApplicationListingPage() {
                 </Button>
             </div>
 
+            <div className="text-sm font-medium text-slate-700">
+                {data?.total ?? 0} Applications Found
+            </div>
+
             {isError && !data ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
                     <p className="text-red-500">Failed to load applications.</p>
@@ -172,7 +173,15 @@ export default function ApplicationListingPage() {
                     )}
                 </div>
             ) : (
-                <div className="grid gap-4">
+                <div className="relative">
+                    {isFetching && (
+                        <div className="absolute inset-0 z-10 bg-white/65 backdrop-blur-[1px] rounded-lg border border-slate-100 p-4 space-y-3">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-20 w-full" />
+                            ))}
+                        </div>
+                    )}
+                    <div className="grid gap-4">
                     {data?.items.map((app) => {
                         const company = app.job?.company_name || app.job?.advertiser_name || 'Unknown Company'
                         return (
@@ -229,6 +238,7 @@ export default function ApplicationListingPage() {
                             </Card>
                         )
                     })}
+                    </div>
                 </div>
             )}
 
