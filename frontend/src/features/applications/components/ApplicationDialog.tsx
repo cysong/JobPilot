@@ -33,7 +33,7 @@ interface ApplicationDialogProps {
 
 export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: ApplicationDialogProps) {
     const [selectedResumeId, setSelectedResumeId] = useState<string>('')
-    const [tailoringLevel, setTailoringLevel] = useState<TailoringLevel>('light')
+    const [tailoringLevel, setTailoringLevel] = useState<TailoringLevel>('deep')
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes()
     const { createApplication } = useApplicationMutations()
     const { data: matchDetail } = useQuery({
@@ -56,7 +56,7 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                 onSuccess: () => {
                     onOpenChange(false)
                     setSelectedResumeId('')
-                    setTailoringLevel('light')
+                    setTailoringLevel('deep')
                 }
             }
         )
@@ -67,7 +67,7 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
 
     useEffect(() => {
         if (!open) return
-        setTailoringLevel('light')
+        setTailoringLevel('deep')
     }, [open])
 
     useEffect(() => {
