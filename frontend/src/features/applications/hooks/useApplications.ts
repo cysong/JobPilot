@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
 import type {
     ApplicationListRequest,
@@ -13,6 +13,7 @@ export const useApplications = (filters: ApplicationListRequest) => {
     return useQuery({
         queryKey: ['applications', filters],
         queryFn: () => applicationApi.list(filters),
+        placeholderData: keepPreviousData,
     })
 }
 

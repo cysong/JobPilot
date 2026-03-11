@@ -34,7 +34,7 @@ export default function ApplicationListingPage() {
     const statusParam = (searchParams.get('status') as ApplicationStatus | null) || null
     const [keyword, setKeyword] = useState(keywordParam)
 
-    const { data, isLoading, isError } = useApplications({
+    const { data, isLoading, isFetching, isError } = useApplications({
         page: currentPage,
         page_size: pageSize,
         keyword: keywordParam || undefined,
@@ -84,33 +84,13 @@ export default function ApplicationListingPage() {
         updateSearchParams({ status: value === 'all' ? null : value, page: 1 })
     }
 
-    if (isLoading) {
-        return (
-            <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-                <h1 className="text-2xl font-bold text-slate-900">My Applications</h1>
-                <div className="grid gap-4">
-                    {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-32 w-full" />
-                    ))}
-                </div>
-            </div>
-        )
-    }
-
-    if (isError) {
-        return (
-            <div className="max-w-5xl mx-auto px-6 py-8">
-                <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
-                    <p className="text-red-500">Failed to load applications.</p>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-slate-900">My Applications</h1>
+                {isFetching && (
+                    <span className="text-sm text-slate-500">Updating results...</span>
+                )}
             </div>
 
             <div className="bg-white rounded-lg border border-slate-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -159,7 +139,17 @@ export default function ApplicationListingPage() {
                 </Button>
             </div>
 
-            {data?.items.length === 0 ? (
+            {isError && !data ? (
+                <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+                    <p className="text-red-500">Failed to load applications.</p>
+                </div>
+            ) : isLoading && !data ? (
+                <div className="grid gap-4">
+                    {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                </div>
+            ) : data?.items.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
                     {hasActiveFilters ? (
                         <>
