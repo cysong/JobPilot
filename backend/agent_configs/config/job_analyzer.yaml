@@ -17,17 +17,24 @@ instructions: |
   * ONLY extract information EXPLICITLY mentioned in the text
   * Do NOT infer, assume, or hallucinate information
   * If information is missing or unclear, leave the field empty or return []
-  * Normalize skill names (e.g., "React.js" → "React", "Node JS" → "Node.js")
+  * Normalize skill names (e.g., "React.js" -> "React", "Node JS" -> "Node.js")
   * Filter out advertising language and focus on concrete requirements
   * Handle inconsistencies: if multiple experience requirements are mentioned, take the minimum
   * Be consistent: similar jobs should produce similar outputs
   * Aim for deterministic results - same input should give same output
+  * Distinguish examples vs explicit requirements:
+    - If components/services are introduced as examples (e.g., "such as", "for example", "including", "e.g.", "例如", "比如", "包括"), treat them as illustrative and do NOT extract component names.
+    - If specific component/service names are explicitly required (and not framed as examples), extract those component names as skills.
 
   **Field Extraction Guidelines:**
 
   - **normalized_job_title**: Standardized title stripped of seniority/location/tech modifiers (e.g., "Senior Backend Engineer (Python/FastAPI)" -> "Backend Developer"); if no clear role, leave empty.
   - **required_skills**: Explicitly marked required/must-have hard skills.
+    * Cloud/component handling:
+      - If platform + example list pattern appears (e.g., "Azure experience, including Function Apps/Logic Apps/APIM"), keep platform only ("Azure"), exclude listed components.
+      - If the JD explicitly requires specific components/services (e.g., "must have APIM and Service Bus experience"), include those component/service names.
   - **preferred_skills**: Only items labeled preferred/nice-to-have/plus/advantageous; do not include required items.
+    * Apply the same cloud/component handling as required_skills.
   - **certifications**: Explicit certifications (e.g., AWS/Azure certs, CCNA, PMP, CISSP). If none, return [].
   - **tech_stack**: Extract up to 3 items. Use standard skill names and spelling. Prefer abstract categories only when clearly implied by explicit mentions. Rules:
     * Programming languages: use the language name (e.g., Java, C#, Python, JavaScript).
@@ -39,7 +46,9 @@ instructions: |
     * Performance testing:
       * If explicitly stated as a practice, you may output "Performance Testing".
       * If only a single tool is mentioned (e.g., JMeter) and no other testing tools, output the tool name only.
-    * Cloud: if AWS/Azure components are explicitly mentioned, output "AWS" or "Azure" (not individual services).
+    * Cloud:
+      - If cloud components are listed as examples under a named platform, output platform only ("AWS" or "Azure"), not individual services.
+      - If specific cloud components/services are explicitly required (not an example list), output those component/service names (e.g., Lambda, APIM, Service Bus).
     * Do not add items without explicit evidence. No advertising language.
   - **seniority**: Choose from {Intern, Junior, Mid-level, Intermediate, Senior, Lead, Principal, Manager, Director, Level x}; if unclear, leave empty.
   - **key_responsibilities**: 3-5 concise duties, one line each; if fewer are explicit, return only those.
@@ -58,6 +67,14 @@ instructions: |
   - If job heavily emphasizes collaboration and mentoring: ["Team collaboration", "Mentorship ability", "Communication"]
   - If job focuses on rapid delivery and autonomy: ["Fast execution", "Independent problem-solving", "Adaptability"]
   - If job stresses technical depth and innovation: ["Deep technical expertise", "Innovation mindset", "System design skills"]
+
+  **Examples for cloud extraction behavior:**
+  - Input: "Experience with Microsoft Azure, including Azure Function Apps, Azure Logic Apps, Azure Service Bus, Azure APIM."
+    - required_skills: ["Azure"]
+    - tech_stack (if selected): ["Azure"]
+  - Input: "Must have hands-on experience with Azure APIM and Azure Service Bus."
+    - required_skills: ["Azure APIM", "Azure Service Bus"] (or normalized forms like "APIM", "Service Bus")
+    - tech_stack may include component names when they are concrete requirements.
 
   **Output Format:**
   Return JSON matching the AnalyzedJob schema exactly. All list fields must be arrays, even if empty.
