@@ -10,9 +10,6 @@ import {
   ExternalLink,
   Plus,
   Eye,
-  BrainCircuit,
-  CheckCircle2,
-  ListChecks,
   Star,
   Users,
   Code2,
@@ -321,150 +318,6 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {/* AI Analysis Card */}
-            {job.analysis && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                  <BrainCircuit className="h-32 w-32 text-indigo-600" />
-                </div>
-
-                <div className="flex items-center gap-3 relative">
-                  <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
-                    <BrainCircuit className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">
-                      AI Insight
-                    </h2>
-                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
-                      Powered by JobPilot AI
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-6 relative">
-                  {/* Hiring Priorities */}
-                  {job.analysis.hiring_priorities.length > 0 && (
-                    <div className="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100">
-                      <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-3 text-sm">
-                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                        Key Hiring Priorities
-                      </h3>
-                      <div className="space-y-2">
-                        {job.analysis.hiring_priorities.map((priority, i) => (
-                          <div
-                            key={i}
-                            className="flex gap-2.5 items-start text-sm text-slate-700"
-                          >
-                            <div className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
-                            <span>{priority}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Responsibilities */}
-                    <div className="space-y-3">
-                      <h3 className="flex items-center gap-2 font-semibold text-slate-900 text-sm">
-                        <ListChecks className="h-4 w-4 text-indigo-600" />
-                        Core Responsibilities
-                      </h3>
-                      <ul className="space-y-2">
-                        {job.analysis.key_responsibilities
-                          .slice(0, 5)
-                          .map((resp, i) => (
-                            <li
-                              key={i}
-                              className="flex gap-2 items-start text-sm text-slate-600"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                              <span className="line-clamp-2">{resp}</span>
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-
-                    {/* Tech Stack & Skills */}
-                    <div className="space-y-4">
-                      {job.analysis.tech_stack.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="flex items-center gap-2 font-semibold text-slate-900 text-sm">
-                            <Code2 className="h-4 w-4 text-indigo-600" />
-                            Tech Stack
-                          </h3>
-                          <div className="flex flex-wrap gap-1.5">
-                            {job.analysis.tech_stack.map((tech, i) => (
-                              <Badge
-                                key={i}
-                                variant="secondary"
-                                className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
-                              >
-                                {tech}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {job.analysis.required_skills.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="flex items-center gap-2 font-semibold text-slate-900 text-sm">
-                            <Zap className="h-4 w-4 text-indigo-600" />
-                            Required Skills
-                          </h3>
-                          <div className="flex flex-wrap gap-1.5">
-                            {job.analysis.required_skills.map((skill, i) => (
-                              <Badge
-                                key={i}
-                                variant="outline"
-                                className="text-slate-600 border-slate-200"
-                              >
-                                {skill}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Culture & Soft Skills */}
-                  {(job.analysis.company_culture_keywords.length > 0 ||
-                    job.analysis.soft_skills.length > 0) && (
-                    <div className="pt-4 border-t border-slate-100">
-                      <h3 className="flex items-center gap-2 font-semibold text-slate-900 text-sm mb-3">
-                        <Users className="h-4 w-4 text-indigo-600" />
-                        Culture & Capabilities
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {job.analysis.company_culture_keywords.map(
-                          (culture, i) => (
-                            <Badge
-                              key={`culture-${i}`}
-                              className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-100"
-                            >
-                              {culture}
-                            </Badge>
-                          )
-                        )}
-                        {job.analysis.soft_skills.map((soft, i) => (
-                          <Badge
-                            key={`soft-${i}`}
-                            variant="secondary"
-                            className="bg-slate-50 text-slate-600"
-                          >
-                            {soft}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Job Description */}
             <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
               <div className="flex items-center justify-between gap-3">
@@ -526,6 +379,108 @@ export default function JobDetailPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* AI Insight Card */}
+            {job.analysis && (
+              <Card>
+                <CardContent className="p-6 space-y-6">
+                  <h3 className="font-semibold text-slate-900 mb-4">
+                    AI Insight
+                  </h3>
+
+                  {job.analysis.hiring_priorities.length > 0 && (
+                    <div className="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100">
+                      <h4 className="flex items-center gap-2 font-semibold text-slate-900 mb-3 text-sm">
+                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        Key Hiring Priorities
+                      </h4>
+                      <div className="space-y-2">
+                        {job.analysis.hiring_priorities.map((priority, i) => (
+                          <div
+                            key={i}
+                            className="flex gap-2.5 items-start text-sm text-slate-700"
+                          >
+                            <div className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
+                            <span>{priority}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.analysis.tech_stack.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="flex items-center gap-2 font-semibold text-slate-900 text-sm">
+                        <Code2 className="h-4 w-4 text-indigo-600" />
+                        Tech Stack
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.analysis.tech_stack.map((tech, i) => (
+                          <Badge
+                            key={i}
+                            variant="secondary"
+                            className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+                          >
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {job.analysis.required_skills.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="flex items-center gap-2 font-semibold text-slate-900 text-sm">
+                        <Zap className="h-4 w-4 text-indigo-600" />
+                        Required Skills
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.analysis.required_skills.map((skill, i) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-slate-600 border-slate-200"
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(job.analysis.company_culture_keywords.length > 0 ||
+                    job.analysis.soft_skills.length > 0) && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <h4 className="flex items-center gap-2 font-semibold text-slate-900 text-sm mb-3">
+                        <Users className="h-4 w-4 text-indigo-600" />
+                        Culture & Capabilities
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {job.analysis.company_culture_keywords.map(
+                          (culture, i) => (
+                            <Badge
+                              key={`culture-${i}`}
+                              className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-100"
+                            >
+                              {culture}
+                            </Badge>
+                          )
+                        )}
+                        {job.analysis.soft_skills.map((soft, i) => (
+                          <Badge
+                            key={`soft-${i}`}
+                            variant="secondary"
+                            className="bg-slate-50 text-slate-600"
+                          >
+                            {soft}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Similar Jobs (Placeholder - would use useSimilarJobs hook) */}
             {/* <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
