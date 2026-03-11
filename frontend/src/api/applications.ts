@@ -1,6 +1,7 @@
 import client from './client';
 import type {
     Application,
+    ApplicationListRequest,
     ApplicationListResponse,
     CreateApplicationRequest,
     RetryApplicationRequest,
@@ -24,10 +25,20 @@ export const applicationApi = {
         return result || null;
     },
 
-    list: async (page = 1, size = 20) => {
-        const result = await client.get<ApplicationListResponse, ApplicationListResponse>('/applications', {
-            params: { page, size }
-        });
+    list: async (filters: ApplicationListRequest) => {
+        const params = new URLSearchParams();
+        params.append('page', filters.page.toString());
+        params.append('page_size', filters.page_size.toString());
+        if (filters.keyword) {
+            params.append('keyword', filters.keyword);
+        }
+        if (filters.status) {
+            params.append('status', filters.status);
+        }
+
+        const result = await client.get<ApplicationListResponse, ApplicationListResponse>(
+            `/applications?${params.toString()}`
+        );
         return result;
     },
 

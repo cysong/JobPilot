@@ -324,10 +324,20 @@ class ApplicationService:
 
     @staticmethod
     async def list_applications(
-        db: AsyncSession, user: User, params: PaginationParams
+        db: AsyncSession,
+        user: User,
+        params: PaginationParams,
+        keyword: str | None = None,
+        status: ApplicationStatus | None = None,
     ) -> PaginatedResponse[Application]:
         """List applications for the current user with pagination helpers."""
-        items, total = await ApplicationRepository.list_for_user(db, user.id, params)
+        items, total = await ApplicationRepository.list_for_user(
+            db,
+            user.id,
+            params,
+            keyword=keyword,
+            status=status,
+        )
 
         return PaginatedResponse.create(
             items=items, total=total, page=params.page, page_size=params.page_size

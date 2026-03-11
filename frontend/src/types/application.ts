@@ -45,10 +45,17 @@ export interface RetryApplicationRequest {
     tailoring_level?: TailoringLevel;
 }
 
+export interface ApplicationListRequest {
+    keyword?: string;
+    status?: ApplicationStatus;
+    page: number;
+    page_size: number;
+}
+
 export interface ApplicationListResponse {
     items: Application[];
     total: number;
     page: number;
-    size: number;
+    page_size: number;
     total_pages: number;
 }

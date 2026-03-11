@@ -1,11 +1,12 @@
 """Repository helpers for Application entities."""
 from __future__ import annotations
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.applications.models import Application
+from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Resume
 from app.shared.enums import ApplicationStatus
 from app.shared.pagination import PaginationParams
@@ -59,8 +60,28 @@ class ApplicationRepository:
         db: AsyncSession,
         user_id: int,
         params: PaginationParams,
+        keyword: str | None = None,
+        status: ApplicationStatus | None = None,
     ) -> tuple[list[Application], int]:
-        base_query = select(Application).where(Application.user_id == user_id)
+        base_query = (
+            select(Application)
+            .join(SeekJob, SeekJob.id == Application.job_id)
+            .where(Application.user_id == user_id)
+        )
+
+        if keyword:
+            search_pattern = f"%{keyword}%"
+            base_query = base_query.where(
+                or_(
+                    SeekJob.title.ilike(search_pattern),
+                    SeekJob.company_name.ilike(search_pattern),
+                    SeekJob.advertiser_name.ilike(search_pattern),
+                )
+            )
+
+        if status:
+            base_query = base_query.where(Application.status == status)
+
         result = await db.execute(
             base_query.options(selectinload(Application.job))
             .order_by(Application.created_at.desc())

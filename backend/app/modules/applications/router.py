@@ -1,7 +1,7 @@
 """Application APIs for creating and managing job applications."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status, Body
+from fastapi import APIRouter, Depends, status, Body, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.shared.pagination import PaginationParams
+from app.shared.enums import ApplicationStatus
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -28,9 +29,17 @@ async def list_applications(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     params: Annotated[PaginationParams, Depends()],
+    keyword: str | None = Query(None, description="Search by job title or company"),
+    status: ApplicationStatus | None = Query(None, description="Filter by application status"),
 ):
     """List applications for the current user with pagination."""
-    return await ApplicationService.list_applications(db, current_user, params)
+    return await ApplicationService.list_applications(
+        db,
+        current_user,
+        params,
+        keyword=keyword,
+        status=status,
+    )
 
 
 @router.post("/", response_model=ApplicationDetail, status_code=status.HTTP_201_CREATED)

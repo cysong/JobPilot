@@ -1,14 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
-import type { CreateApplicationRequest, RetryApplicationRequest } from '@/types/application'
+import type {
+    ApplicationListRequest,
+    CreateApplicationRequest,
+    RetryApplicationRequest
+} from '@/types/application'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 import { useToast } from '@/components/ui/use-toast'
 import { ApiError } from '@/types/api'
 
-export const useApplications = (page = 1, size = 20) => {
+export const useApplications = (filters: ApplicationListRequest) => {
     return useQuery({
-        queryKey: ['applications', page, size],
-        queryFn: () => applicationApi.list(page, size),
+        queryKey: ['applications', filters],
+        queryFn: () => applicationApi.list(filters),
     })
 }
 
