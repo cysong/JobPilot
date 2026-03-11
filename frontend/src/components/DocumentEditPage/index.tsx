@@ -416,7 +416,7 @@ export function DocumentEditPage<TData = any>({
             </div>
           </div>
         ) : (
-          <div className="h-full overflow-auto bg-slate-50 p-8 flex justify-center">
+          <div className="h-full overflow-auto bg-slate-50 p-8 flex justify-center items-start">
             <div className="bg-white shadow-sm border min-h-[297mm] w-[210mm]">
               <MarkdownPreview content={form.watch('content')} />
             </div>
