@@ -18,6 +18,7 @@ import {
 import type { JobFiltersRequest } from "@/types/job";
 import { JobCard } from "@/features/jobs/components/JobCard";
 import { FilterDropdown } from "@/features/jobs/components/FilterDropdown";
+import { CompanyFilterDropdown } from "@/features/jobs/components/CompanyFilterDropdown";
 import { JobSearch } from "@/features/jobs/components/JobSearch";
 import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
@@ -247,15 +248,11 @@ export default function JobListingPage() {
                       emptyText="No work types found"
                     />
 
-                    <FilterDropdown
-                      label="Company"
-                      options={filterOptions.companies}
+                    <CompanyFilterDropdown
                       selectedValues={companies}
                       onSelectionChange={(values) =>
                         handleFilterChange("companies", values)
                       }
-                      searchPlaceholder="Search companies..."
-                      emptyText="No companies found"
                     />
 
                     {/* Clear All Button */}

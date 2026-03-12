@@ -238,6 +238,85 @@ class JobService:
         )
 
     @staticmethod
+    async def search_companies(
+        db: AsyncSession,
+        keyword: str | None = None,
+        limit: int = 20,
+    ) -> list[str]:
+        """
+        Search companies for filter dropdown using both company_name and advertiser_name.
+
+        Args:
+            db: Database session
+            keyword: Optional keyword for fuzzy search
+            limit: Maximum companies to return
+
+        Returns:
+            Deduplicated company list
+        """
+        normalized_limit = max(1, min(limit, 50))
+        # Over-fetch slightly so we can preserve requested size after case-insensitive dedupe.
+        fetch_limit = normalized_limit * 3
+
+        normalized_company_name = func.trim(SeekJob.company_name)
+        normalized_advertiser_name = func.trim(SeekJob.advertiser_name)
+
+        company_name_query = (
+            select(normalized_company_name.label("company"))
+            .where(
+                and_(
+                    SeekJob.is_expired == False,
+                    SeekJob.company_name.isnot(None),
+                    normalized_company_name != "",
+                )
+            )
+        )
+        advertiser_name_query = (
+            select(normalized_advertiser_name.label("company"))
+            .where(
+                and_(
+                    SeekJob.is_expired == False,
+                    SeekJob.advertiser_name.isnot(None),
+                    normalized_advertiser_name != "",
+                )
+            )
+        )
+
+        if keyword:
+            pattern = f"%{keyword.strip()}%"
+            company_name_query = company_name_query.where(
+                normalized_company_name.ilike(pattern)
+            )
+            advertiser_name_query = advertiser_name_query.where(
+                normalized_advertiser_name.ilike(pattern)
+            )
+
+        merged_query = (
+            company_name_query.union(advertiser_name_query).subquery()
+        )
+        query = (
+            select(merged_query.c.company)
+            .order_by(merged_query.c.company)
+            .limit(fetch_limit)
+        )
+
+        result = await db.execute(query)
+        raw_companies = [name for name in result.scalars().all() if name]
+
+        deduped_companies: list[str] = []
+        seen_keys: set[str] = set()
+        for company in raw_companies:
+            normalized_key = company.casefold()
+            if normalized_key in seen_keys:
+                continue
+            seen_keys.add(normalized_key)
+            deduped_companies.append(company)
+            if len(deduped_companies) >= normalized_limit:
+                break
+
+        return deduped_companies
+
+    @staticmethod
     async def get_similar_jobs(
         db: AsyncSession,
         job_id: int,

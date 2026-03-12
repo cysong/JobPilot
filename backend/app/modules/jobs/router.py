@@ -197,6 +197,17 @@ async def get_filter_options(
     return await service.JobService.get_filter_options(db)
 
 
+@router.get("/filters/companies", response_model=list[str])
+async def search_company_filters(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    q: str | None = Query(None, description="Company keyword"),
+    limit: int = Query(20, ge=1, le=50, description="Maximum number of companies"),
+):
+    """Search company options for company filter dropdown."""
+    return await service.JobService.search_companies(db, q, limit)
+
+
 @router.get("/{job_id}/saved", response_model=SavedJobStatus)
 async def get_job_saved_status(
     job_id: int,

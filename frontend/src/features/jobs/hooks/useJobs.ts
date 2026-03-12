@@ -60,6 +60,18 @@ export const useJobFilterOptions = () => {
 }
 
 /**
+ * Hook to search company options for company filter
+ */
+export const useCompanyFilterOptions = (keyword: string, limit = 20, enabled = true) => {
+  return useQuery({
+    queryKey: ['job-company-filter-options', keyword, limit],
+    queryFn: () => jobsApi.searchCompanies(keyword, limit),
+    enabled: enabled && keyword.trim().length > 0,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+/**
  * Hook to fetch matched jobs for current user
  */
 export const useJobMatches = (filters: JobMatchFiltersRequest) => {

@@ -136,6 +136,17 @@ export const jobsApi = {
   },
 
   /**
+   * Search company options for filter dropdown
+   */
+  searchCompanies: async (keyword: string, limit = 20): Promise<string[]> => {
+    const params = new URLSearchParams()
+    params.append('q', keyword)
+    params.append('limit', limit.toString())
+    const result = await apiClient.get<string[], string[]>(`/jobs/filters/companies?${params.toString()}`)
+    return result
+  },
+
+  /**
    * Get matched jobs for current user
    */
   getJobMatches: async (filters: JobMatchFiltersRequest): Promise<UserJobMatch[]> => {

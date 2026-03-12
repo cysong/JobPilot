@@ -11,6 +11,24 @@
 
 ## Work Log
 
+### 2026-03-13 - Jobs Company Filter: Debounced Remote Search
+
+**Completed Tasks:**
+- Added backend endpoint for company filter remote search:
+  - `GET /api/v1/jobs/filters/companies?q=...&limit=...`
+- Implemented backend company search logic in jobs service:
+  - searches both `company_name` and `advertiser_name`
+  - filters out null/empty values and expired jobs
+  - merges and deduplicates results (case-insensitive) before returning
+  - supports keyword fuzzy match with `ILIKE`
+- Updated frontend jobs API and hooks:
+  - added `jobsApi.searchCompanies`
+  - added `useCompanyFilterOptions` (React Query)
+- Added new frontend dropdown component:
+  - `CompanyFilterDropdown` with 300ms debounce and remote search
+  - preserves selected companies while searching
+- Replaced static company options dropdown in Job Listing page with the new remote-search dropdown.
+
 ### 2026-03-12 - Admin Task List UX: Debounced Retry Refresh + Auto Exit Animation
 
 **Completed Tasks:**
