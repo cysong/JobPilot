@@ -896,3 +896,26 @@ None at this stage.
 - Added live elapsed-time display for tasks in `Running` status on the admin task list card.
 - Elapsed time now updates every second based on `startedAt` (format: `Xs`, `Xm Ys`, `Xh Ym Zs`).
 - Kept the change scoped to `TaskCard` rendering logic only.
+- Fixed timezone parsing on admin task card for API datetime strings without timezone suffix:
+  - treat naive datetime string as UTC before duration/relative-time calculation
+  - corrected Running duration and Created relative time drift (e.g., NZ +13h offset)
+
+### 2026-03-13 - Timezone Audit & Naive Datetime Remediation (Code + Data)
+
+**Completed Tasks:**
+- Audited backend for naive datetime usage (`utcnow()` / `now()` without timezone).
+- Replaced naive timestamp writes with UTC-aware timestamps in runtime-critical modules:
+  - workflow task state writes (`started_at`, `completed_at`)
+  - outbox retry/publish timestamps
+  - application progress `last_update`
+  - resume soft-delete and resume-skill update timestamps
+  - jobs repository time-window filters
+- Normalized resume PDF metadata generation time to explicit UTC label.
+- Added Alembic migration to repair schema/data for timezone consistency:
+  - conditionally promote key columns from `timestamp without time zone` to `timestamptz` (interpreting existing values as UTC)
+  - backfill `applications.tailoring_progress.last_update` naive ISO strings by appending `Z`
+  - migration file: `20260313_1100_d9f2a8c4e6b1_fix_naive_timestamps.py`
+- Added Running duration anomaly correction on admin task card:
+  - detect historical `startedAt` offsets (~10-14h behind `createdAt`)
+  - auto-normalize displayed running duration for affected legacy rows
+- Extended timezone migration with data repair SQL for shifted `task_executions.started_at` in `Running` status.

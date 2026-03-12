@@ -395,3 +395,43 @@ Within a short burst of task execution, multiple Celery tasks failed with:
 ### Expected Result
 - No more `This event loop is already running` from task wrapper execution.
 - No more cross-loop DB errors caused by fallback thread loops.
+
+---
+
+## ✅ Fixed: Timezone drift from naive datetime writes (code + historical data)
+
+### Problem
+Admin task durations and relative times could drift by local timezone offset (e.g. +13h), especially when API datetime strings were emitted without timezone suffix.
+
+### Root Cause
+- Several backend write paths used naive datetimes (`datetime.utcnow()` / `datetime.now()` without timezone).
+- Mixed historical data might include columns effectively behaving like `timestamp without time zone` in some environments.
+- Progress JSON field `tailoring_progress.last_update` stored naive ISO datetime strings.
+
+### Code Fixes
+- Replaced naive writes with `datetime.now(timezone.utc)` in:
+  - `app/modules/workflow/repositories.py`
+  - `app/modules/applications/repositories/outbox_repo.py`
+  - `app/modules/applications/tasks.py`
+  - `app/modules/resumes/service.py`
+  - `app/modules/jobs/repository.py`
+- Updated PDF export metadata timestamp to explicit UTC formatting in:
+  - `app/modules/resumes/export/generator.py`
+
+### Data Fixes
+Added migration:
+- `backend/alembic/versions/20260313_1100_d9f2a8c4e6b1_fix_naive_timestamps.py`
+
+Migration behavior:
+- Conditionally converts these columns to `TIMESTAMP WITH TIME ZONE` only when current type is `timestamp without time zone`:
+  - `task_executions.started_at`
+  - `task_executions.completed_at`
+  - `outbox_events.next_retry_at`
+  - `outbox_events.published_at`
+  - `resumes.deleted_at`
+- Converts existing values with `AT TIME ZONE 'UTC'` to preserve intended UTC meaning.
+- Backfills `applications.tailoring_progress.last_update` naive ISO strings by appending `Z`.
+
+### Verification Notes
+- Repository scan confirms no remaining naive datetime calls in backend app code.
+- Bytecode compile validation was partially blocked by local filesystem `PermissionError` on `__pycache__` writes in this environment.

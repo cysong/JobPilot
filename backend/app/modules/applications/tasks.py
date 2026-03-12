@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,7 +69,7 @@ async def update_tailoring_progress(
     # Update current step status
     progress["current_step"] = step_name
     progress["message"] = message
-    progress["last_update"] = datetime.utcnow().isoformat()
+    progress["last_update"] = datetime.now(timezone.utc).isoformat()
     progress["steps"][step_name] = status
 
     # Explicitly mark modified for JSON field updates to ensure persistence

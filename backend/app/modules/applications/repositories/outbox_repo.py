@@ -1,7 +1,7 @@
 """Repository helpers for OutboxEvent persistence."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from sqlalchemy import and_, or_, select
@@ -51,7 +51,7 @@ class OutboxRepository:
                     OutboxEvent.retry_count < OutboxEvent.max_retries,
                     or_(
                         OutboxEvent.next_retry_at.is_(None),
-                        OutboxEvent.next_retry_at <= datetime.utcnow(),
+                        OutboxEvent.next_retry_at <= datetime.now(timezone.utc),
                     ),
                 )
             )
@@ -65,7 +65,7 @@ class OutboxRepository:
     @staticmethod
     async def mark_published(db: AsyncSession, event: OutboxEvent) -> None:
         event.published = True
-        event.published_at = datetime.utcnow()
+        event.published_at = datetime.now(timezone.utc)
         await db.flush()
 
     @staticmethod
@@ -79,8 +79,8 @@ class OutboxRepository:
         event.error_message = error_message
         if event.retry_count < event.max_retries:
             delay_seconds = 60 * (2 ** event.retry_count)
-            event.next_retry_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
+            event.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
         else:
             event.published = True  # Stop retrying
-            event.published_at = datetime.utcnow()
+            event.published_at = datetime.now(timezone.utc)
         await db.flush()

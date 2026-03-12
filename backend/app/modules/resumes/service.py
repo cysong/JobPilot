@@ -267,7 +267,7 @@ class ResumeService:
         was_formal = not resume.is_draft
 
         resume.is_deleted = True
-        resume.deleted_at = datetime.utcnow()
+        resume.deleted_at = datetime.now(timezone.utc)
         db.add(resume)
         await db.commit()
         await db.refresh(resume)
@@ -473,7 +473,7 @@ class ResumeService:
             if existing_skill:
                 # Update existing skill
                 existing_skill.proficiency_level = proficiency
-                existing_skill.updated_at = datetime.now()
+                existing_skill.updated_at = datetime.now(timezone.utc)
             else:
                 # Insert new skill
                 new_skill = ResumeSkill(

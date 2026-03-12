@@ -3,7 +3,7 @@ PDF generator using weasyprint.
 Supports multiple document types (resume, cover_letter, etc.)
 """
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import os
 
@@ -132,7 +132,7 @@ class PDFGenerator:
             "document_type": self.document_type,
             "title": title,
             "content": html_content,
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             "include_metadata": self.include_metadata,
             "font_size": self.font_size,
             "language": language,
