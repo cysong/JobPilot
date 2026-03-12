@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import type { ApplicationStatus, TailoringLevel } from '@/types/application';
+import { buildApplicationPdfFilename } from '@/utils/pdfFilename';
 
 type StatusAction = {
   label: string;
@@ -62,11 +63,6 @@ const STATUS_ACTIONS: Record<ApplicationStatus, StatusAction[]> = {
   Failed: [],
 };
 
-const toSafeFilename = (value: string) => {
-    const cleaned = value.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
-    return cleaned || 'document'
-}
-
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
@@ -83,7 +79,7 @@ export default function ApplicationDetailPage() {
     const buildFilename = (label: string) => {
         const jobTitle = application?.job?.title || 'Job';
         const userName = user?.full_name || 'User';
-        return `${toSafeFilename(`${userName}_${label}_${jobTitle}`)}.pdf`;
+        return buildApplicationPdfFilename({ userName, label, jobTitle });
 
     };
 

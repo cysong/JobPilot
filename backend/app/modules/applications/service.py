@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Optional
 from uuid import uuid4
 
@@ -251,19 +252,20 @@ class ApplicationService:
 
     @staticmethod
     def _sanitize_filename(value: str) -> str:
-        cleaned = "".join(
-            c if c.isascii() and (c.isalnum() or c in ("_", "-")) else "-"
-            for c in value.strip()
-        )
-        cleaned = cleaned.strip("-")
-        return cleaned or "document"
+        cleaned = re.sub(r"[^A-Za-z0-9]+", "_", value.strip())
+        return re.sub(r"_+", "_", cleaned).strip("_")
 
     @staticmethod
     def _build_download_filename(user: User, job_title: str | None, label: str) -> str:
-        user_part = ApplicationService._sanitize_filename(user.full_name or "User")
-        job_part = ApplicationService._sanitize_filename(job_title or "Job")
+        user_part = ApplicationService._sanitize_filename(user.full_name or "") or "User"
+        job_part = ApplicationService._sanitize_filename(job_title or "") or "Job"
         label_part = ApplicationService._sanitize_filename(label)
-        return f"{user_part}_{label_part}_{job_part}.pdf"
+
+        parts = [user_part]
+        if label_part:
+            parts.append(label_part)
+        parts.append(job_part)
+        return f"{'_'.join(parts)}.pdf"
 
     @staticmethod
     async def export_tailored_resume_to_pdf(

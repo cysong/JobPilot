@@ -11,6 +11,26 @@
 
 ## Work Log
 
+### 2026-03-12 - PDF Export Filename Rule Unification (Resume + Cover Letter)
+
+**Completed Tasks:**
+- Fixed application PDF filename sanitization to remove symbol-only fragments when converting to underscore format.
+- Unified backend naming behavior for:
+  - `POST /api/v1/applications/{application_id}/resume/export`
+  - `POST /api/v1/applications/{application_id}/cover-letter/export`
+- Updated backend sanitizer in:
+  - `backend/app/modules/applications/service.py`
+  - `backend/app/modules/resumes/export/service.py`
+- Added shared frontend filename utility:
+  - `frontend/src/utils/pdfFilename.ts`
+- Replaced duplicated frontend filename logic in:
+  - `frontend/src/features/applications/ApplicationDetailPage.tsx`
+  - `frontend/src/features/applications/TailoredResumeEditPage.tsx`
+  - `frontend/src/features/applications/CoverLetterEditPage.tsx`
+- Result example:
+  - Input job title: `Spaceplane - HITL Engineer`
+  - Output: `Anson_Chen_Resume_Spaceplane_HITL_Engineer.pdf` (dropped symbol-only `-` token)
+
 ### 2026-03-12 - Jobs: Saved (Watchlist) Feature
 
 **Completed Tasks:**

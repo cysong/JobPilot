@@ -4,6 +4,7 @@ Supports resume, cover_letter, and other document types.
 """
 from typing import Optional
 from pathlib import Path
+import re
 
 from .generator import PDFGenerator
 
@@ -61,11 +62,9 @@ class DocumentExportService:
         )
 
         # Generate safe filename
-        safe_title = "".join(
-            c if c.isalnum() or c in (' ', '-', '_') else '_'
-            for c in title
-        )
-        filename = f"{safe_title}_{document_type}.pdf"
+        safe_title = re.sub(r"_+", "_", re.sub(r"[^A-Za-z0-9]+", "_", title.strip())).strip("_") or "document"
+        safe_type = re.sub(r"_+", "_", re.sub(r"[^A-Za-z0-9]+", "_", document_type.strip())).strip("_") or "document"
+        filename = f"{safe_title}_{safe_type}.pdf"
 
         return pdf_bytes, filename, generator.template_name
 

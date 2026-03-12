@@ -4,11 +4,7 @@ import { DocumentEditPage } from '@/components/DocumentEditPage'
 import { applicationApi } from '@/api/applications'
 import { useCoverLetterForEdit, useUpdateCoverLetterContent } from './hooks/useApplications'
 import type { DocumentEditConfig } from '@/components/DocumentEditPage/types'
-
-const toSafeFilename = (value: string) => {
-  const cleaned = value.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
-  return cleaned || 'document'
-}
+import { buildApplicationPdfFilename } from '@/utils/pdfFilename'
 
 export default function CoverLetterEditPage() {
   const { applicationId } = useParams()
@@ -20,7 +16,7 @@ export default function CoverLetterEditPage() {
     const url = window.URL.createObjectURL(blob)
     const jobTitle = documentData?.job_title || 'Job'
     const userName = user?.full_name || 'User'
-    const filename = `${toSafeFilename(`${userName}_CoverLetter_${jobTitle}`)}.pdf`
+    const filename = buildApplicationPdfFilename({ userName, label: 'CoverLetter', jobTitle })
     const a = document.createElement('a')
     a.href = url
     a.download = filename
