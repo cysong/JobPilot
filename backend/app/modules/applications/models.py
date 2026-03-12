@@ -77,6 +77,16 @@ class Application(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
+    applied_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    offered_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     tailoring_level: Mapped[TailoringLevel] = mapped_column(
         SQLEnum(
             TailoringLevel,

@@ -51,6 +51,8 @@ class ApplicationResponse(BaseModel):
     resume_document_id: Optional[str] = None
     cover_letter_document_id: Optional[str] = None
     status: ApplicationStatus
+    applied_at: Optional[datetime] = None
+    offered_at: Optional[datetime] = None
     tailoring_level: TailoringLevel
     last_error: Optional[str] = None
     created_at: datetime

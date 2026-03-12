@@ -11,6 +11,21 @@
 
 ## Work Log
 
+### 2026-03-12 - Application Timestamps: applied_at and offered_at
+
+**Completed Tasks:**
+- Added `applications.applied_at` and `applications.offered_at` model fields (nullable, indexed).
+- Added Alembic migration to create the two columns and indexes:
+  - `20260312_1730_c31f8b6f2a90_add_applied_offered_at.py`
+- Updated application API response schema to include:
+  - `applied_at`
+  - `offered_at`
+- Updated status transition service logic:
+  - first transition to `Applied` sets `applied_at` (write-once)
+  - first transition to `Offer` sets `offered_at` (write-once)
+- No historical backfill added per requirement.
+- No frontend display/statistics changes added per requirement.
+
 ### 2026-03-12 - Application Detail: Apply Button + Status Transition Actions
 
 **Completed Tasks:**

@@ -94,7 +94,12 @@ class ApplicationService:
             note=note,
         )
         application.status = target_status
-        application.updated_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        if target_status == ApplicationStatus.APPLIED and application.applied_at is None:
+            application.applied_at = now
+        if target_status == ApplicationStatus.OFFER and application.offered_at is None:
+            application.offered_at = now
+        application.updated_at = now
         if target_status != ApplicationStatus.FAILED:
             application.last_error = None
 
