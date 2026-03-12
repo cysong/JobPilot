@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
@@ -31,6 +31,15 @@ export default function TaskMonitorPage() {
   const retryMutation = useRetryTask()
   const taskTypesQuery = useTaskTypes()
   const retryRefreshTimerRef = useRef<number | null>(null)
+  const workerOptions = useMemo(() => {
+    const values = new Set<string>()
+    const items = tasksQuery.data?.items || []
+    items.forEach((item) => {
+      if (item.workerId) values.add(item.workerId)
+    })
+    if (filters.workerId) values.add(filters.workerId)
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [tasksQuery.data?.items, filters.workerId])
 
   useEffect(() => {
     const next = new URLSearchParams()
@@ -95,6 +104,7 @@ export default function TaskMonitorPage() {
         workerId={filters.workerId}
         keyword={filters.keyword}
         taskTypesOptions={taskTypesQuery.data || []}
+        workerOptions={workerOptions}
         onChange={(next) => {
           setFilters(next)
           setPage(1)
