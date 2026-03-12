@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 import time
 from typing import Any
 
@@ -21,7 +20,7 @@ from openai import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
-from app.core.celery_lifecycle import get_worker_loop
+from app.core.celery_lifecycle import run_coroutine_sync
 from app.modules.workflow.repositories import TaskRepository
 from app.shared.enums import TaskStatus
 
@@ -75,7 +74,7 @@ class AsyncBaseTask(Task):
                     finally:
                         self._db_session = None
 
-            return get_worker_loop().run_until_complete(_execute())
+            return run_coroutine_sync(_execute())
         return result
 
     def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
@@ -96,7 +95,7 @@ class AsyncBaseTask(Task):
                 finally:
                     self._db_session = None
 
-        return get_worker_loop().run_until_complete(_execute())
+        return run_coroutine_sync(_execute())
 
     def _handle_async_autoretry(self, exc: Exception) -> None:
         """
@@ -199,29 +198,8 @@ class DBTrackingTask(AsyncBaseTask):
     def _run_db_coro(coro: Any) -> None:
         """
         Execute a coroutine for DB state updates from sync Celery hooks.
-
-        Celery hooks can be called while the worker loop is already running.
-        In that case, running the coroutine in a short-lived thread avoids
-        "This event loop is already running" runtime errors.
         """
-        loop = get_worker_loop()
-        if loop.is_running():
-            err: list[Exception] = []
-
-            def _runner() -> None:
-                try:
-                    asyncio.run(coro)
-                except Exception as exc:  # noqa: BLE001
-                    err.append(exc)
-
-            thread = threading.Thread(target=_runner, daemon=True)
-            thread.start()
-            thread.join()
-            if err:
-                raise err[0]
-            return
-
-        loop.run_until_complete(coro)
+        run_coroutine_sync(coro)
 
     def before_start(self, task_id, args, kwargs):
         """Called before the task starts. Mark as RUNNING."""
