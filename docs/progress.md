@@ -11,6 +11,18 @@
 
 ## Work Log
 
+### 2026-03-12 - Admin Task List UX: Debounced Retry Refresh + Auto Exit Animation
+
+**Completed Tasks:**
+- Implemented debounced refresh after manual retry in task monitor page:
+  - removed immediate query invalidation from retry mutation hook.
+  - added page-level delayed refresh (1.2s) that coalesces multiple retry successes into a single `tasks` + `statistics` refetch.
+  - ensured pending timer cleanup on unmount and when user clicks manual `Refresh`.
+- Added automatic list enter/exit animation for task cards:
+  - installed `@formkit/auto-animate`.
+  - attached animation container to task list rendering block so removed task rows now animate out instead of disappearing instantly.
+- Preserved existing retry failure behavior (toast + no forced refresh changes).
+
 ### 2026-03-12 - Admin Task Retry Load Reduction (Fast Path + Targeted Broker Check)
 
 **Completed Tasks:**

@@ -332,3 +332,33 @@ Frontend build currently reports pre-existing TypeScript errors unrelated to thi
 **Fixed On**: 2026-03-12
 **Status**: Completed
 **Scope**: Frontend shared pagination component
+
+## Known Issue: Frontend build has pre-existing TypeScript type errors
+
+### Problem
+Running `pnpm run build` in `frontend/` fails due to multiple TypeScript errors that are not introduced by the retry-refresh/animation changes.
+
+### Root Cause
+The current codebase has existing type mismatches across admin API/query hooks (Axios response typing vs expected query/mutation payload typing), plus several unrelated strict-mode/type hygiene issues.
+
+### Impact
+- Full frontend production build is currently blocked.
+- This affects validation confidence for unrelated UI changes unless a scoped check strategy is used.
+
+### Workaround
+- Validate changed behavior manually in dev mode for now.
+- Handle type-system cleanup in a dedicated follow-up task to avoid mixing with feature fixes.
+
+### Verification
+Build command executed:
+```bash
+cd frontend
+pnpm run build
+```
+Result: failed with existing TypeScript errors across files outside this task's modified scope.
+
+---
+
+**Detected On**: 2026-03-12
+**Status**: Open
+**Scope**: Frontend TypeScript typing baseline

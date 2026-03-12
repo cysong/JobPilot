@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
@@ -30,6 +30,7 @@ export default function TaskMonitorPage() {
   const statsQuery = useTaskStatistics({ status: filters.status, taskType: filters.taskType })
   const retryMutation = useRetryTask()
   const taskTypesQuery = useTaskTypes()
+  const retryRefreshTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const next = new URLSearchParams()
@@ -41,13 +42,38 @@ export default function TaskMonitorPage() {
     setSearchParams(next, { replace: true })
   }, [filters, page, setSearchParams])
 
+  useEffect(() => {
+    return () => {
+      if (retryRefreshTimerRef.current !== null) {
+        window.clearTimeout(retryRefreshTimerRef.current)
+      }
+    }
+  }, [])
+
+  const scheduleRetryRefresh = () => {
+    if (retryRefreshTimerRef.current !== null) {
+      window.clearTimeout(retryRefreshTimerRef.current)
+    }
+
+    retryRefreshTimerRef.current = window.setTimeout(() => {
+      retryRefreshTimerRef.current = null
+      tasksQuery.refetch()
+      statsQuery.refetch()
+    }, 1200)
+  }
+
   const refresh = () => {
+    if (retryRefreshTimerRef.current !== null) {
+      window.clearTimeout(retryRefreshTimerRef.current)
+      retryRefreshTimerRef.current = null
+    }
     tasksQuery.refetch()
     statsQuery.refetch()
   }
 
   const handleRetry = async (taskId: string) => {
     await retryMutation.mutateAsync(taskId)
+    scheduleRetryRefresh()
   }
 
   return (
