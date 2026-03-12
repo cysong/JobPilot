@@ -877,3 +877,22 @@ None at this stage.
 - Database migrations managed by Alembic (async mode)
 - JWT tokens stored in localStorage with automatic axios interceptor injection
 - Celery workers will be configured in later stages
+
+### 2026-03-13 - Celery Async Loop Concurrency Fix (Event Loop Re-entry)
+
+**Completed Tasks:**
+- Investigated worker failures in `backend/logs/celery-worker.log` for `This event loop is already running`.
+- Confirmed failure path in async task base wrappers and DB tracking hooks (`run_until_complete` re-entry + cross-loop fallback).
+- Refactored worker async loop lifecycle:
+  - introduced a dedicated background asyncio loop thread.
+  - added sync bridge utility `run_coroutine_sync(...)` for Celery sync context.
+  - added safe worker startup/shutdown handling for loop and `engine.dispose()`.
+- Updated async task execution and DB hook execution to use the shared sync bridge.
+- Performed syntax verification via compileall for changed backend files.
+
+### 2026-03-13 - Task Monitor: Running Task Elapsed Time Display
+
+**Completed Tasks:**
+- Added live elapsed-time display for tasks in `Running` status on the admin task list card.
+- Elapsed time now updates every second based on `startedAt` (format: `Xs`, `Xm Ys`, `Xh Ym Zs`).
+- Kept the change scoped to `TaskCard` rendering logic only.

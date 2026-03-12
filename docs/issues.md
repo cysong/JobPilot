@@ -362,3 +362,36 @@ Result: failed with existing TypeScript errors across files outside this task's 
 **Detected On**: 2026-03-12
 **Status**: Open
 **Scope**: Frontend TypeScript typing baseline
+
+---
+
+## ✅ Fixed: Celery async task failures with `This event loop is already running`
+
+### Problem
+Within a short burst of task execution, multiple Celery tasks failed with:
+
+- `RuntimeError: This event loop is already running`
+- Follow-up errors such as `Future attached to a different loop`
+
+### Root Cause
+- Async Celery task execution used `get_worker_loop().run_until_complete(...)` from sync task wrappers.
+- Under concurrent worker execution, the shared loop was re-entered, which is illegal in asyncio.
+- Hook fallback logic executed DB coroutines via `asyncio.run(...)` in temporary threads, creating extra loops and causing cross-loop asyncpg/SQLAlchemy resource usage.
+
+### Fix
+- Replaced the ad-hoc shared-loop `run_until_complete` model with a dedicated background asyncio loop thread.
+- Added sync bridge: `run_coroutine_sync(coro)` using `asyncio.run_coroutine_threadsafe(...).result()`.
+- Updated task wrappers and DB hook execution paths to use the same bridge, so all async DB work runs on one loop.
+- Added worker lifecycle-safe startup/shutdown for the dedicated loop and async engine disposal.
+
+### Files Updated
+- `backend/app/core/celery_lifecycle.py`
+- `backend/app/modules/workflow/tasks_base.py`
+
+### Verification
+- `python -m compileall backend/app/core/celery_lifecycle.py backend/app/modules/workflow/tasks_base.py`
+- No syntax errors.
+
+### Expected Result
+- No more `This event loop is already running` from task wrapper execution.
+- No more cross-loop DB errors caused by fallback thread loops.
