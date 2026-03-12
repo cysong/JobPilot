@@ -9,7 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.jobs.models import SeekJob
-from app.modules.jobs.schemas import JobFiltersRequest, JobFiltersOptions
+from app.modules.jobs.repository import JobRepository, SavedJobRepository
+from app.modules.jobs.schemas import (
+    JobFiltersRequest,
+    JobFiltersOptions,
+    JobBase,
+    SavedJobItem,
+    SavedJobListResponse,
+    SavedJobStatus,
+)
+from app.modules.auth.models import User
+from app.core.exceptions import NotFoundError
 from app.shared.pagination import PaginationParams
 
 
@@ -269,3 +279,83 @@ class JobService:
 
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_saved_status(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+    ) -> SavedJobStatus:
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        saved = await SavedJobRepository.get_by_user_and_job(db, user.id, job_id)
+        if not saved:
+            return SavedJobStatus(is_saved=False, saved_at=None)
+
+        return SavedJobStatus(is_saved=True, saved_at=saved.created_at)
+
+    @staticmethod
+    async def save_job(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+    ) -> SavedJobStatus:
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        saved = await SavedJobRepository.get_by_user_and_job(db, user.id, job_id)
+        if not saved:
+            saved = await SavedJobRepository.create(db, user.id, job_id)
+            await db.commit()
+
+        return SavedJobStatus(is_saved=True, saved_at=saved.created_at)
+
+    @staticmethod
+    async def unsave_job(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+    ) -> SavedJobStatus:
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        deleted = await SavedJobRepository.delete_by_user_and_job(db, user.id, job_id)
+        if deleted:
+            await db.commit()
+
+        return SavedJobStatus(is_saved=False, saved_at=None)
+
+    @staticmethod
+    async def list_saved_jobs(
+        db: AsyncSession,
+        user: User,
+        pagination: PaginationParams,
+    ) -> SavedJobListResponse:
+        rows, total = await SavedJobRepository.list_by_user(
+            db,
+            user.id,
+            offset=pagination.get_offset(),
+            limit=pagination.get_limit(),
+        )
+        items: list[SavedJobItem] = []
+        for saved, job in rows:
+            job_item = JobBase.model_validate(job)
+            # Keep saved cards visually aligned with list cards when source logo is missing.
+            if not job_item.company_logo and job.branding_logo_url:
+                job_item.company_logo = job.branding_logo_url
+            items.append(
+                SavedJobItem(
+                    job=job_item,
+                    saved_at=saved.created_at,
+                )
+            )
+        return SavedJobListResponse.create(
+            items=items,
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )

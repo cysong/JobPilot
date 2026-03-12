@@ -128,6 +128,24 @@ class JobListResponse(PaginatedResponse[JobBase]):
     """Paginated job list response"""
 
 
+class SavedJobStatus(BaseModel):
+    """Saved status for a user-job pair."""
+
+    is_saved: bool
+    saved_at: Optional[datetime] = None
+
+
+class SavedJobItem(BaseModel):
+    """Saved jobs list item."""
+
+    job: JobBase
+    saved_at: datetime
+
+
+class SavedJobListResponse(PaginatedResponse[SavedJobItem]):
+    """Paginated saved jobs response."""
+
+
 class JobFiltersRequest(BaseModel):
     """Job filtering parameters"""
     # Search

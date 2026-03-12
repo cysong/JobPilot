@@ -1,9 +1,17 @@
 /**
  * React Query hooks for Jobs
  */
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { jobsApi } from '@/api/jobs'
-import type { JobFiltersRequest, JobMatchFiltersRequest } from '@/types/job'
+import type {
+  Job,
+  JobFiltersRequest,
+  JobMatchFiltersRequest,
+  SavedJobListResponse,
+  SavedJobStatusResponse,
+  SavedJobsRequest,
+} from '@/types/job'
+import { useToast } from '@/components/ui/use-toast'
 
 /**
  * Hook to fetch paginated job list with filters
@@ -60,4 +68,155 @@ export const useJobMatches = (filters: JobMatchFiltersRequest) => {
     queryFn: () => jobsApi.getJobMatches(filters),
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
+}
+
+/**
+ * Hook to fetch current user's saved status for a job
+ */
+export const useJobSavedStatus = (jobId: number | null) => {
+  return useQuery({
+    queryKey: ['job-saved-status', jobId],
+    queryFn: () => jobsApi.getSavedStatus(jobId!),
+    enabled: !!jobId,
+  })
+}
+
+/**
+ * Hook to fetch current user's saved jobs
+ */
+export const useSavedJobs = (filters: SavedJobsRequest) => {
+  return useQuery({
+    queryKey: ['saved-jobs', filters],
+    queryFn: () => jobsApi.getSavedJobs(filters),
+  })
+}
+
+/**
+ * Save/unsave mutations for jobs
+ */
+export const useJobSavedMutations = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  type SavedMutationPayload = { jobId: number; job?: Job }
+  type SavedListSnapshot = [readonly unknown[], SavedJobListResponse | undefined]
+
+  const recalcTotalPages = (total: number, pageSize: number): number =>
+    pageSize > 0 ? Math.ceil(total / pageSize) : 0
+
+  const saveJob = useMutation({
+    mutationFn: ({ jobId }: SavedMutationPayload) => jobsApi.saveJob(jobId),
+    onMutate: async ({ jobId, job }) => {
+      await queryClient.cancelQueries({ queryKey: ['job-saved-status', jobId] })
+      await queryClient.cancelQueries({ queryKey: ['saved-jobs'] })
+
+      const previousStatus = queryClient.getQueryData<SavedJobStatusResponse>(['job-saved-status', jobId])
+      const previousSavedLists = queryClient.getQueriesData<SavedJobListResponse>({
+        queryKey: ['saved-jobs'],
+      }) as SavedListSnapshot[]
+      const savedAt = new Date().toISOString()
+
+      queryClient.setQueryData<SavedJobStatusResponse>(['job-saved-status', jobId], {
+        is_saved: true,
+        saved_at: savedAt,
+      })
+
+      previousSavedLists.forEach(([queryKey, data]) => {
+        if (!data) return
+
+        const filters = queryKey[1] as SavedJobsRequest | undefined
+        const page = filters?.page ?? data.page
+        const pageSize = filters?.page_size ?? data.page_size
+
+        const hasExisting = data.items.some((item) => item.job.id === jobId)
+        let nextItems = data.items
+        if (!hasExisting && page === 1 && job) {
+          nextItems = [{ job, saved_at: savedAt }, ...data.items].slice(0, pageSize)
+        }
+
+        const nextTotal = hasExisting ? data.total : data.total + 1
+        queryClient.setQueryData<SavedJobListResponse>(queryKey, {
+          ...data,
+          items: nextItems,
+          total: nextTotal,
+          total_pages: recalcTotalPages(nextTotal, pageSize),
+        })
+      })
+
+      return { previousStatus, previousSavedLists, jobId }
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return
+      queryClient.setQueryData(['job-saved-status', context.jobId], context.previousStatus)
+      context.previousSavedLists.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data)
+      })
+    },
+    onSuccess: (_, { jobId }) => {
+      queryClient.invalidateQueries({ queryKey: ['job-saved-status', jobId] })
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] })
+      toast({ title: 'Saved', description: 'Job added to saved list' })
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['job-saved-status', variables.jobId] })
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] })
+    },
+  })
+
+  const unsaveJob = useMutation({
+    mutationFn: ({ jobId }: SavedMutationPayload) => jobsApi.unsaveJob(jobId),
+    onMutate: async ({ jobId }) => {
+      await queryClient.cancelQueries({ queryKey: ['job-saved-status', jobId] })
+      await queryClient.cancelQueries({ queryKey: ['saved-jobs'] })
+
+      const previousStatus = queryClient.getQueryData<SavedJobStatusResponse>(['job-saved-status', jobId])
+      const previousSavedLists = queryClient.getQueriesData<SavedJobListResponse>({
+        queryKey: ['saved-jobs'],
+      }) as SavedListSnapshot[]
+
+      queryClient.setQueryData<SavedJobStatusResponse>(['job-saved-status', jobId], {
+        is_saved: false,
+        saved_at: null,
+      })
+
+      previousSavedLists.forEach(([queryKey, data]) => {
+        if (!data) return
+
+        const filters = queryKey[1] as SavedJobsRequest | undefined
+        const pageSize = filters?.page_size ?? data.page_size
+        const hadItem = data.items.some((item) => item.job.id === jobId)
+        const nextItems = data.items.filter((item) => item.job.id !== jobId)
+        const nextTotal = hadItem ? Math.max(0, data.total - 1) : data.total
+
+        queryClient.setQueryData<SavedJobListResponse>(queryKey, {
+          ...data,
+          items: nextItems,
+          total: nextTotal,
+          total_pages: recalcTotalPages(nextTotal, pageSize),
+        })
+      })
+
+      return { previousStatus, previousSavedLists, jobId }
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return
+      queryClient.setQueryData(['job-saved-status', context.jobId], context.previousStatus)
+      context.previousSavedLists.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data)
+      })
+    },
+    onSuccess: (_, { jobId }) => {
+      queryClient.invalidateQueries({ queryKey: ['job-saved-status', jobId] })
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] })
+      toast({ title: 'Removed', description: 'Job removed from saved list' })
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['job-saved-status', variables.jobId] })
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] })
+    },
+  })
+
+  return {
+    saveJob,
+    unsaveJob,
+  }
 }

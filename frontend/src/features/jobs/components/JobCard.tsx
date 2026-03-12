@@ -15,12 +15,13 @@ import {
 interface JobCardProps {
     job: Job | JobBriefInfo // Accept both full Job and JobBriefInfo
     matchData?: UserJobMatch // Optional match data for recommended view
+    savedAt?: string | null
 }
 
 const formatSourceLabel = (source: string | null | undefined): string =>
   source ? source.toUpperCase() : "UNKNOWN";
 
-export function JobCard({ job, matchData }: JobCardProps) {
+export function JobCard({ job, matchData, savedAt }: JobCardProps) {
     const [searchParams] = useSearchParams()
 
     // Preserve current search params when navigating to detail page
@@ -109,7 +110,11 @@ export function JobCard({ job, matchData }: JobCardProps) {
         </CardContent>
         <CardFooter className="p-4 pt-0 text-xs text-slate-400">
           <span>
-            {job.listed_at
+            {savedAt
+              ? `saved ${formatDistanceToNow(new Date(savedAt), {
+                  addSuffix: true,
+                })}`
+              : job.listed_at
               ? formatDistanceToNow(new Date(job.listed_at), {
                   addSuffix: true,
                 })

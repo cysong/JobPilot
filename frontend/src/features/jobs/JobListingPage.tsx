@@ -1,8 +1,20 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sparkles, Briefcase, ChevronDown, ChevronUp, X } from "lucide-react";
+import {
+  Sparkles,
+  Briefcase,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Star,
+} from "lucide-react";
 
-import { useJobs, useJobMatches, useJobFilterOptions } from "@/features/jobs/hooks/useJobs";
+import {
+  useJobs,
+  useJobMatches,
+  useJobFilterOptions,
+  useSavedJobs,
+} from "@/features/jobs/hooks/useJobs";
 import type { JobFiltersRequest } from "@/types/job";
 import { JobCard } from "@/features/jobs/components/JobCard";
 import { FilterDropdown } from "@/features/jobs/components/FilterDropdown";
@@ -26,7 +38,10 @@ export default function JobListingPage() {
   const companies = searchParams.getAll("companies");
   const sources = searchParams.getAll("sources");
   const activeFilterCount =
-    locationCities.length + workTypes.length + companies.length + sources.length;
+    locationCities.length +
+    workTypes.length +
+    companies.length +
+    sources.length;
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
@@ -51,6 +66,10 @@ export default function JobListingPage() {
     offset: (currentPage - 1) * 10,
   };
   const matchesQuery = useJobMatches(matchFilters);
+  const savedJobsQuery = useSavedJobs({
+    page: currentPage,
+    page_size: 10,
+  });
 
   // All jobs view: fetch with filters
   const jobFilters: JobFiltersRequest = {
@@ -68,11 +87,33 @@ export default function JobListingPage() {
 
   // Select data based on view mode
   const isRecommendedView = viewMode === "recommended";
-  const { data: matchesData, isLoading: matchesLoading, isError: matchesError } = matchesQuery;
-  const { data: jobsData, isLoading: jobsLoading, isError: jobsError } = jobsQuery;
+  const isSavedView = viewMode === "saved";
+  const {
+    data: matchesData,
+    isLoading: matchesLoading,
+    isError: matchesError,
+  } = matchesQuery;
+  const {
+    data: jobsData,
+    isLoading: jobsLoading,
+    isError: jobsError,
+  } = jobsQuery;
+  const {
+    data: savedData,
+    isLoading: savedLoading,
+    isError: savedError,
+  } = savedJobsQuery;
 
-  const isLoading = isRecommendedView ? matchesLoading : jobsLoading;
-  const isError = isRecommendedView ? matchesError : jobsError;
+  const isLoading = isRecommendedView
+    ? matchesLoading
+    : isSavedView
+      ? savedLoading
+      : jobsLoading;
+  const isError = isRecommendedView
+    ? matchesError
+    : isSavedView
+      ? savedError
+      : jobsError;
 
   // Calculate pagination for matches (backend returns array, not paginated response)
   const totalMatches = matchesData?.length || 0;
@@ -89,8 +130,8 @@ export default function JobListingPage() {
 
   // Handle filter selection change
   const handleFilterChange = (
-    filterKey: 'location_cities' | 'work_types' | 'companies' | 'sources',
-    values: string[]
+    filterKey: "location_cities" | "work_types" | "companies" | "sources",
+    values: string[],
   ) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete(filterKey);
@@ -121,9 +162,9 @@ export default function JobListingPage() {
       <div className="px-6">
         <div className="bg-white border-b rounded-lg shadow-sm border-slate-200 sticky top-[65px] z-30 px-6 py-4">
           {/* View Mode Tabs - at the top */}
-          <div className="mb-4">
+          <div className="">
             <Tabs value={viewMode} onValueChange={handleViewChange}>
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-lg grid-cols-3">
                 <TabsTrigger value="recommended" className="gap-2">
                   <Sparkles className="h-4 w-4" />
                   Recommended
@@ -132,14 +173,18 @@ export default function JobListingPage() {
                   <Briefcase className="h-4 w-4" />
                   All Jobs
                 </TabsTrigger>
+                <TabsTrigger value="saved" className="gap-2">
+                  <Star className="h-4 w-4" />
+                  Saved
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
           {/* Search Bar - only show in 'all' view */}
-          {!isRecommendedView && (
+          {viewMode === "all" && (
             <>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 mt-4">
                 <div className="flex-1">
                   <JobSearch />
                 </div>
@@ -173,7 +218,9 @@ export default function JobListingPage() {
                       label="Source"
                       options={filterOptions.sources}
                       selectedValues={sources}
-                      onSelectionChange={(values) => handleFilterChange('sources', values)}
+                      onSelectionChange={(values) =>
+                        handleFilterChange("sources", values)
+                      }
                       searchPlaceholder="Search sources..."
                       emptyText="No sources found"
                     />
@@ -182,7 +229,9 @@ export default function JobListingPage() {
                       label="Location"
                       options={filterOptions.location_cities}
                       selectedValues={locationCities}
-                      onSelectionChange={(values) => handleFilterChange('location_cities', values)}
+                      onSelectionChange={(values) =>
+                        handleFilterChange("location_cities", values)
+                      }
                       searchPlaceholder="Search locations..."
                       emptyText="No locations found"
                     />
@@ -191,7 +240,9 @@ export default function JobListingPage() {
                       label="Work Type"
                       options={filterOptions.work_types}
                       selectedValues={workTypes}
-                      onSelectionChange={(values) => handleFilterChange('work_types', values)}
+                      onSelectionChange={(values) =>
+                        handleFilterChange("work_types", values)
+                      }
                       searchPlaceholder="Search work types..."
                       emptyText="No work types found"
                     />
@@ -200,7 +251,9 @@ export default function JobListingPage() {
                       label="Company"
                       options={filterOptions.companies}
                       selectedValues={companies}
-                      onSelectionChange={(values) => handleFilterChange('companies', values)}
+                      onSelectionChange={(values) =>
+                        handleFilterChange("companies", values)
+                      }
                       searchPlaceholder="Search companies..."
                       emptyText="No companies found"
                     />
@@ -238,6 +291,8 @@ export default function JobListingPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : isRecommendedView ? (
                   `${totalMatches} Matched Jobs`
+                ) : isSavedView ? (
+                  `${savedData?.total || 0} Saved Jobs`
                 ) : (
                   `${jobsData?.total || 0} Jobs Found`
                 )}
@@ -306,34 +361,54 @@ export default function JobListingPage() {
                   )}
                 </>
               )
-            ) : (
-              // All jobs view
-              jobsData?.items.length === 0 ? (
+            ) : isSavedView ? (
+              savedData?.items.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
-                  <p className="text-slate-500">
-                    No jobs found matching your criteria.
-                  </p>
-                  <Button
-                    variant="link"
-                    onClick={() => (window.location.href = "/jobs")}
-                    className="mt-2 text-indigo-600"
-                  >
-                    Clear all filters
-                  </Button>
+                  <p className="text-slate-500">No saved jobs yet.</p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-4">
-                    {jobsData?.items.map((job) => (
-                      <JobCard key={job.id} job={job} />
+                    {savedData?.items.map((item) => (
+                      <JobCard
+                        key={item.job.id}
+                        job={item.job}
+                        savedAt={item.saved_at}
+                      />
                     ))}
                   </div>
                   <JobPagination
-                    currentPage={jobsData?.page || 1}
-                    totalPages={jobsData?.total_pages || 1}
+                    currentPage={savedData?.page || 1}
+                    totalPages={savedData?.total_pages || 1}
                   />
                 </>
               )
+            ) : // All jobs view
+            jobsData?.items.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+                <p className="text-slate-500">
+                  No jobs found matching your criteria.
+                </p>
+                <Button
+                  variant="link"
+                  onClick={() => (window.location.href = "/jobs")}
+                  className="mt-2 text-indigo-600"
+                >
+                  Clear all filters
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  {jobsData?.items.map((job) => (
+                    <JobCard key={job.id} job={job} />
+                  ))}
+                </div>
+                <JobPagination
+                  currentPage={jobsData?.page || 1}
+                  totalPages={jobsData?.total_pages || 1}
+                />
+              </>
             )}
           </div>
         </div>

@@ -273,3 +273,29 @@ class JobAnalysis(Base, TimestampMixin):
     # Relationships
     # ============================================
     job: Mapped["SeekJob"] = relationship("SeekJob", backref=backref("analysis", uselist=False))
+
+
+class UserSavedJob(Base, TimestampMixin):
+    """Saved jobs per user."""
+
+    __tablename__ = "user_saved_jobs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_saved_jobs_user_job"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(255), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("seek_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship("User")
+    job: Mapped["SeekJob"] = relationship("SeekJob")

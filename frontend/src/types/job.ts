@@ -121,6 +121,24 @@ export interface JobListResponse {
   total_pages: number
 }
 
+export interface SavedJobStatusResponse {
+  is_saved: boolean
+  saved_at: string | null
+}
+
+export interface SavedJobListItem {
+  job: Job
+  saved_at: string
+}
+
+export interface SavedJobListResponse {
+  items: SavedJobListItem[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 export interface JobFiltersRequest {
   // Search
   keyword?: string
@@ -240,4 +258,9 @@ export interface JobMatchFiltersRequest {
   min_score?: number // Minimum skill match score (0-100)
   limit?: number
   offset?: number
+}
+
+export interface SavedJobsRequest {
+  page: number
+  page_size: number
 }

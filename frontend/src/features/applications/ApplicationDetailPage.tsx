@@ -374,7 +374,8 @@ export default function ApplicationDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-2 justify-end">
-            {application.job?.share_link && (
+            {application.job?.share_link &&
+              ['Pending', 'Ready'].includes(application.status) && (
               <Button variant="default" asChild>
                 <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
                   Apply

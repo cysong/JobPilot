@@ -11,6 +11,29 @@
 
 ## Work Log
 
+### 2026-03-12 - Jobs: Saved (Watchlist) Feature
+
+**Completed Tasks:**
+- Added backend saved-jobs data model `user_saved_jobs` (user + job unique pair).
+- Added Alembic migration:
+  - `20260312_2300_7f4d2c9ab1e0_add_user_saved_jobs.py`
+- Added Jobs API endpoints:
+  - `GET /api/v1/jobs/saved`
+  - `GET /api/v1/jobs/{job_id}/saved`
+  - `POST /api/v1/jobs/{job_id}/saved`
+  - `DELETE /api/v1/jobs/{job_id}/saved`
+- Added frontend API/types/hooks for saved jobs.
+- Updated Job detail page:
+  - Added star save toggle button (`Save` / `Saved`)
+  - Filled gold star visual for saved state
+- Updated Job listing page:
+  - Added `Saved` tab next to `Recommended` and `All Jobs`
+  - Renders saved jobs sorted by saved time (newest first, from backend)
+- Updated Job card time copy for saved context:
+  - `saved x days ago`
+  - Uses the same `formatDistanceToNow(..., { addSuffix: true })` logic as `listed_at`.
+- Per requirement, did not add expired-job handling in saved flow.
+
 ### 2026-03-12 - Application Timestamps: applied_at and offered_at
 
 **Completed Tasks:**

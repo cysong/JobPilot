@@ -16,7 +16,12 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useJobDetail, useSimilarJobs } from "@/features/jobs/hooks/useJobs";
+import {
+  useJobDetail,
+  useJobSavedMutations,
+  useJobSavedStatus,
+  useSimilarJobs,
+} from "@/features/jobs/hooks/useJobs";
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
@@ -64,6 +69,8 @@ export default function JobDetailPage() {
     data: similarJobs,
     isLoading: isSimilarJobsLoading,
   } = useSimilarJobs(jobIdNum, 5);
+  const { data: savedStatus } = useJobSavedStatus(jobIdNum);
+  const { saveJob, unsaveJob } = useJobSavedMutations();
 
   const hasCn = Boolean(job?.content_cn?.trim() || job?.analysis?.cn_content?.trim());
 
@@ -140,6 +147,15 @@ export default function JobDetailPage() {
     language === "zh" && hasCn
       ? job.content_cn || job.analysis?.cn_content || job.content
       : job.content;
+  const isSaved = Boolean(savedStatus?.is_saved);
+
+  const handleToggleSaved = () => {
+    if (isSaved) {
+      unsaveJob.mutate({ jobId: job.id });
+      return;
+    }
+    saveJob.mutate({ jobId: job.id, job });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -162,6 +178,18 @@ export default function JobDetailPage() {
               <Button variant="outline" size="sm">
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleSaved}
+                disabled={saveJob.isPending || unsaveJob.isPending}
+                className={isSaved ? "text-amber-500 border-amber-200 hover:bg-amber-50" : ""}
+              >
+                <Star
+                  className={`h-4 w-4 mr-2 ${isSaved ? "fill-amber-500 text-amber-500" : ""}`}
+                />
+                {isSaved ? "Saved" : "Save"}
               </Button>
 
               {/* Application Button Logic */}
@@ -345,11 +373,6 @@ export default function JobDetailPage() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  {!hasCn && (
-                    <span className="text-xs text-slate-500">
-                      Chinese not available
-                    </span>
-                  )}
                 </div>
               </div>
 

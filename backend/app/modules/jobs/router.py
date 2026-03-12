@@ -23,6 +23,8 @@ from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobListResponse,
     ResumeBriefInfo,
+    SavedJobListResponse,
+    SavedJobStatus,
     UserJobMatchDetailResponse,
     UserJobMatchResponse,
 )
@@ -176,6 +178,16 @@ async def list_jobs(
     )
 
 
+@router.get("/saved", response_model=SavedJobListResponse)
+async def list_saved_jobs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    params: PaginationParams = Depends(),
+):
+    """List saved jobs for current user."""
+    return await service.JobService.list_saved_jobs(db, current_user, params)
+
+
 @router.get("/filters", response_model=JobFiltersOptions)
 async def get_filter_options(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -183,6 +195,36 @@ async def get_filter_options(
 ):
     """Get available filter options for UI dropdowns."""
     return await service.JobService.get_filter_options(db)
+
+
+@router.get("/{job_id}/saved", response_model=SavedJobStatus)
+async def get_job_saved_status(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get saved status for current user and job."""
+    return await service.JobService.get_saved_status(db, current_user, job_id)
+
+
+@router.post("/{job_id}/saved", response_model=SavedJobStatus)
+async def save_job(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Save a job for current user."""
+    return await service.JobService.save_job(db, current_user, job_id)
+
+
+@router.delete("/{job_id}/saved", response_model=SavedJobStatus)
+async def unsave_job(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Remove job from saved list for current user."""
+    return await service.JobService.unsave_job(db, current_user, job_id)
 
 
 @router.get("/{job_id}", response_model=JobDetail)

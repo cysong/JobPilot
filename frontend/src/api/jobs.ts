@@ -10,7 +10,10 @@ import type {
   JobFiltersOptions,
   UserJobMatch,
   UserJobMatchDetail,
-  JobMatchFiltersRequest
+  JobMatchFiltersRequest,
+  SavedJobStatusResponse,
+  SavedJobListResponse,
+  SavedJobsRequest,
 } from '@/types/job'
 
 export const jobsApi = {
@@ -78,6 +81,41 @@ export const jobsApi = {
    */
   getJobById: async (jobId: number): Promise<JobDetail> => {
     const result = await apiClient.get<JobDetail, JobDetail>(`/jobs/${jobId}`)
+    return result
+  },
+
+  /**
+   * Get saved status for current user
+   */
+  getSavedStatus: async (jobId: number): Promise<SavedJobStatusResponse> => {
+    const result = await apiClient.get<SavedJobStatusResponse, SavedJobStatusResponse>(`/jobs/${jobId}/saved`)
+    return result
+  },
+
+  /**
+   * Save a job for current user
+   */
+  saveJob: async (jobId: number): Promise<SavedJobStatusResponse> => {
+    const result = await apiClient.post<SavedJobStatusResponse, SavedJobStatusResponse>(`/jobs/${jobId}/saved`)
+    return result
+  },
+
+  /**
+   * Remove job from saved list for current user
+   */
+  unsaveJob: async (jobId: number): Promise<SavedJobStatusResponse> => {
+    const result = await apiClient.delete<SavedJobStatusResponse, SavedJobStatusResponse>(`/jobs/${jobId}/saved`)
+    return result
+  },
+
+  /**
+   * Get paginated saved jobs for current user
+   */
+  getSavedJobs: async (params: SavedJobsRequest): Promise<SavedJobListResponse> => {
+    const query = new URLSearchParams()
+    query.append('page', params.page.toString())
+    query.append('page_size', params.page_size.toString())
+    const result = await apiClient.get<SavedJobListResponse, SavedJobListResponse>(`/jobs/saved?${query.toString()}`)
     return result
   },
 

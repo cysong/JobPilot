@@ -2,11 +2,11 @@
 import datetime
 from typing import Optional
 
-from sqlalchemy import and_, select, String
+from sqlalchemy import and_, select, String, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.jobs.models import SeekJob, JobAnalysis
+from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskType
 
@@ -334,3 +334,68 @@ class JobAnalysisRepository:
             await db.flush()
             return True
         return False
+
+
+class SavedJobRepository:
+    """Repository for user saved jobs."""
+
+    @staticmethod
+    async def get_by_user_and_job(
+        db: AsyncSession,
+        user_id: int,
+        job_id: int,
+    ) -> Optional[UserSavedJob]:
+        result = await db.execute(
+            select(UserSavedJob).where(
+                and_(UserSavedJob.user_id == user_id, UserSavedJob.job_id == job_id)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create(
+        db: AsyncSession,
+        user_id: int,
+        job_id: int,
+    ) -> UserSavedJob:
+        saved = UserSavedJob(user_id=user_id, job_id=job_id)
+        db.add(saved)
+        await db.flush()
+        await db.refresh(saved)
+        return saved
+
+    @staticmethod
+    async def delete_by_user_and_job(
+        db: AsyncSession,
+        user_id: int,
+        job_id: int,
+    ) -> bool:
+        saved = await SavedJobRepository.get_by_user_and_job(db, user_id, job_id)
+        if not saved:
+            return False
+        await db.delete(saved)
+        await db.flush()
+        return True
+
+    @staticmethod
+    async def list_by_user(
+        db: AsyncSession,
+        user_id: int,
+        *,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[tuple[UserSavedJob, SeekJob]], int]:
+        count_result = await db.execute(
+            select(func.count()).select_from(UserSavedJob).where(UserSavedJob.user_id == user_id)
+        )
+        total = count_result.scalar_one()
+
+        result = await db.execute(
+            select(UserSavedJob, SeekJob)
+            .join(SeekJob, SeekJob.id == UserSavedJob.job_id)
+            .where(UserSavedJob.user_id == user_id)
+            .order_by(UserSavedJob.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.all()), total
