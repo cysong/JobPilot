@@ -299,3 +299,44 @@ class UserSavedJob(Base, TimestampMixin):
 
     user: Mapped["User"] = relationship("User")
     job: Mapped["SeekJob"] = relationship("SeekJob")
+
+
+class UserJobView(Base, TimestampMixin):
+    """Viewed jobs per user."""
+
+    __tablename__ = "user_job_views"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_views_user_job"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(255), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("seek_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    first_viewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    last_viewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    view_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    user: Mapped["User"] = relationship("User")
+    job: Mapped["SeekJob"] = relationship("SeekJob")

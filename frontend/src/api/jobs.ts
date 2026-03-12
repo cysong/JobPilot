@@ -12,6 +12,7 @@ import type {
   UserJobMatchDetail,
   JobMatchFiltersRequest,
   SavedJobStatusResponse,
+  JobViewedStatusResponse,
   SavedJobListResponse,
   SavedJobsRequest,
 } from '@/types/job'
@@ -64,6 +65,10 @@ export const jobsApi = {
       })
     }
 
+    if (filters.view_status && filters.view_status !== 'all') {
+      params.append('view_status', filters.view_status)
+    }
+
     // Add date range filters
     if (filters.listed_after) {
       params.append('listed_after', filters.listed_after)
@@ -89,6 +94,16 @@ export const jobsApi = {
    */
   getSavedStatus: async (jobId: number): Promise<SavedJobStatusResponse> => {
     const result = await apiClient.get<SavedJobStatusResponse, SavedJobStatusResponse>(`/jobs/${jobId}/saved`)
+    return result
+  },
+
+  getViewedStatus: async (jobId: number): Promise<JobViewedStatusResponse> => {
+    const result = await apiClient.get<JobViewedStatusResponse, JobViewedStatusResponse>(`/jobs/${jobId}/viewed`)
+    return result
+  },
+
+  markJobViewed: async (jobId: number): Promise<JobViewedStatusResponse> => {
+    const result = await apiClient.post<JobViewedStatusResponse, JobViewedStatusResponse>(`/jobs/${jobId}/viewed`)
     return result
   },
 

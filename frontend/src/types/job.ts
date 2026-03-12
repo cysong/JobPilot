@@ -39,6 +39,10 @@ export interface Job {
 
   // Share link
   share_link: string | null
+
+  // User-specific metadata
+  is_viewed?: boolean
+  last_viewed_at?: string | null
 }
 
 export interface JobDetail extends Job {
@@ -126,6 +130,13 @@ export interface SavedJobStatusResponse {
   saved_at: string | null
 }
 
+export interface JobViewedStatusResponse {
+  is_viewed: boolean
+  first_viewed_at: string | null
+  last_viewed_at: string | null
+  view_count: number
+}
+
 export interface SavedJobListItem {
   job: Job
   saved_at: string
@@ -148,6 +159,7 @@ export interface JobFiltersRequest {
   work_types?: string[]
   companies?: string[]
   sources?: string[]
+  view_status?: 'all' | 'viewed' | 'unviewed'
 
   // Date range
   listed_after?: string
@@ -217,6 +229,8 @@ export interface JobBriefInfo {
   abstract: string | null
   classification: string | null
   sub_classification: string | null
+  is_viewed?: boolean
+  last_viewed_at?: string | null
 }
 
 /**

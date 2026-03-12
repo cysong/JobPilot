@@ -25,13 +25,55 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+type ViewStatus = "all" | "viewed" | "unviewed";
+type ListPositionState = {
+  anchorJobId: number;
+  scrollY: number;
+  updatedAt: number;
+};
+
+const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
+const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
+const RESTORE_HIGHLIGHT_MS = 2000;
+
+const normalizeSearchParams = (params: URLSearchParams): string => {
+  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
+    if (aKey === bKey) return aVal.localeCompare(bVal);
+    return aKey.localeCompare(bKey);
+  });
+  return entries
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join("&");
+};
+
+const getContextKey = (params: URLSearchParams): string => {
+  return `jobs:list:${normalizeSearchParams(params)}`;
+};
+
+const readPositions = (): Record<string, ListPositionState> => {
+  try {
+    const raw = sessionStorage.getItem(JOB_LIST_POSITIONS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, ListPositionState>) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writePositions = (positions: Record<string, ListPositionState>) => {
+  sessionStorage.setItem(JOB_LIST_POSITIONS_KEY, JSON.stringify(positions));
+};
+
 export default function JobListingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
+  const [highlightedJobId, setHighlightedJobId] = useState<number | null>(null);
+  const previousContextKey = useRef<string | null>(null);
 
   // Get view mode from URL (default: recommended)
   const viewMode = searchParams.get("view") || "recommended";
   const currentPage = parseInt(searchParams.get("page") || "1");
+  const viewStatus = (searchParams.get("view_status") as ViewStatus) || "all";
+  const contextKey = getContextKey(searchParams);
 
   // Get active filters
   const locationCities = searchParams.getAll("location_cities");
@@ -42,7 +84,8 @@ export default function JobListingPage() {
     locationCities.length +
     workTypes.length +
     companies.length +
-    sources.length;
+    sources.length +
+    (viewStatus === "all" ? 0 : 1);
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
@@ -83,6 +126,7 @@ export default function JobListingPage() {
     work_types: searchParams.getAll("work_types"),
     companies: searchParams.getAll("companies"),
     sources: searchParams.getAll("sources"),
+    view_status: viewStatus,
   };
   const jobsQuery = useJobs(jobFilters);
 
@@ -141,6 +185,17 @@ export default function JobListingPage() {
     setSearchParams(newParams);
   };
 
+  const handleViewStatusChange = (nextStatus: ViewStatus) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (nextStatus === "all") {
+      newParams.delete("view_status");
+    } else {
+      newParams.set("view_status", nextStatus);
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   // Handle clear all filters
   const handleClearAllFilters = () => {
     const newParams = new URLSearchParams(searchParams);
@@ -148,14 +203,66 @@ export default function JobListingPage() {
     newParams.delete("work_types");
     newParams.delete("companies");
     newParams.delete("sources");
+    newParams.delete("view_status");
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
 
-  // Scroll to top on page change
+  const handleOpenJob = (jobId: number) => {
+    const positions = readPositions();
+    positions[contextKey] = {
+      anchorJobId: jobId,
+      scrollY: window.scrollY,
+      updatedAt: Date.now(),
+    };
+    writePositions(positions);
+  };
+
+  // Reset to top when list context changes (filters/search/sort/view/page)
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentPage]);
+    if (previousContextKey.current && previousContextKey.current !== contextKey) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+    previousContextKey.current = contextKey;
+  }, [contextKey]);
+
+  // Restore anchor position only when returning from detail with same context.
+  useEffect(() => {
+    if (isLoading || isError) return;
+
+    const rawIntent = sessionStorage.getItem(JOB_LIST_RETURN_INTENT_KEY);
+    if (!rawIntent) return;
+
+    let intent: { contextKey: string; jobId: number } | null = null;
+    try {
+      intent = JSON.parse(rawIntent) as { contextKey: string; jobId: number };
+    } catch {
+      sessionStorage.removeItem(JOB_LIST_RETURN_INTENT_KEY);
+      return;
+    }
+
+    if (!intent || intent.contextKey !== contextKey) {
+      return;
+    }
+
+    sessionStorage.removeItem(JOB_LIST_RETURN_INTENT_KEY);
+
+    const positions = readPositions();
+    const position = positions[contextKey];
+    const targetJobId = intent.jobId || position?.anchorJobId;
+    if (!targetJobId) return;
+
+    requestAnimationFrame(() => {
+      const anchorElement = document.querySelector(`[data-job-id="${targetJobId}"]`);
+      if (anchorElement instanceof HTMLElement) {
+        anchorElement.scrollIntoView({ block: "center", behavior: "auto" });
+      } else if (position?.scrollY !== undefined) {
+        window.scrollTo({ top: position.scrollY, behavior: "auto" });
+      }
+      setHighlightedJobId(targetJobId);
+      window.setTimeout(() => setHighlightedJobId(null), RESTORE_HIGHLIGHT_MS);
+    });
+  }, [contextKey, isError, isLoading]);
 
   return (
     <div className="flex flex-col h-full">
@@ -189,6 +296,19 @@ export default function JobListingPage() {
                 <div className="flex-1">
                   <JobSearch />
                 </div>
+
+                <Tabs
+                  value={viewStatus}
+                  onValueChange={(value) =>
+                    handleViewStatusChange(value as ViewStatus)
+                  }
+                >
+                  <TabsList className="grid grid-cols-3">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="unviewed">Unviewed</TabsTrigger>
+                    <TabsTrigger value="viewed">Viewed</TabsTrigger>
+                  </TabsList>
+                </Tabs>
 
                 {/* Filter Toggle Button */}
                 <Button
@@ -347,6 +467,8 @@ export default function JobListingPage() {
                         key={match.id}
                         job={match.job}
                         matchData={match}
+                        onOpenJob={handleOpenJob}
+                        highlighted={highlightedJobId === match.job.id}
                       />
                     ))}
                   </div>
@@ -371,6 +493,8 @@ export default function JobListingPage() {
                         key={item.job.id}
                         job={item.job}
                         savedAt={item.saved_at}
+                        onOpenJob={handleOpenJob}
+                        highlighted={highlightedJobId === item.job.id}
                       />
                     ))}
                   </div>
@@ -398,7 +522,12 @@ export default function JobListingPage() {
               <>
                 <div className="space-y-4">
                   {jobsData?.items.map((job) => (
-                    <JobCard key={job.id} job={job} />
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      onOpenJob={handleOpenJob}
+                      highlighted={highlightedJobId === job.id}
+                    />
                   ))}
                 </div>
                 <JobPagination

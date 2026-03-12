@@ -1,15 +1,14 @@
 """
 Job service layer - business logic for job operations.
 """
-from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, func, or_, and_, distinct
+from sqlalchemy import select, func, or_, and_, distinct, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.jobs.models import SeekJob
-from app.modules.jobs.repository import JobRepository, SavedJobRepository
+from app.modules.jobs.models import SeekJob, UserJobView
+from app.modules.jobs.repository import JobRepository, SavedJobRepository, UserJobViewRepository
 from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobFiltersOptions,
@@ -17,6 +16,7 @@ from app.modules.jobs.schemas import (
     SavedJobItem,
     SavedJobListResponse,
     SavedJobStatus,
+    JobViewedStatus,
 )
 from app.modules.auth.models import User
 from app.core.exceptions import NotFoundError
@@ -31,7 +31,8 @@ class JobService:
         db: AsyncSession,
         filters: JobFiltersRequest,
         pagination: PaginationParams,
-    ) -> tuple[list[SeekJob], int]:
+        user_id: int,
+    ) -> tuple[list[JobBase], int]:
         """
         Get paginated job list with filtering.
 
@@ -92,6 +93,30 @@ class JobService:
         if filters.listed_before:
             query = query.where(SeekJob.listed_at <= filters.listed_before)
 
+        # Apply viewed status filter
+        if filters.view_status == "viewed":
+            query = query.where(
+                exists(
+                    select(1).where(
+                        and_(
+                            UserJobView.user_id == user_id,
+                            UserJobView.job_id == SeekJob.id,
+                        )
+                    )
+                )
+            )
+        elif filters.view_status == "unviewed":
+            query = query.where(
+                ~exists(
+                    select(1).where(
+                        and_(
+                            UserJobView.user_id == user_id,
+                            UserJobView.job_id == SeekJob.id,
+                        )
+                    )
+                )
+            )
+
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await db.execute(count_query)
@@ -117,7 +142,19 @@ class JobService:
         result = await db.execute(query)
         jobs = result.scalars().all()
 
-        return list(jobs), total
+        job_list = list(jobs)
+        job_ids = [job.id for job in job_list]
+        view_map = await UserJobViewRepository.get_view_map(db, user_id, job_ids)
+
+        job_items: list[JobBase] = []
+        for job in job_list:
+            item = JobBase.model_validate(job)
+            view = view_map.get(job.id)
+            item.is_viewed = view is not None
+            item.last_viewed_at = view.last_viewed_at if view else None
+            job_items.append(item)
+
+        return job_items, total
 
     @staticmethod
     async def get_job_by_id(db: AsyncSession, job_id: int) -> Optional[SeekJob]:
@@ -376,6 +413,51 @@ class JobService:
         return SavedJobStatus(is_saved=True, saved_at=saved.created_at)
 
     @staticmethod
+    async def get_viewed_status(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+    ) -> JobViewedStatus:
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        viewed = await UserJobViewRepository.get_by_user_and_job(db, user.id, job_id)
+        if not viewed:
+            return JobViewedStatus(
+                is_viewed=False,
+                first_viewed_at=None,
+                last_viewed_at=None,
+                view_count=0,
+            )
+
+        return JobViewedStatus(
+            is_viewed=True,
+            first_viewed_at=viewed.first_viewed_at,
+            last_viewed_at=viewed.last_viewed_at,
+            view_count=viewed.view_count,
+        )
+
+    @staticmethod
+    async def mark_job_viewed(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+    ) -> JobViewedStatus:
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        viewed = await UserJobViewRepository.mark_viewed(db, user.id, job_id)
+        await db.commit()
+        return JobViewedStatus(
+            is_viewed=True,
+            first_viewed_at=viewed.first_viewed_at,
+            last_viewed_at=viewed.last_viewed_at,
+            view_count=viewed.view_count,
+        )
+
+    @staticmethod
     async def save_job(
         db: AsyncSession,
         user: User,
@@ -421,11 +503,16 @@ class JobService:
             limit=pagination.get_limit(),
         )
         items: list[SavedJobItem] = []
+        job_ids = [job.id for _, job in rows]
+        view_map = await UserJobViewRepository.get_view_map(db, user.id, job_ids)
         for saved, job in rows:
             job_item = JobBase.model_validate(job)
             # Keep saved cards visually aligned with list cards when source logo is missing.
             if not job_item.company_logo and job.branding_logo_url:
                 job_item.company_logo = job.branding_logo_url
+            viewed = view_map.get(job.id)
+            job_item.is_viewed = viewed is not None
+            job_item.last_viewed_at = viewed.last_viewed_at if viewed else None
             items.append(
                 SavedJobItem(
                     job=job_item,

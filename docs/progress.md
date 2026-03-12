@@ -11,6 +11,37 @@
 
 ## Work Log
 
+### 2026-03-13 - Jobs: Viewed State + Return Position Restore
+
+**Completed Tasks:**
+- Added end-to-end viewed-state support for jobs browsing.
+- Added backend viewed data model:
+  - new table `user_job_views` with user+job unique constraint
+  - fields: `first_viewed_at`, `last_viewed_at`, `view_count`
+  - migration: `20260313_1610_5e2c7d9b1a4f_add_user_job_views.py`
+- Extended Jobs API:
+  - `GET /api/v1/jobs/{job_id}/viewed`
+  - `POST /api/v1/jobs/{job_id}/viewed`
+  - `GET /api/v1/jobs` now supports `view_status=all|viewed|unviewed`
+- Extended jobs response schemas:
+  - list/saved/match items now include `is_viewed` and `last_viewed_at`
+- Implemented backend viewed filtering and viewed metadata hydration in:
+  - job list
+  - saved jobs list
+  - recommended matches list
+- Implemented frontend non-blocking viewed marking:
+  - detail page triggers background mark-viewed mutation (no render blocking, no toast interruption)
+  - added short dedupe window to avoid excessive repeat calls
+- Implemented frontend list position restore across detail navigation:
+  - per-context anchor persistence via `sessionStorage`
+  - restore and temporary highlight when returning from detail under same context
+  - filter/search/sort/view/page context changes reset list to top
+- Added viewed UI affordances:
+  - `All / Unviewed / Viewed` segmented filter on Jobs list
+  - `Viewed` badge and viewed-relative-time on job cards
+- Added implementation design doc:
+  - `docs/job_browsing_viewed_and_position_plan.md`
+
 ### 2026-03-13 - Jobs Company Filter: Debounced Remote Search
 
 **Completed Tasks:**

@@ -3,10 +3,11 @@ import datetime
 from typing import Optional
 
 from sqlalchemy import and_, select, String, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob
+from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob, UserJobView
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskType
 
@@ -406,3 +407,79 @@ class SavedJobRepository:
             .limit(limit)
         )
         return list(result.all()), total
+
+
+class UserJobViewRepository:
+    """Repository for user viewed jobs."""
+
+    @staticmethod
+    async def get_by_user_and_job(
+        db: AsyncSession,
+        user_id: int,
+        job_id: int,
+    ) -> Optional[UserJobView]:
+        result = await db.execute(
+            select(UserJobView).where(
+                and_(UserJobView.user_id == user_id, UserJobView.job_id == job_id)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def mark_viewed(
+        db: AsyncSession,
+        user_id: int,
+        job_id: int,
+    ) -> UserJobView:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        existing = await UserJobViewRepository.get_by_user_and_job(db, user_id, job_id)
+        if existing:
+            existing.last_viewed_at = now
+            existing.view_count = max(1, existing.view_count) + 1
+            await db.flush()
+            await db.refresh(existing)
+            return existing
+
+        viewed = UserJobView(
+            user_id=user_id,
+            job_id=job_id,
+            first_viewed_at=now,
+            last_viewed_at=now,
+            view_count=1,
+        )
+        db.add(viewed)
+        try:
+            await db.flush()
+            await db.refresh(viewed)
+            return viewed
+        except IntegrityError:
+            await db.rollback()
+            # Handle rare race condition on unique(user_id, job_id).
+            existing = await UserJobViewRepository.get_by_user_and_job(db, user_id, job_id)
+            if not existing:
+                raise
+            existing.last_viewed_at = now
+            existing.view_count = max(1, existing.view_count) + 1
+            await db.flush()
+            await db.refresh(existing)
+            return existing
+
+    @staticmethod
+    async def get_view_map(
+        db: AsyncSession,
+        user_id: int,
+        job_ids: list[int],
+    ) -> dict[int, UserJobView]:
+        if not job_ids:
+            return {}
+
+        result = await db.execute(
+            select(UserJobView).where(
+                and_(
+                    UserJobView.user_id == user_id,
+                    UserJobView.job_id.in_(job_ids),
+                )
+            )
+        )
+        views = result.scalars().all()
+        return {view.job_id: view for view in views}

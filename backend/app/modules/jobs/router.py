@@ -13,7 +13,7 @@ from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.jobs import service
-from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
+from app.modules.jobs.repository import JobRepository, JobAnalysisRepository, UserJobViewRepository
 from app.modules.jobs.schemas import (
     JobAnalysisResponse,
     JobBase,
@@ -25,6 +25,7 @@ from app.modules.jobs.schemas import (
     ResumeBriefInfo,
     SavedJobListResponse,
     SavedJobStatus,
+    JobViewedStatus,
     UserJobMatchDetailResponse,
     UserJobMatchResponse,
 )
@@ -56,6 +57,12 @@ async def list_my_matches(
         offset=offset,
     )
 
+    view_map = await UserJobViewRepository.get_view_map(
+        db=db,
+        user_id=current_user.id,
+        job_ids=[match.job_id for match in matches],
+    )
+
     results: list[UserJobMatchResponse] = []
     for match in matches:
         job = await JobRepository.get_by_id(db, match.job_id)
@@ -65,10 +72,15 @@ async def list_my_matches(
         if match.recommended_resume_id:
             resume = await ResumeRepository.get_by_id(db, match.recommended_resume_id)
 
+        job_info = JobBriefInfo.model_validate(job)
+        viewed = view_map.get(match.job_id)
+        job_info.is_viewed = viewed is not None
+        job_info.last_viewed_at = viewed.last_viewed_at if viewed else None
+
         results.append(
             UserJobMatchResponse(
                 id=match.id,
-                job=JobBriefInfo.model_validate(job) if job else None,
+                job=job_info,
                 skill_match_score=match.skill_match_score,
                 resume_match_score=match.resume_match_score,
                 ai_match_score=match.ai_match_score,
@@ -133,6 +145,7 @@ async def list_jobs(
     work_types: list[str] | None = Query(None, description="Filter by work types"),
     companies: list[str] | None = Query(None, description="Filter by companies"),
     sources: list[str] | None = Query(None, description="Filter by sources"),
+    view_status: str = Query("all", pattern="^(all|viewed|unviewed)$", description="Viewed status filter"),
     listed_after: str | None = Query(None, description="Listed after date (ISO format)"),
     listed_before: str | None = Query(None, description="Listed before date (ISO format)"),
     params: PaginationParams = Depends(),
@@ -161,14 +174,14 @@ async def list_jobs(
         work_types=work_types,
         companies=companies,
         sources=sources,
+        view_status=view_status,
         listed_after=parsed_listed_after,
         listed_before=parsed_listed_before,
         sort_by=sort_by,
         sort_order=sort_order,
     )
 
-    jobs, total = await service.JobService.get_jobs(db, filters, params)
-    job_items = [JobBase.model_validate(job) for job in jobs]
+    job_items, total = await service.JobService.get_jobs(db, filters, params, current_user.id)
 
     return JobListResponse.create(
         items=job_items,
@@ -216,6 +229,26 @@ async def get_job_saved_status(
 ):
     """Get saved status for current user and job."""
     return await service.JobService.get_saved_status(db, current_user, job_id)
+
+
+@router.get("/{job_id}/viewed", response_model=JobViewedStatus)
+async def get_job_viewed_status(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get viewed status for current user and job."""
+    return await service.JobService.get_viewed_status(db, current_user, job_id)
+
+
+@router.post("/{job_id}/viewed", response_model=JobViewedStatus)
+async def mark_job_viewed(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Mark a job as viewed for current user."""
+    return await service.JobService.mark_job_viewed(db, current_user, job_id)
 
 
 @router.post("/{job_id}/saved", response_model=SavedJobStatus)

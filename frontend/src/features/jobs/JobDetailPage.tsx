@@ -21,6 +21,7 @@ import {
   useJobSavedMutations,
   useJobSavedStatus,
   useSimilarJobs,
+  useJobViewedMutations,
 } from "@/features/jobs/hooks/useJobs";
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
@@ -46,6 +47,23 @@ import {
 } from "@/components/ui/tooltip";
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
+const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
+const VIEWED_DEDUP_WINDOW_MS = 60 * 1000;
+
+const normalizeSearchParams = (params: URLSearchParams): string => {
+  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
+    if (aKey === bKey) return aVal.localeCompare(bVal);
+    return aKey.localeCompare(bKey);
+  });
+  return entries
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join("&");
+};
+
+const getContextKey = (params: URLSearchParams): string => {
+  return `jobs:list:${normalizeSearchParams(params)}`;
+};
+
 const formatSourceLabel = (source: string | null | undefined): string =>
   source ? source.toUpperCase() : "UNKNOWN";
 
@@ -57,6 +75,7 @@ const getCompanyDisplayName = (
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const [searchParams] = useSearchParams();
+  const serializedSearchParams = searchParams.toString();
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
   const [language, setLanguage] = useState<"en" | "zh">("en");
   const jobIdNum = parseInt(jobId || "0");
@@ -71,6 +90,7 @@ export default function JobDetailPage() {
   } = useSimilarJobs(jobIdNum, 5);
   const { data: savedStatus } = useJobSavedStatus(jobIdNum);
   const { saveJob, unsaveJob } = useJobSavedMutations();
+  const { markViewed } = useJobViewedMutations();
 
   const hasCn = Boolean(job?.content_cn?.trim() || job?.analysis?.cn_content?.trim());
 
@@ -82,6 +102,27 @@ export default function JobDetailPage() {
     }
     setLanguage("en");
   }, [jobIdNum, hasCn]);
+
+  useEffect(() => {
+    if (!jobIdNum) return;
+    const contextKey = getContextKey(searchParams);
+    sessionStorage.setItem(
+      JOB_LIST_RETURN_INTENT_KEY,
+      JSON.stringify({ contextKey, jobId: jobIdNum }),
+    );
+  }, [jobIdNum, serializedSearchParams, searchParams]);
+
+  useEffect(() => {
+    if (!jobIdNum) return;
+
+    const dedupeKey = `jobs:viewed:last:${jobIdNum}`;
+    const lastMarkedAt = Number(sessionStorage.getItem(dedupeKey) || "0");
+    const now = Date.now();
+    if (now - lastMarkedAt < VIEWED_DEDUP_WINDOW_MS) return;
+
+    sessionStorage.setItem(dedupeKey, String(now));
+    markViewed.mutate({ jobId: jobIdNum });
+  }, [jobIdNum, markViewed]);
 
   const handleLanguageChange = (value: string) => {
     if (value === "zh" && !hasCn) return;

@@ -48,6 +48,10 @@ class JobBase(BaseModel):
     # Share link
     share_link: Optional[str] = None
 
+    # User-specific metadata
+    is_viewed: bool = False
+    last_viewed_at: Optional[datetime] = None
+
     model_config = {"from_attributes": True}
 
 
@@ -135,6 +139,15 @@ class SavedJobStatus(BaseModel):
     saved_at: Optional[datetime] = None
 
 
+class JobViewedStatus(BaseModel):
+    """Viewed status for a user-job pair."""
+
+    is_viewed: bool
+    first_viewed_at: Optional[datetime] = None
+    last_viewed_at: Optional[datetime] = None
+    view_count: int = 0
+
+
 class SavedJobItem(BaseModel):
     """Saved jobs list item."""
 
@@ -156,6 +169,7 @@ class JobFiltersRequest(BaseModel):
     work_types: Optional[list[str]] = Field(None, description="Filter by work types")
     companies: Optional[list[str]] = Field(None, description="Filter by company names")
     sources: Optional[list[str]] = Field(None, description="Filter by job sources")
+    view_status: str = Field("all", description="Viewed status filter: all, viewed, unviewed")
 
     # Date range
     listed_after: Optional[datetime] = Field(None, description="Filter jobs listed after this date")
@@ -245,6 +259,8 @@ class JobBriefInfo(BaseModel):
     abstract: Optional[str] = None
     classification: Optional[str] = None
     sub_classification: Optional[str] = None
+    is_viewed: bool = False
+    last_viewed_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

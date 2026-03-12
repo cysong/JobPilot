@@ -9,6 +9,7 @@ import type {
   JobMatchFiltersRequest,
   SavedJobListResponse,
   SavedJobStatusResponse,
+  JobViewedStatusResponse,
   SavedJobsRequest,
 } from '@/types/job'
 import { useToast } from '@/components/ui/use-toast'
@@ -89,6 +90,17 @@ export const useJobSavedStatus = (jobId: number | null) => {
   return useQuery({
     queryKey: ['job-saved-status', jobId],
     queryFn: () => jobsApi.getSavedStatus(jobId!),
+    enabled: !!jobId,
+  })
+}
+
+/**
+ * Hook to fetch current user's viewed status for a job
+ */
+export const useJobViewedStatus = (jobId: number | null) => {
+  return useQuery({
+    queryKey: ['job-viewed-status', jobId],
+    queryFn: () => jobsApi.getViewedStatus(jobId!),
     enabled: !!jobId,
   })
 }
@@ -231,4 +243,68 @@ export const useJobSavedMutations = () => {
     saveJob,
     unsaveJob,
   }
+}
+
+/**
+ * Viewed-state mutation for jobs.
+ * Intentionally no toast to keep browsing flow uninterrupted.
+ */
+export const useJobViewedMutations = () => {
+  const queryClient = useQueryClient()
+
+  const markViewed = useMutation({
+    mutationFn: ({ jobId }: { jobId: number }) => jobsApi.markJobViewed(jobId),
+    onMutate: async ({ jobId }) => {
+      const now = new Date().toISOString()
+      const previousViewed = queryClient.getQueryData<JobViewedStatusResponse>(['job-viewed-status', jobId])
+      queryClient.setQueryData<JobViewedStatusResponse>(['job-viewed-status', jobId], {
+        is_viewed: true,
+        first_viewed_at: previousViewed?.first_viewed_at || now,
+        last_viewed_at: now,
+        view_count: (previousViewed?.view_count || 0) + 1,
+      })
+
+      const patchJob = <T extends { id: number; is_viewed?: boolean; last_viewed_at?: string | null }>(job: T): T => {
+        if (job.id !== jobId) return job
+        return { ...job, is_viewed: true, last_viewed_at: now }
+      }
+
+      queryClient.setQueriesData({ queryKey: ['jobs'] }, (oldData: unknown) => {
+        const data = oldData as { items?: Array<{ id: number; is_viewed?: boolean; last_viewed_at?: string | null }> } | undefined
+        if (!data?.items) return oldData
+        return {
+          ...data,
+          items: data.items.map((job) => patchJob(job)),
+        }
+      })
+
+      queryClient.setQueriesData({ queryKey: ['saved-jobs'] }, (oldData: unknown) => {
+        const data = oldData as {
+          items?: Array<{ job: { id: number; is_viewed?: boolean; last_viewed_at?: string | null } }>
+        } | undefined
+        if (!data?.items) return oldData
+        return {
+          ...data,
+          items: data.items.map((item) => ({
+            ...item,
+            job: patchJob(item.job),
+          })),
+        }
+      })
+
+      queryClient.setQueriesData({ queryKey: ['job-matches'] }, (oldData: unknown) => {
+        const data = oldData as Array<{ job: { id: number; is_viewed?: boolean; last_viewed_at?: string | null } }> | undefined
+        if (!data) return oldData
+        return data.map((item) => ({
+          ...item,
+          job: patchJob(item.job),
+        }))
+      })
+    },
+    onSuccess: (data, { jobId }) => {
+      queryClient.setQueryData<JobViewedStatusResponse>(['job-viewed-status', jobId], data)
+    },
+  })
+
+  return { markViewed }
 }

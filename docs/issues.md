@@ -435,3 +435,25 @@ Migration behavior:
 ### Verification Notes
 - Repository scan confirms no remaining naive datetime calls in backend app code.
 - Bytecode compile validation was partially blocked by local filesystem `PermissionError` on `__pycache__` writes in this environment.
+
+## Fixed: Alembic migration file encoding caused syntax error (BOM)
+
+### Problem
+The new migration file for `user_job_views` failed to parse with:
+`SyntaxError: invalid non-printable character U+FEFF`.
+
+### Root Cause
+The file was initially written with UTF-8 BOM using PowerShell `Set-Content -Encoding UTF8`, and Python interpreted BOM as an invalid leading character.
+
+### Solution
+Rewrote the migration file in UTF-8 without BOM using .NET `UTF8Encoding(false)`.
+
+### Verification
+Validated parsing via `compile(source, path, 'exec')` over all modified backend Python files, including:
+- `backend/alembic/versions/20260313_1610_5e2c7d9b1a4f_add_user_job_views.py`
+
+---
+
+**Fixed On**: 2026-03-13
+**Status**: Completed
+**Scope**: Backend migration file encoding

@@ -16,19 +16,28 @@ interface JobCardProps {
     job: Job | JobBriefInfo // Accept both full Job and JobBriefInfo
     matchData?: UserJobMatch // Optional match data for recommended view
     savedAt?: string | null
+    onOpenJob?: (jobId: number) => void
+    highlighted?: boolean
 }
 
 const formatSourceLabel = (source: string | null | undefined): string =>
   source ? source.toUpperCase() : "UNKNOWN";
 
-export function JobCard({ job, matchData, savedAt }: JobCardProps) {
+export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
 
     // Preserve current search params when navigating to detail page
     const detailUrl = `/jobs/${job.id}?${searchParams.toString()}`
 
+    const isViewed = Boolean(job.is_viewed);
+
     return (
-      <Card className="relative hover:shadow-md transition-shadow border-slate-200">
+      <Card
+        data-job-id={job.id}
+        className={`relative hover:shadow-md transition-shadow border-slate-200 bg-white ${
+          highlighted ? "ring-2 ring-amber-300 border-amber-300" : ""
+        }`}
+      >
         {/* Company logo - absolute positioned at Card level, independent of all content */}
         {job.company_logo && (
           <img
@@ -54,12 +63,24 @@ export function JobCard({ job, matchData, savedAt }: JobCardProps) {
               </div>
             )}
 
-            <Link
-              to={detailUrl}
-              className="font-semibold text-lg text-slate-900 hover:text-indigo-600 line-clamp-2"
-            >
-              {job.title}
-            </Link>
+            <div className="flex items-start gap-3">
+              <Link
+                to={detailUrl}
+                className={`text-lg hover:text-indigo-600 line-clamp-2 ${
+                  isViewed ? "font-medium text-slate-700" : "font-semibold text-slate-900"
+                }`}
+                onClick={() => onOpenJob?.(job.id)}
+              >
+                {job.title}
+              </Link>
+              <span
+                className={`mt-2 h-2.5 w-2.5 rounded-full shrink-0 ${
+                  isViewed ? "bg-slate-300" : "border border-indigo-500"
+                }`}
+                aria-label={isViewed ? "Viewed job" : "Unviewed job"}
+                title={isViewed ? "Viewed" : "Unviewed"}
+              />
+            </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Building2 className="h-4 w-4" />
               <span className="font-medium">{job.advertiser_name}</span>
@@ -108,10 +129,14 @@ export function JobCard({ job, matchData, savedAt }: JobCardProps) {
             )}
           </div>
         </CardContent>
-        <CardFooter className="p-4 pt-0 text-xs text-slate-400">
+        <CardFooter className={`p-4 pt-0 text-xs ${isViewed ? "text-slate-400" : "text-slate-500"}`}>
           <span>
             {savedAt
               ? `saved ${formatDistanceToNow(new Date(savedAt), {
+                  addSuffix: true,
+                })}`
+              : isViewed && job.last_viewed_at
+              ? `viewed ${formatDistanceToNow(new Date(job.last_viewed_at), {
                   addSuffix: true,
                 })}`
               : job.listed_at
