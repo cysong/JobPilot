@@ -5,11 +5,37 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-11
+**Last Updated:** 2026-03-12
 
 ---
 
 ## Work Log
+
+### 2026-03-12 - Job Detail Similar Jobs: Hide Reason Tags + Company Name Consistency
+
+**Completed Tasks:**
+- Temporarily commented out recommendation reason badges (`Same company` / `Same classification`) in similar job cards on the job detail page.
+- Unified company display logic in job detail page via shared helper:
+  - Current job header/company section and similar job cards now use the same fallback order:
+    - `advertiser_name` -> `company_name` -> `Unknown company`
+- Removed now-unused inline reason helper logic from page runtime path.
+
+### 2026-03-12 - Job Detail: Similar Jobs Module (Phase 1)
+
+**Completed Tasks:**
+- Connected `useSimilarJobs(jobId, 5)` to the job detail page sidebar.
+- Replaced previous placeholder with a production-ready `Similar Jobs` card section.
+- Added loading skeleton state for similar jobs request.
+- Added empty state copy: `No similar jobs found.`
+- Rendered similar job items with key fields:
+  - title (navigable link)
+  - company
+  - location
+  - relative posted time
+- Added explainability tags for recommendation reasons:
+  - `Same company`
+  - `Same classification`
+- Preserved listing query params when navigating from detail page to a similar job detail.
 
 ### 2026-03-11 - Applications Listing: Search + Status Filter + Pagination Params
 

@@ -16,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useJobDetail } from "@/features/jobs/hooks/useJobs";
+import { useJobDetail, useSimilarJobs } from "@/features/jobs/hooks/useJobs";
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
@@ -44,6 +44,11 @@ const LANGUAGE_STORAGE_KEY = "job_detail_language";
 const formatSourceLabel = (source: string | null | undefined): string =>
   source ? source.toUpperCase() : "UNKNOWN";
 
+const getCompanyDisplayName = (
+  companyName: string | null | undefined,
+  advertiserName: string | null | undefined,
+): string => advertiserName?.trim() || companyName?.trim() || "Unknown company";
+
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const [searchParams] = useSearchParams();
@@ -55,6 +60,10 @@ export default function JobDetailPage() {
     isLoading,
     isError,
   } = useJobDetail(jobIdNum);
+  const {
+    data: similarJobs,
+    isLoading: isSimilarJobsLoading,
+  } = useSimilarJobs(jobIdNum, 5);
 
   const hasCn = Boolean(job?.content_cn?.trim() || job?.analysis?.cn_content?.trim());
 
@@ -278,7 +287,7 @@ export default function JobDetailPage() {
                 <div className="flex items-center gap-2 text-slate-600 mb-4">
                   <Building2 className="h-5 w-5 text-indigo-600" />
                   <span className="font-medium text-lg">
-                    {job.advertiser_name}
+                    {getCompanyDisplayName(job.company_name, job.advertiser_name)}
                   </span>
                 </div>
               </div>
@@ -371,8 +380,8 @@ export default function JobDetailPage() {
                 </h3>
                 <p className="text-sm text-slate-600 mb-4">
                   {job.classification
-                    ? `${job.company_name || job.advertiser_name} is a leading company in the ${job.classification} sector.`
-                    : `${job.company_name || job.advertiser_name} is a leading company.`}
+                    ? `${getCompanyDisplayName(job.company_name, job.advertiser_name)} is a leading company in the ${job.classification} sector.`
+                    : `${getCompanyDisplayName(job.company_name, job.advertiser_name)} is a leading company.`}
                 </p>
                 <Button variant="outline" className="w-full">
                   View Company Profile
@@ -482,15 +491,78 @@ export default function JobDetailPage() {
               </Card>
             )}
 
-            {/* Similar Jobs (Placeholder - would use useSimilarJobs hook) */}
-            {/* <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h3 className="font-semibold text-slate-900 mb-4">Similar Jobs</h3>
-              <div className="space-y-4">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            </div> */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-slate-900 mb-4">Similar Jobs</h3>
+
+                {isSimilarJobsLoading && (
+                  <div className="space-y-3">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                )}
+
+                {!isSimilarJobsLoading && (!similarJobs || similarJobs.length === 0) && (
+                  <p className="text-sm text-slate-500">No similar jobs found.</p>
+                )}
+
+                {!isSimilarJobsLoading && similarJobs && similarJobs.length > 0 && (
+                  <div className="space-y-4">
+                    {similarJobs.map((similarJob) => (
+                      <div
+                        key={similarJob.id}
+                        className="border border-slate-200 rounded-lg p-4 hover:border-indigo-200 transition-colors"
+                      >
+                        <Link
+                          to={`/jobs/${similarJob.id}?${searchParams.toString()}`}
+                          className="font-semibold text-slate-900 hover:text-indigo-600 line-clamp-2"
+                        >
+                          {similarJob.title}
+                        </Link>
+                        <div className="mt-2 text-sm text-slate-600 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{getCompanyDisplayName(similarJob.company_name, similarJob.advertiser_name)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{similarJob.location_label || "Location not specified"}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                            <span>
+                              {similarJob.listed_at
+                                ? formatDistanceToNow(new Date(similarJob.listed_at), {
+                                    addSuffix: true,
+                                  })
+                                : "recently"}
+                            </span>
+                          </div>
+                        </div>
+                        {/* <div className="mt-3 flex flex-wrap gap-2">
+                          {hasSameCompany(
+                            job.company_name,
+                            job.advertiser_name,
+                            similarJob.company_name,
+                            similarJob.advertiser_name,
+                          ) && (
+                            <Badge variant="secondary" className="text-xs">
+                              Same company
+                            </Badge>
+                          )}
+                          {hasSameClassification(job.classification, similarJob.classification) && (
+                            <Badge variant="outline" className="text-xs">
+                              Same classification
+                            </Badge>
+                          )}
+                        </div> */}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
