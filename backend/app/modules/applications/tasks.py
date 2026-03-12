@@ -245,6 +245,11 @@ async def resume_tailoring_task(
         resume_id: Source resume ID (not working document ID)
         is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
+    app = await ApplicationRepository.get_by_id(self.db, application_id)
+    if app:
+        await ApplicationRepository.mark_tailoring(self.db, app)
+        await self.db.commit()
+
     await update_tailoring_progress(
         self.db, application_id, "resume_tailoring", "Tailoring resume...", "in_progress"
     )

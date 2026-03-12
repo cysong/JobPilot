@@ -33,7 +33,34 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
-import type { TailoringLevel } from '@/types/application';
+import type { ApplicationStatus, TailoringLevel } from '@/types/application';
+
+type StatusAction = {
+  label: string;
+  nextStatus: ApplicationStatus;
+  variant?: 'default' | 'outline';
+};
+
+const STATUS_ACTIONS: Record<ApplicationStatus, StatusAction[]> = {
+  Pending: [],
+  Tailoring: [],
+  Ready: [{ label: 'Mark as Applied', nextStatus: 'Applied', variant: 'default' }],
+  Applied: [
+    { label: 'Move to Phone Screen', nextStatus: 'PhoneScreen', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  ],
+  PhoneScreen: [
+    { label: 'Move to Interviewing', nextStatus: 'Interviewing', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  ],
+  Interviewing: [
+    { label: 'Mark Offer Received', nextStatus: 'Offer', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  ],
+  Offer: [],
+  Rejected: [],
+  Failed: [],
+};
 
 const toSafeFilename = (value: string) => {
     const cleaned = value.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
@@ -43,7 +70,7 @@ const toSafeFilename = (value: string) => {
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
-    const { retryCoverLetter } = useApplicationMutations();
+    const { retryCoverLetter, updateStatus } = useApplicationMutations();
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes();
     const { user } = useAuthStore();
     const { toast } = useToast();
@@ -73,7 +100,7 @@ export default function ApplicationDetailPage() {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-        } catch (error) {
+        } catch {
             toast({
                 title: 'Error',
                 description: 'Failed to download PDF',
@@ -97,7 +124,7 @@ export default function ApplicationDetailPage() {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-        } catch (error) {
+        } catch {
             toast({
                 title: 'Error',
                 description: 'Failed to download PDF',
@@ -168,6 +195,12 @@ export default function ApplicationDetailPage() {
             }
         );
     };
+
+    const handleStatusUpdate = (status: ApplicationStatus) => {
+      updateStatus.mutate({ id: application.id, status });
+    };
+
+    const availableStatusActions = STATUS_ACTIONS[application.status] || [];
 
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
@@ -341,16 +374,37 @@ export default function ApplicationDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-2 justify-end">
+            {application.job?.share_link && (
+              <Button variant="default" asChild>
+                <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
+                  Apply
+                  <ExternalLink className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+            )}
             <Button variant="outline" asChild>
               <Link to={`/jobs/${application.job_id}`}>
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Job
               </Link>
             </Button>
-            <Button
+            {availableStatusActions.map((action) => (
+              <Button
+                key={action.nextStatus}
+                variant={action.variant || 'default'}
+                onClick={() => handleStatusUpdate(action.nextStatus)}
+                disabled={updateStatus.isPending}
+              >
+                {updateStatus.isPending && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                {action.label}
+              </Button>
+            ))}
+              <Button
               variant="default"
               onClick={openRetryDialog}
-              disabled={retryCoverLetter.isPending}
+              disabled={retryCoverLetter.isPending || !['Ready', 'Failed'].includes(application.status)}
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${

@@ -31,6 +31,7 @@ export interface Application {
         advertiser_name?: string;
         company_name?: string;
         company_logo?: string;
+        share_link?: string;
     };
 }
 
@@ -43,6 +44,11 @@ export interface CreateApplicationRequest {
 export interface RetryApplicationRequest {
     resume_template_id?: string;
     tailoring_level?: TailoringLevel;
+}
+
+export interface UpdateApplicationStatusRequest {
+    status: ApplicationStatus;
+    note?: string;
 }
 
 export interface ApplicationListRequest {

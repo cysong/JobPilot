@@ -25,6 +25,83 @@ from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 class ApplicationService:
     """Business logic for job applications and workflow orchestration."""
 
+    ALLOWED_STATUS_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
+        ApplicationStatus.PENDING: {ApplicationStatus.TAILORING},
+        ApplicationStatus.TAILORING: {ApplicationStatus.READY, ApplicationStatus.FAILED},
+        ApplicationStatus.READY: {ApplicationStatus.APPLIED, ApplicationStatus.FAILED},
+        ApplicationStatus.APPLIED: {ApplicationStatus.PHONE_SCREEN, ApplicationStatus.REJECTED},
+        ApplicationStatus.PHONE_SCREEN: {ApplicationStatus.INTERVIEWING, ApplicationStatus.REJECTED},
+        ApplicationStatus.INTERVIEWING: {ApplicationStatus.OFFER, ApplicationStatus.REJECTED},
+        ApplicationStatus.OFFER: set(),
+        ApplicationStatus.REJECTED: set(),
+        ApplicationStatus.FAILED: {ApplicationStatus.PENDING},
+    }
+
+    @staticmethod
+    def _append_status_history(
+        application: Application,
+        from_status: ApplicationStatus,
+        to_status: ApplicationStatus,
+        operator_user_id: int,
+        note: str | None = None,
+    ) -> None:
+        """Append status transition record into tailoring_progress JSON."""
+        progress = dict(application.tailoring_progress or {})
+        history = list(progress.get("status_history", []))
+        history.append(
+            {
+                "changed_at": datetime.now(timezone.utc).isoformat(),
+                "from_status": from_status.value,
+                "to_status": to_status.value,
+                "operator_user_id": operator_user_id,
+                "note": note,
+            }
+        )
+        progress["status_history"] = history
+        application.tailoring_progress = progress
+
+    @staticmethod
+    async def update_status(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        target_status: ApplicationStatus,
+        note: str | None = None,
+    ) -> Application:
+        """Update application status with guarded state transitions."""
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+
+        current_status = application.status
+        if current_status == target_status:
+            raise BadRequestError("Application is already in the target status")
+
+        allowed_targets = ApplicationService.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
+        if target_status not in allowed_targets:
+            allowed_labels = ", ".join(status.value for status in sorted(allowed_targets, key=lambda x: x.value))
+            message = (
+                f"Invalid status transition: {current_status.value} -> {target_status.value}. "
+                f"Allowed next statuses: {allowed_labels or 'none'}."
+            )
+            raise BadRequestError(message)
+
+        ApplicationService._append_status_history(
+            application=application,
+            from_status=current_status,
+            to_status=target_status,
+            operator_user_id=user.id,
+            note=note,
+        )
+        application.status = target_status
+        application.updated_at = datetime.now(timezone.utc)
+        if target_status != ApplicationStatus.FAILED:
+            application.last_error = None
+
+        await db.commit()
+        await db.refresh(application)
+        return application
+
     @staticmethod
     async def get_tailored_resume_for_edit(
         db: AsyncSession, application_id: str, user: User

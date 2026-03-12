@@ -11,6 +11,26 @@
 
 ## Work Log
 
+### 2026-03-12 - Application Detail: Apply Button + Status Transition Actions
+
+**Completed Tasks:**
+- Added backend API for manual application status update:
+  - `PATCH /api/v1/applications/{application_id}/status`
+  - payload: `status`, optional `note`
+- Implemented guarded status transition rules in service layer:
+  - `Ready -> Applied`
+  - `Applied -> PhoneScreen | Rejected`
+  - `PhoneScreen -> Interviewing | Rejected`
+  - `Interviewing -> Offer | Rejected`
+  - `Failed -> Pending`
+- Added status change history append into `tailoring_progress.status_history`.
+- Updated async workflow to set status to `Tailoring` when resume tailoring starts.
+- Added frontend API/hook support for status updates.
+- Updated Application detail page actions:
+  - Added `Apply` button linking to job original posting (`job.share_link`)
+  - Added dynamic status transition action buttons based on current status
+  - `Retry Generation` is now limited to `Failed` status.
+
 ### 2026-03-12 - Job Detail Similar Jobs: Hide Reason Tags + Company Name Consistency
 
 **Completed Tasks:**

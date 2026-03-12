@@ -3,11 +3,29 @@ import { applicationApi } from '@/api/applications'
 import type {
     ApplicationListRequest,
     CreateApplicationRequest,
-    RetryApplicationRequest
+    RetryApplicationRequest,
+    ApplicationStatus,
 } from '@/types/application'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 import { useToast } from '@/components/ui/use-toast'
 import { ApiError } from '@/types/api'
+
+const extractErrorMessage = (error: unknown, fallback: string): string => {
+    if (error instanceof ApiError) {
+        return error.message
+    }
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: unknown }).response === 'object' &&
+        (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail &&
+        typeof (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+    ) {
+        return (error as { response?: { data?: { detail?: string } } }).response?.data?.detail || fallback
+    }
+    return fallback
+}
 
 export const useApplications = (filters: ApplicationListRequest) => {
     return useQuery({
@@ -78,10 +96,8 @@ export const useApplicationMutations = () => {
             queryClient.invalidateQueries({ queryKey: ['application', 'by-job', data.job_id] })
             toast({ title: 'Success', description: 'Application started successfully' })
         },
-        onError: (error: any) => {
-            const message = error instanceof ApiError
-                ? error.message
-                : error?.response?.data?.detail || 'Failed to create application'
+        onError: (error: unknown) => {
+            const message = extractErrorMessage(error, 'Failed to create application')
             toast({
                 title: 'Error',
                 description: message,
@@ -103,8 +119,28 @@ export const useApplicationMutations = () => {
         }
     })
 
+    const updateStatus = useMutation({
+        mutationFn: ({ id, status, note }: { id: string; status: ApplicationStatus; note?: string }) =>
+            applicationApi.updateStatus(id, { status, note }),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['applications'] })
+            queryClient.invalidateQueries({ queryKey: ['applications', data.id] })
+            queryClient.invalidateQueries({ queryKey: ['application', 'by-job', data.job_id] })
+            toast({ title: 'Success', description: 'Application status updated' })
+        },
+        onError: (error: unknown) => {
+            const message = extractErrorMessage(error, 'Failed to update status')
+            toast({
+                title: 'Error',
+                description: message,
+                variant: 'destructive'
+            })
+        }
+    })
+
     return {
         createApplication,
-        retryCoverLetter
+        retryCoverLetter,
+        updateStatus,
     }
 }

@@ -5,6 +5,7 @@ import type {
     ApplicationListResponse,
     CreateApplicationRequest,
     RetryApplicationRequest,
+    UpdateApplicationStatusRequest,
 } from '@/types/application';
 import type { ResumeExportRequest } from '@/types/resume';
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document';
@@ -44,6 +45,11 @@ export const applicationApi = {
 
     retryCoverLetter: async (id: string, data?: RetryApplicationRequest) => {
         const result = await client.post<Application, Application>(`/applications/${id}/retry`, data || {});
+        return result;
+    },
+
+    updateStatus: async (id: string, data: UpdateApplicationStatusRequest) => {
+        const result = await client.patch<Application, Application>(`/applications/${id}/status`, data);
         return result;
     },
 

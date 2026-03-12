@@ -31,6 +31,17 @@ class ApplicationRetryRequest(BaseModel):
     )
 
 
+class ApplicationStatusUpdateRequest(BaseModel):
+    """Request payload for updating application status manually."""
+
+    status: ApplicationStatus = Field(..., description="Target application status")
+    note: Optional[str] = Field(
+        default=None,
+        description="Optional note for status change history",
+        max_length=500,
+    )
+
+
 class ApplicationResponse(BaseModel):
     """Base response for application resources."""
 

@@ -12,6 +12,7 @@ from app.modules.applications.schemas import (
     ApplicationDetail,
     ApplicationListResponse,
     ApplicationRetryRequest,
+    ApplicationStatusUpdateRequest,
 )
 from app.modules.applications.service import ApplicationService
 from app.modules.resumes.schemas import ResumeExportRequest
@@ -179,3 +180,20 @@ async def retry_application_tailor(
         db, application_id, current_user, payload
     )
     return application
+
+
+@router.patch("/{application_id}/status", response_model=ApplicationDetail)
+async def update_application_status(
+    application_id: str,
+    payload: ApplicationStatusUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Manually update application status with guarded transitions."""
+    return await ApplicationService.update_status(
+        db=db,
+        application_id=application_id,
+        user=current_user,
+        target_status=payload.status,
+        note=payload.note,
+    )
