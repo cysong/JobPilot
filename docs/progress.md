@@ -11,6 +11,24 @@
 
 ## Work Log
 
+### 2026-03-12 - Shared Pagination Fix (Duplicate Last Page Numbers)
+
+**Completed Tasks:**
+- Investigated admin task page pagination issue where last-page numbers were repeated (e.g., multiple `10` with total `198` records).
+- Confirmed root cause in shared UI pagination algorithm (`frontend/src/components/ui/pagination.tsx`) rather than backend total/page calculation.
+- Refactored page window generation to a bounded sliding-window strategy:
+  - stable `startPage` / `endPage` clamp
+  - strictly increasing, unique `pageNumbers` array
+  - removed duplicated page keys during near-end rendering
+- Kept existing pagination interactions unchanged:
+  - first/prev/next/last buttons
+  - trailing ellipsis behavior
+- Impact scope verified:
+  - admin tasks list pagination
+  - jobs listing pagination
+  - applications listing pagination
+  (all reuse the same shared `Pagination` component)
+
 ### 2026-03-12 - PDF Export Filename Rule Unification (Resume + Cover Letter)
 
 **Completed Tasks:**

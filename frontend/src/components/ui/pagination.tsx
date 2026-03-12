@@ -19,6 +19,12 @@ export function Pagination({
   if (totalPages <= 1) return null
 
   const pagesToShow = Math.min(5, totalPages)
+  const startPage = Math.max(1, Math.min(currentPage - 2, totalPages - pagesToShow + 1))
+  const endPage = Math.min(totalPages, startPage + pagesToShow - 1)
+  const pageNumbers = Array.from(
+    { length: endPage - startPage + 1 },
+    (_, index) => startPage + index
+  )
 
   return (
     <div className={cn('flex items-center justify-center gap-2', className)}>
@@ -45,19 +51,7 @@ export function Pagination({
       </Button>
 
       <div className="flex items-center gap-1">
-        {Array.from({ length: pagesToShow }, (_, i) => {
-          let pageNum = i + 1
-          if (totalPages > 5) {
-            if (currentPage > 3) {
-              pageNum = currentPage - 3 + i
-            }
-            if (pageNum > totalPages) {
-              pageNum = totalPages - 4 + i
-            }
-          }
-
-          if (pageNum < 1) pageNum = i + 1
-
+        {pageNumbers.map((pageNum) => {
           return (
             <Button
               key={pageNum}
@@ -73,7 +67,7 @@ export function Pagination({
             </Button>
           )
         })}
-        {totalPages > 5 && currentPage < totalPages - 2 && (
+        {endPage < totalPages && (
           <span className="text-slate-400 px-1">...</span>
         )}
       </div>

@@ -301,3 +301,34 @@ tailwindcss@4.1.17
 **修复时间**: 2025-01-23
 **修复状态**: ✅ 完成
 **影响范围**: 前端构建系统
+
+## Fixed: Shared Pagination rendered duplicate last-page numbers
+
+### Problem
+On the admin task monitor page, pagination could render duplicate page numbers near the end of the range (example: total records `198`, page size `20`, expected total pages `10`, but UI showed repeated `10`).
+
+### Root Cause
+The shared pagination component (`frontend/src/components/ui/pagination.tsx`) used a page-number generation algorithm that could produce duplicate `pageNum` values when `currentPage` was near the end.
+
+### Solution
+Replaced page-number generation with a bounded sliding window:
+- Compute `startPage` with clamp: `max(1, min(currentPage - 2, totalPages - pagesToShow + 1))`
+- Compute `endPage` from `startPage`
+- Build page list from `startPage..endPage` to ensure uniqueness and ordering
+- Keep existing controls and ellipsis behavior unchanged
+
+### Verification
+- Confirmed no duplicate page numbers in end-range scenarios.
+- Confirmed this fix applies to all pages reusing shared `Pagination`:
+  - Admin task list
+  - Jobs listing
+  - Applications listing
+
+### Notes
+Frontend build currently reports pre-existing TypeScript errors unrelated to this pagination fix. The pagination patch itself is isolated to shared UI rendering logic.
+
+---
+
+**Fixed On**: 2026-03-12
+**Status**: Completed
+**Scope**: Frontend shared pagination component
