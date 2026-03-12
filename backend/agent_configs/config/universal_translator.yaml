@@ -1,6 +1,6 @@
 version: 1
 name: universal_translator
-model: gpt-5-mini
+model: gpt-4.1-mini
 model_settings:
   max_tokens: 16000
   reasoning:

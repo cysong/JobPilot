@@ -2,7 +2,7 @@ version: 1
 name: job_analyzer
 model: gpt-5-mini
 model_settings:
-  max_tokens: 3000
+  max_tokens: 5000
   reasoning:
     effort: low
   verbosity: low
