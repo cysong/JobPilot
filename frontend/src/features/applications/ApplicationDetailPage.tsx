@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
     ArrowLeft,
@@ -65,6 +65,7 @@ const STATUS_ACTIONS: Record<ApplicationStatus, StatusAction[]> = {
 
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
+    const [searchParams] = useSearchParams();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
     const { retryCoverLetter, updateStatus } = useApplicationMutations();
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes();
@@ -75,6 +76,7 @@ export default function ApplicationDetailPage() {
     const [isRetryDialogOpen, setIsRetryDialogOpen] = useState(false);
     const [retryResumeId, setRetryResumeId] = useState<string>('');
     const [retryTailoringLevel, setRetryTailoringLevel] = useState<TailoringLevel>('light');
+    const backUrl = searchParams.toString() ? `/applications?${searchParams.toString()}` : '/applications';
 
     const buildFilename = (label: string) => {
         const jobTitle = application?.job?.title || 'Job';
@@ -156,7 +158,7 @@ export default function ApplicationDetailPage() {
                         Failed to load application details.
                     </AlertDescription>
                     <Button asChild variant="outline" className="mt-4 w-full">
-                        <Link to="/applications">Back to Applications</Link>
+                        <Link to={backUrl}>Back to Applications</Link>
                     </Button>
                 </Alert>
             </div>
@@ -210,7 +212,7 @@ export default function ApplicationDetailPage() {
                 asChild
                 className="text-slate-600"
               >
-                <Link to="/applications">
+                <Link to={backUrl}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Applications
                 </Link>

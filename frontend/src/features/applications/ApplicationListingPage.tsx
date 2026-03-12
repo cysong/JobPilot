@@ -184,12 +184,14 @@ export default function ApplicationListingPage() {
                     <div className="grid gap-4">
                     {data?.items.map((app) => {
                         const company = app.job?.company_name || app.job?.advertiser_name || 'Unknown Company'
+                        const query = searchParams.toString()
+                        const detailUrl = query ? `/applications/${app.id}?${query}` : `/applications/${app.id}`
                         return (
                             <Card key={app.id} className="overflow-hidden">
                                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
-                                            <Link to={`/applications/${app.id}`}>
+                                            <Link to={detailUrl}>
                                                 <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
                                                     {app.job?.title || 'Unknown Job'}
                                                 </CardTitle>
