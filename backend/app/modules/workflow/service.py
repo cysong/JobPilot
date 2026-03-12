@@ -277,20 +277,19 @@ class TaskService:
         )
 
     @staticmethod
-    def _get_broker_task_ids() -> set[str]:
+    def _is_task_id_in_broker(celery_task_id: str) -> bool:
         """
-        Collect task IDs currently visible in broker/worker snapshots.
+        Check whether a Celery task ID is currently visible in worker snapshots.
 
-        We inspect active/reserved/scheduled queues and extract Celery task IDs.
+        This avoids building a full in-memory task-id set when we only need
+        to validate one specific task.
         """
+        if not celery_task_id:
+            return False
+
         from app.core.celery_app import celery_app
 
         inspector = celery_app.control.inspect()
-        active = inspector.active() or {}
-        reserved = inspector.reserved() or {}
-        scheduled = inspector.scheduled() or {}
-
-        task_ids: set[str] = set()
 
         def _extract_task_id(item: Any) -> str | None:
             if not isinstance(item, dict):
@@ -308,16 +307,15 @@ class TaskService:
 
             return None
 
-        for snapshot in (active, reserved, scheduled):
+        for snapshot in (inspector.active() or {}, inspector.reserved() or {}, inspector.scheduled() or {}):
             for items in snapshot.values():
                 if not isinstance(items, list):
                     continue
                 for item in items:
-                    task_id = _extract_task_id(item)
-                    if task_id:
-                        task_ids.add(task_id)
+                    if _extract_task_id(item) == celery_task_id:
+                        return True
 
-        return task_ids
+        return False
 
     @staticmethod
     def _is_task_stale(task: TaskExecution, now: datetime) -> bool:
@@ -343,7 +341,6 @@ class TaskService:
         task: TaskExecution,
         *,
         now: datetime,
-        broker_task_ids: set[str],
     ) -> tuple[bool, str]:
         """
         Decide if the workflow anchor task can be manually retried.
@@ -363,7 +360,7 @@ class TaskService:
                     f"(threshold: {settings.TASK_RETRY_STALE_TIMEOUT_MINUTES} minutes).",
                 )
 
-            if task.celery_task_id and task.celery_task_id in broker_task_ids:
+            if task.celery_task_id and TaskService._is_task_id_in_broker(task.celery_task_id):
                 return (
                     False,
                     f"Task {task.id} is still present in broker queues/active workers "
@@ -572,11 +569,9 @@ class TaskService:
         if start_idx is None:
             raise BadRequestError("All tasks already succeeded")
         anchor_task = workflow_tasks[start_idx]
-        broker_task_ids = TaskService._get_broker_task_ids()
         retryable, reason = TaskService._can_retry_anchor_task(
             anchor_task,
             now=datetime.now(timezone.utc),
-            broker_task_ids=broker_task_ids,
         )
         if not retryable:
             raise BadRequestError(reason)

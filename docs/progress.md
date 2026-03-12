@@ -11,6 +11,18 @@
 
 ## Work Log
 
+### 2026-03-12 - Admin Task Retry Load Reduction (Fast Path + Targeted Broker Check)
+
+**Completed Tasks:**
+- Optimized manual retry path in `TaskService.retry_task` to avoid unnecessary broker inspection for failed anchors.
+- Added fast-path behavior in retry eligibility check:
+  - `FAILED` anchor tasks are immediately eligible without Celery queue snapshot checks.
+- Replaced full broker task-id set construction with targeted single-ID presence check:
+  - new helper checks only the anchor task `celery_task_id` when needed.
+  - broker inspection is now triggered only for stale `Pending` / `Running` anchors that have a `celery_task_id`.
+- Removed now-unused full-snapshot helper to keep retry code path lean and maintainable.
+- Performed syntax validation for updated backend service module.
+
 ### 2026-03-12 - Shared Pagination Fix (Duplicate Last Page Numbers)
 
 **Completed Tasks:**
