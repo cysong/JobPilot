@@ -51,6 +51,7 @@ class JobBase(BaseModel):
     # User-specific metadata
     is_viewed: bool = False
     last_viewed_at: Optional[datetime] = None
+    has_application: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -261,6 +262,7 @@ class JobBriefInfo(BaseModel):
     sub_classification: Optional[str] = None
     is_viewed: bool = False
     last_viewed_at: Optional[datetime] = None
+    has_application: bool = False
 
     model_config = {"from_attributes": True}
 

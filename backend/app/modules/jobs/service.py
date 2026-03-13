@@ -9,6 +9,8 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.jobs.models import SeekJob, UserJobView
 from app.modules.jobs.repository import JobRepository, SavedJobRepository, UserJobViewRepository
+from app.modules.applications.models import Application
+from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobFiltersOptions,
@@ -44,8 +46,18 @@ class JobService:
         Returns:
             Tuple of (job_list, total_count)
         """
+        has_application_expr = exists(
+            select(1).where(
+                and_(
+                    Application.user_id == user_id,
+                    Application.is_deleted.is_(False),
+                    Application.job_id == SeekJob.id,
+                )
+            )
+        ).label("has_application")
+
         # Base query
-        query = select(SeekJob).where(SeekJob.is_expired == False)
+        query = select(SeekJob, has_application_expr).where(SeekJob.is_expired == False)
 
         # Apply keyword search (title + abstract + content + company names)
         if filters.keyword:
@@ -140,9 +152,10 @@ class JobService:
 
         # Execute query
         result = await db.execute(query)
-        jobs = result.scalars().all()
+        rows = result.all()
 
-        job_list = list(jobs)
+        job_list = [row[0] for row in rows]
+        has_application_map = {row[0].id: bool(row[1]) for row in rows}
         job_ids = [job.id for job in job_list]
         view_map = await UserJobViewRepository.get_view_map(db, user_id, job_ids)
 
@@ -152,6 +165,7 @@ class JobService:
             view = view_map.get(job.id)
             item.is_viewed = view is not None
             item.last_viewed_at = view.last_viewed_at if view else None
+            item.has_application = has_application_map.get(job.id, False)
             job_items.append(item)
 
         return job_items, total
@@ -505,6 +519,11 @@ class JobService:
         items: list[SavedJobItem] = []
         job_ids = [job.id for _, job in rows]
         view_map = await UserJobViewRepository.get_view_map(db, user.id, job_ids)
+        application_job_ids = await ApplicationRepository.get_job_id_set_by_user(
+            db,
+            user.id,
+            job_ids,
+        )
         for saved, job in rows:
             job_item = JobBase.model_validate(job)
             # Keep saved cards visually aligned with list cards when source logo is missing.
@@ -513,6 +532,7 @@ class JobService:
             viewed = view_map.get(job.id)
             job_item.is_viewed = viewed is not None
             job_item.last_viewed_at = viewed.last_viewed_at if viewed else None
+            job_item.has_application = job.id in application_job_ids
             items.append(
                 SavedJobItem(
                     job=job_item,

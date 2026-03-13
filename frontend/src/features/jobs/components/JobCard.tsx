@@ -2,6 +2,7 @@ import {
   MapPin,
   Clock,
   Globe,
+  CircleCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -99,13 +100,13 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
               >
                 {job.title}
               </Link>
-              <span
-                className={`mt-2 h-2.5 w-2.5 rounded-full shrink-0 ${
-                  isViewed ? "bg-slate-300" : "border border-indigo-500"
-                }`}
-                aria-label={isViewed ? "Viewed job" : "Unviewed job"}
-                title={isViewed ? "Viewed" : "Unviewed"}
-              />
+              {job.has_application && (
+                <CircleCheck
+                  className="mt-1 h-5 w-5 shrink-0 text-emerald-600"
+                  aria-label="Added to applications"
+                  title="Added to applications"
+                />
+              )}
             </div>
             <div className="flex items-center gap-2 text-lg text-slate-600">
               {sourceMeta.iconSrc ? (

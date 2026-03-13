@@ -36,6 +36,7 @@ from app.modules.workflow import TaskService
 from app.shared.enums import EntityType
 from app.modules.applications.service import ApplicationService
 from app.modules.applications.schemas import ApplicationDetail
+from app.modules.applications.repositories.application_repo import ApplicationRepository
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -62,6 +63,11 @@ async def list_my_matches(
         user_id=current_user.id,
         job_ids=[match.job_id for match in matches],
     )
+    application_job_ids = await ApplicationRepository.get_job_id_set_by_user(
+        db=db,
+        user_id=current_user.id,
+        job_ids=[match.job_id for match in matches],
+    )
 
     results: list[UserJobMatchResponse] = []
     for match in matches:
@@ -76,6 +82,7 @@ async def list_my_matches(
         viewed = view_map.get(match.job_id)
         job_info.is_viewed = viewed is not None
         job_info.last_viewed_at = viewed.last_viewed_at if viewed else None
+        job_info.has_application = match.job_id in application_job_ids
 
         results.append(
             UserJobMatchResponse(

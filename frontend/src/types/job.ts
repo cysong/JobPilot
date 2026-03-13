@@ -43,6 +43,7 @@ export interface Job {
   // User-specific metadata
   is_viewed?: boolean
   last_viewed_at?: string | null
+  has_application?: boolean
 }
 
 export interface JobDetail extends Job {
@@ -231,6 +232,7 @@ export interface JobBriefInfo {
   sub_classification: string | null
   is_viewed?: boolean
   last_viewed_at?: string | null
+  has_application?: boolean
 }
 
 /**

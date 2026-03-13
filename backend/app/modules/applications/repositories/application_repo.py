@@ -26,6 +26,27 @@ class ApplicationRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_job_id_set_by_user(
+        db: AsyncSession,
+        user_id: int,
+        job_ids: list[int],
+    ) -> set[int]:
+        """Return job IDs that already have an application for the user."""
+        if not job_ids:
+            return set()
+
+        result = await db.execute(
+            select(Application.job_id).where(
+                and_(
+                    Application.user_id == user_id,
+                    Application.is_deleted.is_(False),
+                    Application.job_id.in_(job_ids),
+                )
+            )
+        )
+        return set(result.scalars().all())
+
+    @staticmethod
     async def get_by_id_for_user(
         db: AsyncSession,
         application_id: str,
