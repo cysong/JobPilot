@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
+    APP_TIMEZONE: str = "Pacific/Auckland"
 
     # Logging
     LOG_LEVEL: str = "INFO"
