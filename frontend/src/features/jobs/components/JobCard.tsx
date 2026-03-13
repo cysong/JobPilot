@@ -1,14 +1,20 @@
-import { MapPin, Building2, Clock } from 'lucide-react'
+import {
+  MapPin,
+  Clock,
+  Globe,
+  type LucideIcon,
+} from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 import { Link, useSearchParams } from 'react-router-dom'
+import linkedinIcon from '@/assets/source-icons/linkedin.svg'
+import seekIcon from '@/assets/source-icons/seek.ico'
 
 import type { Job, JobBriefInfo, UserJobMatch } from '@/types/job'
 import { Badge } from '@/components/ui/badge'
 import {
     Card,
     CardContent,
-    CardFooter,
     CardHeader,
 } from '@/components/ui/card'
 
@@ -20,11 +26,31 @@ interface JobCardProps {
     highlighted?: boolean
 }
 
-const formatSourceLabel = (source: string | null | undefined): string =>
-  source ? source.toUpperCase() : "UNKNOWN";
+type SourceMeta = {
+  icon?: LucideIcon
+  iconSrc?: string
+  label: string
+}
+
+const getSourceMeta = (source: string | null | undefined): SourceMeta => {
+  const raw = source?.trim()
+  const normalized = raw?.toLowerCase()
+  const label = raw && raw.length > 0 ? raw : "unknown"
+
+  if (normalized === "linkedin") {
+    return { iconSrc: linkedinIcon, label }
+  }
+  if (normalized === "seek") {
+    return { iconSrc: seekIcon, label }
+  }
+
+  return { icon: Globe, label }
+}
 
 export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
+    const sourceMeta = getSourceMeta(job.source)
+    const SourceIcon = sourceMeta.icon
 
     // Preserve current search params when navigating to detail page
     const detailUrl = `/jobs/${job.id}?${searchParams.toString()}`
@@ -81,8 +107,18 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
                 title={isViewed ? "Viewed" : "Unviewed"}
               />
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Building2 className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-lg text-slate-600">
+              {sourceMeta.iconSrc ? (
+                <img
+                  src={sourceMeta.iconSrc}
+                  alt={`${sourceMeta.label} icon`}
+                  className="h-5 w-5 rounded-sm object-contain"
+                />
+              ) : (
+                SourceIcon && <SourceIcon className="h-5 w-5" />
+              )}
+              <span className="text-slate-500">{sourceMeta.label}</span>
+              <span className="text-slate-300">|</span>
               <span className="font-medium">{job.advertiser_name}</span>
             </div>
           </div>
@@ -111,9 +147,6 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            <Badge variant="outline" className="font-normal text-xs text-slate-500">
-              {formatSourceLabel(job.source)}
-            </Badge>
             {job.classification && (
               <Badge variant="secondary" className="font-normal text-xs">
                 {job.classification}
@@ -127,25 +160,24 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
                 {job.sub_classification}
               </Badge>
             )}
+            <span className="ml-auto whitespace-nowrap text-xs text-slate-400 flex items-center">
+              {savedAt
+                ? `saved ${formatDistanceToNow(new Date(savedAt), {
+                    addSuffix: true,
+                  })}`
+                : isViewed && job.last_viewed_at
+                ? `viewed ${formatDistanceToNow(new Date(job.last_viewed_at), {
+                    addSuffix: true,
+                  })}`
+                : job.listed_at
+                ? `Posted ${formatDistanceToNow(new Date(job.listed_at), {
+                    addSuffix: true,
+                  })}`
+                : "Posted recently"}
+            </span>
           </div>
         </CardContent>
-        <CardFooter className={`p-4 pt-0 text-xs ${isViewed ? "text-slate-400" : "text-slate-500"}`}>
-          <span>
-            {savedAt
-              ? `saved ${formatDistanceToNow(new Date(savedAt), {
-                  addSuffix: true,
-                })}`
-              : isViewed && job.last_viewed_at
-              ? `viewed ${formatDistanceToNow(new Date(job.last_viewed_at), {
-                  addSuffix: true,
-                })}`
-              : job.listed_at
-              ? formatDistanceToNow(new Date(job.listed_at), {
-                  addSuffix: true,
-                })
-              : "recently"}
-          </span>
-        </CardFooter>
       </Card>
     );
 }
+

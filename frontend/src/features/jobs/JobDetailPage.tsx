@@ -16,6 +16,8 @@ import {
   Users,
   Code2,
   Zap,
+  Globe,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -47,6 +49,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import linkedinIcon from "@/assets/source-icons/linkedin.svg";
+import seekIcon from "@/assets/source-icons/seek.ico";
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
@@ -73,8 +77,26 @@ const getContextKey = (params: URLSearchParams): string => {
   return `jobs:list:${normalizeSearchParams(params)}`;
 };
 
-const formatSourceLabel = (source: string | null | undefined): string =>
-  source ? source.toUpperCase() : "UNKNOWN";
+type SourceMeta = {
+  icon?: LucideIcon;
+  iconSrc?: string;
+  label: string;
+};
+
+const getSourceMeta = (source: string | null | undefined): SourceMeta => {
+  const raw = source?.trim();
+  const normalized = raw?.toLowerCase();
+  const label = raw && raw.length > 0 ? raw : "unknown";
+
+  if (normalized === "linkedin") {
+    return { iconSrc: linkedinIcon, label };
+  }
+  if (normalized === "seek") {
+    return { iconSrc: seekIcon, label };
+  }
+
+  return { icon: Globe, label };
+};
 
 const getCompanyDisplayName = (
   companyName: string | null | undefined,
@@ -237,6 +259,8 @@ export default function JobDetailPage() {
       ? job.content_cn || job.analysis?.cn_content || job.content
       : job.content;
   const isSaved = Boolean(savedStatus?.is_saved);
+  const sourceMeta = getSourceMeta(job.source);
+  const SourceIcon = sourceMeta.icon;
 
   const handleToggleSaved = () => {
     if (isSaved) {
@@ -401,9 +425,19 @@ export default function JobDetailPage() {
                 <h1 className="text-2xl font-bold text-slate-900 mb-2">
                   {job.title}
                 </h1>
-                <div className="flex items-center gap-2 text-slate-600 mb-4">
-                  <Building2 className="h-5 w-5 text-indigo-600" />
-                  <span className="font-medium text-lg">
+                <div className="flex items-center gap-2 text-lg text-slate-600 mb-4">
+                  {sourceMeta.iconSrc ? (
+                    <img
+                      src={sourceMeta.iconSrc}
+                      alt={`${sourceMeta.label} icon`}
+                      className="h-5 w-5 rounded-sm object-contain"
+                    />
+                  ) : (
+                    SourceIcon && <SourceIcon className="h-5 w-5" />
+                  )}
+                  <span className="text-slate-500">{sourceMeta.label}</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="font-medium">
                     {getCompanyDisplayName(job.company_name, job.advertiser_name)}
                   </span>
                 </div>
@@ -426,14 +460,13 @@ export default function JobDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-6">
-                <Badge variant="outline">{formatSourceLabel(job.source)}</Badge>
                 {job.classification && (
                   <Badge variant="secondary">{job.classification}</Badge>
                 )}
                 {job.sub_classification && (
                   <Badge variant="outline">{job.sub_classification}</Badge>
                 )}
-                <span className="text-xs text-slate-400 flex items-center ml-auto">
+                <span className="text-xs text-slate-400 flex items-center ml-auto whitespace-nowrap">
                   Posted{" "}
                   {job.listed_at
                     ? formatDistanceToNow(new Date(job.listed_at), {
