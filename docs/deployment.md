@@ -68,7 +68,7 @@
 - `CELERY_BROKER_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_RESULT_BACKEND=redis://jobpilot-redis:6379/1`
 - `OPENAI_API_KEY=<secret>`
-- `ALLOWED_ORIGINS=https://app.jobpilot.me`
+- `CORS_ORIGINS=["https://app.jobpilot.me"]`
 - `CORS_ALLOW_CREDENTIALS=true`
 
 建议增加：
@@ -99,8 +99,9 @@
 发布流水线：
 1. 执行 lint/test。
 2. 构建单个应用镜像。
-3. 推送到 GHCR。
-4. VPS 自动拉取指定 tag 并滚动更新。
+3. 构建前端并上传 GitHub Artifact。
+4. 推送后端镜像到 GHCR。
+5. VPS 自动拉取指定 tag，并通过脚本从 GitHub Artifact 拉取前端静态文件后滚动更新。
 
 必需 Secrets：
 - `GHCR_USERNAME`
@@ -111,10 +112,10 @@
 
 发布动作：
 1. 合并到 `main`。
-2. 产出 `git-sha` 镜像。
-3. VPS 更新 compose 中镜像 tag。
-4. `pull + up -d`。
-5. 执行健康检查。
+2. 产出 `git-sha` 后端镜像。
+3. 产出前端构建 Artifact（`frontend-dist`）。
+4. VPS 更新 compose 中镜像 tag，并下载前端 Artifact 到 Nginx 静态目录。
+5. 执行 migration、`pull + up -d`、健康检查。
 
 ---
 
@@ -216,3 +217,47 @@ Nginx 需要满足：
 - Supabase SSL 连接稳定
 - Migration 流程可重复执行且无并发冲突
 - 已验证至少一次镜像回滚
+
+---
+
+## 14. 已落地测试文件
+
+- 后端镜像构建：`backend/Dockerfile`
+- 后端镜像构建忽略规则：`backend/.dockerignore`
+- 生产编排：`docker-compose.prod.yml`
+- VPS 部署脚本：`deploy/deploy-prod.sh`
+- 后端环境变量模板：`deploy/env/backend.env.example`
+- Nginx 配置模板：`deploy/nginx/jobpilot.conf`
+- 自动发布流程：`.github/workflows/deploy.yml`
+
+---
+
+## 15. GitHub Secrets 清单
+
+以下是当前 `.github/workflows/deploy.yml` 实际读取的 Secrets：
+
+必需：
+- `GHCR_USERNAME`：用于登录 `ghcr.io`
+- `GHCR_TOKEN`：用于推送/拉取 GHCR 镜像
+- `VPS_HOST`：VPS 主机地址
+- `VPS_USER`：VPS SSH 用户
+- `VPS_SSH_KEY`：VPS SSH 私钥（建议专用 deploy key）
+
+可选：
+- `VPS_PORT`：SSH 端口，未设置时默认 `22`
+
+说明：
+- 后端运行时业务变量（如 `DATABASE_URL`、`OPENAI_API_KEY`、`CORS_ORIGINS`）不从 GitHub Secrets 注入容器。
+- 这些变量放在 VPS 文件：`/opt/jobpilot/deploy/env/backend.env`（首次部署会由模板自动生成）。
+- 前端变量 `VITE_API_BASE_URL` 由 GitHub Repository Variable 注入前端构建流程。
+
+---
+
+## 16. GitHub Variables 清单
+
+当前 workflow 需要的 Variables：
+- `VITE_API_BASE_URL`：前端构建时使用，例如 `https://api.jobpilot.me`
+
+说明：
+- 此变量非敏感信息，建议放 Variables，不放 Secrets。
+- workflow 在前端构建前会校验该变量，未配置会直接失败并提示。

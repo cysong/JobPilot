@@ -11,6 +11,32 @@
 
 ## Work Log
 
+### 2026-03-13 - Production Deployment Artifacts (Docker + GHCR + Nginx)
+
+**Completed Tasks:**
+- Implemented single-image production container build for API/Worker/Beat:
+  - added `backend/Dockerfile`
+  - added `backend/.dockerignore`
+- Added production compose orchestration:
+  - added `docker-compose.prod.yml`
+  - API/Worker/Beat use the same image with different commands
+  - Redis kept internal-only with health checks
+- Added VPS deployment script at requested path:
+  - added `deploy/deploy-prod.sh`
+- Added deployment environment and gateway templates:
+  - added `deploy/env/backend.env.example`
+  - added `deploy/nginx/jobpilot.conf`
+- Added GitHub Actions auto-deploy workflow:
+  - added `.github/workflows/deploy.yml`
+  - builds and pushes single backend image to GHCR
+  - builds frontend and uploads artifact (`frontend-dist`) to GitHub Actions artifact storage
+  - runs remote deploy script after merge to `main`
+  - remote script pulls frontend artifact from GitHub API by artifact id and publishes to Nginx static directory
+- Updated deployment documentation:
+  - updated `docs/deployment.md` with actual CORS env key and generated file list
+  - added GitHub Secrets checklist used by current deploy workflow
+  - added GitHub Variables checklist and wired `VITE_API_BASE_URL` into frontend build workflow
+
 ### 2026-03-13 - Hostinger VPS Deployment Plan (GHCR + Unified Nginx)
 
 **Completed Tasks:**

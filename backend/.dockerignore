@@ -1,0 +1,15 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+logs
+.env
+.env.*
+!.env.example
+celerybeat-schedule.*
+jobpilot_backend.egg-info

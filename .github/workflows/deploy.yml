@@ -1,0 +1,135 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/jobpilot
+  VPS_PORT: ${{ secrets.VPS_PORT }}
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:main
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_artifact_id: ${{ steps.upload_frontend.outputs.artifact-id }}
+    env:
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate frontend env
+        run: |
+          if [ -z "${VITE_API_BASE_URL}" ]; then
+            echo "VITE_API_BASE_URL is empty. Please set repository variable VITE_API_BASE_URL."
+            exit 1
+          fi
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Upload frontend artifact
+        id: upload_frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - build-image
+      - build-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "${VPS_PORT:-22}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync deployment files to VPS
+        run: |
+          ssh -p "${VPS_PORT:-22}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "mkdir -p /opt/jobpilot/deploy/env /opt/jobpilot/deploy/nginx /var/www/jobpilot/current"
+          scp -P "${VPS_PORT:-22}" docker-compose.prod.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/docker-compose.prod.yml"
+          scp -P "${VPS_PORT:-22}" deploy/deploy-prod.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/deploy-prod.sh"
+          scp -P "${VPS_PORT:-22}" deploy/nginx/jobpilot.conf "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/nginx/jobpilot.conf"
+          scp -P "${VPS_PORT:-22}" deploy/env/backend.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/backend.env.example"
+
+      - name: Deploy on VPS
+        run: |
+          ssh -p "${VPS_PORT:-22}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "\
+            if [ ! -f /opt/jobpilot/deploy/env/backend.env ]; then \
+              cp /opt/jobpilot/deploy/env/backend.env.example /opt/jobpilot/deploy/env/backend.env; \
+              echo 'Missing /opt/jobpilot/deploy/env/backend.env. Template created, please fill secrets and rerun.'; \
+              exit 1; \
+            fi; \
+            JOBPILOT_IMAGE='${{ env.IMAGE_NAME }}:${{ github.sha }}' \
+            GHCR_USERNAME='${{ secrets.GHCR_USERNAME }}' \
+            GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' \
+            FRONTEND_ARTIFACT_ID='${{ needs.build-frontend.outputs.frontend_artifact_id }}' \
+            GITHUB_REPOSITORY='${{ github.repository }}' \
+            GITHUB_TOKEN='${{ github.token }}' \
+            FRONTEND_DEST='/var/www/jobpilot/current' \
+            APP_DIR='/opt/jobpilot' \
+            bash /opt/jobpilot/deploy/deploy-prod.sh \
+          "
