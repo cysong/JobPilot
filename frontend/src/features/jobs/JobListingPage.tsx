@@ -31,9 +31,14 @@ type ListPositionState = {
   scrollY: number;
   updatedAt: number;
 };
+type JobOrderState = {
+  jobIds: number[];
+  updatedAt: number;
+};
 
 const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
+const JOB_LIST_ORDERS_KEY = "jobs:list:orders";
 const RESTORE_HIGHLIGHT_MS = 2000;
 
 const normalizeSearchParams = (params: URLSearchParams): string => {
@@ -61,6 +66,19 @@ const readPositions = (): Record<string, ListPositionState> => {
 
 const writePositions = (positions: Record<string, ListPositionState>) => {
   sessionStorage.setItem(JOB_LIST_POSITIONS_KEY, JSON.stringify(positions));
+};
+
+const readOrders = (): Record<string, JobOrderState> => {
+  try {
+    const raw = sessionStorage.getItem(JOB_LIST_ORDERS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, JobOrderState>) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeOrders = (orders: Record<string, JobOrderState>) => {
+  sessionStorage.setItem(JOB_LIST_ORDERS_KEY, JSON.stringify(orders));
 };
 
 export default function JobListingPage() {
@@ -263,6 +281,36 @@ export default function JobListingPage() {
       window.setTimeout(() => setHighlightedJobId(null), RESTORE_HIGHLIGHT_MS);
     });
   }, [contextKey, isError, isLoading]);
+
+  // Persist job order per context for detail page previous/next navigation.
+  useEffect(() => {
+    if (isLoading || isError) return;
+
+    let jobIds: number[] = [];
+    if (isRecommendedView) {
+      jobIds = (matchesData || []).map((item) => item.job.id);
+    } else if (isSavedView) {
+      jobIds = (savedData?.items || []).map((item) => item.job.id);
+    } else {
+      jobIds = (jobsData?.items || []).map((item) => item.id);
+    }
+
+    const orders = readOrders();
+    orders[contextKey] = {
+      jobIds,
+      updatedAt: Date.now(),
+    };
+    writeOrders(orders);
+  }, [
+    contextKey,
+    isError,
+    isLoading,
+    isRecommendedView,
+    isSavedView,
+    jobsData,
+    matchesData,
+    savedData,
+  ]);
 
   return (
     <div className="flex flex-col h-full">

@@ -6,6 +6,8 @@ import {
   MapPin,
   Clock,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Share2,
   ExternalLink,
   Plus,
@@ -48,7 +50,14 @@ import {
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
+const JOB_LIST_ORDERS_KEY = "jobs:list:orders";
 const VIEWED_DEDUP_WINDOW_MS = 60 * 1000;
+type DetailNavigationState = {
+  previousJobId: number | null;
+  nextJobId: number | null;
+  currentIndex: number | null;
+  total: number;
+};
 
 const normalizeSearchParams = (params: URLSearchParams): string => {
   const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
@@ -78,6 +87,12 @@ export default function JobDetailPage() {
   const serializedSearchParams = searchParams.toString();
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
   const [language, setLanguage] = useState<"en" | "zh">("en");
+  const [detailNavigation, setDetailNavigation] = useState<DetailNavigationState>({
+    previousJobId: null,
+    nextJobId: null,
+    currentIndex: null,
+    total: 0,
+  });
   const jobIdNum = parseInt(jobId || "0");
   const {
     data: job,
@@ -123,6 +138,39 @@ export default function JobDetailPage() {
     sessionStorage.setItem(dedupeKey, String(now));
     markViewed.mutate({ jobId: jobIdNum });
   }, [jobIdNum, markViewed]);
+
+  useEffect(() => {
+    if (!jobIdNum) return;
+    const contextKey = getContextKey(searchParams);
+
+    let orders: Record<string, { jobIds: number[] }> = {};
+    try {
+      const raw = sessionStorage.getItem(JOB_LIST_ORDERS_KEY);
+      orders = raw ? (JSON.parse(raw) as Record<string, { jobIds: number[] }>) : {};
+    } catch {
+      orders = {};
+    }
+
+    const jobIds = orders[contextKey]?.jobIds || [];
+    const currentIndex = jobIds.findIndex((id) => id === jobIdNum);
+
+    if (currentIndex < 0) {
+      setDetailNavigation({
+        previousJobId: null,
+        nextJobId: null,
+        currentIndex: null,
+        total: jobIds.length,
+      });
+      return;
+    }
+
+    setDetailNavigation({
+      previousJobId: currentIndex > 0 ? jobIds[currentIndex - 1] : null,
+      nextJobId: currentIndex < jobIds.length - 1 ? jobIds[currentIndex + 1] : null,
+      currentIndex,
+      total: jobIds.length,
+    });
+  }, [jobIdNum, searchParams, serializedSearchParams]);
 
   const handleLanguageChange = (value: string) => {
     if (value === "zh" && !hasCn) return;
@@ -431,6 +479,39 @@ export default function JobDetailPage() {
                   __html: descriptionHtml || "<p>No description available.</p>",
                 }}
               />
+            </div>
+
+            <div className="flex items-center justify-center gap-3">
+              {detailNavigation.previousJobId ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    to={`/jobs/${detailNavigation.previousJobId}?${searchParams.toString()}`}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+              )}
+              {detailNavigation.nextJobId ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    to={`/jobs/${detailNavigation.nextJobId}?${searchParams.toString()}`}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
             </div>
           </div>
 

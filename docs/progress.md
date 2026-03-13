@@ -42,6 +42,22 @@
 - Added implementation design doc:
   - `docs/job_browsing_viewed_and_position_plan.md`
 
+### 2026-03-13 - Job Detail Previous/Next Navigation (MVP)
+
+**Completed Tasks:**
+- Implemented MVP previous/next navigation in Job detail page based on current list context.
+- Added job-order persistence in list page:
+  - stores current page job id order by context key (`view + filters + sort + page`) into sessionStorage.
+- Added detail-page navigation resolution:
+  - resolves `previousJobId` and `nextJobId` from stored context order.
+  - keeps query params when navigating between job details.
+- Added header controls in Job detail:
+  - `Previous` button
+  - `Next` button
+  - buttons auto-disable at boundaries or when context order not available.
+- Scope limited to MVP:
+  - current context page only (no cross-page auto-fetch).
+
 ### 2026-03-13 - Jobs Company Filter: Debounced Remote Search
 
 **Completed Tasks:**
