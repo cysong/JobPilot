@@ -5,11 +5,35 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-12
+**Last Updated:** 2026-03-13
 
 ---
 
 ## Work Log
+
+### 2026-03-13 - Hostinger VPS Deployment Plan (GHCR + Unified Nginx)
+
+**Completed Tasks:**
+- Added deployment plan document for the agreed production architecture:
+  - Hostinger VPS + Docker Manager
+  - GHCR image pipeline via GitHub Actions
+  - shared Nginx as unified reverse proxy gateway
+  - containerized API/Worker/Redis
+  - Supabase PostgreSQL as managed database
+- Added operational guidance:
+  - image tag and rollback policy
+  - migration execution order
+  - security baseline and monitoring checklist
+- Incorporated confirmed production decisions:
+  - domain: `app.jobpilot.me` and `api.jobpilot.me`
+  - frontend served by Nginx static hosting
+  - `Celery Beat` enabled
+  - auto deploy on merge to `main`
+- Updated image strategy in deployment plan:
+  - use one shared image for `api/worker/beat`
+  - distinguish runtime roles by startup command only
+- Document path:
+  - `docs/hostinger_vps_ghcr_deployment_plan.md`
 
 ### 2026-03-13 - Jobs: Viewed State + Return Position Restore
 
