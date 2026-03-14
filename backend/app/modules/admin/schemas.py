@@ -30,6 +30,24 @@ class DashboardStats(AdminBase):
     tasks: TaskMetric
 
 
+class JobsDailyTrendPoint(AdminBase):
+    date: str
+    count: int
+
+
+class JobsDailyTrendSeries(AdminBase):
+    name: str
+    points: List[JobsDailyTrendPoint]
+
+
+class JobsDailyTrendResponse(AdminBase):
+    timezone: str
+    start_date: str = Field(..., alias="startDate")
+    end_date: str = Field(..., alias="endDate")
+    sources: List[str]
+    series: List[JobsDailyTrendSeries]
+
+
 # ===== Worker Monitor =====
 class WorkerStatus(AdminBase):
     id: str

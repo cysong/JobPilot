@@ -11,6 +11,7 @@ from app.modules.admin.schemas import (
     BatchRetryRequest,
     BatchRetryResponse,
     DashboardStats,
+    JobsDailyTrendResponse,
     TaskDetailResponse,
     TaskListResponse,
     TaskRetryResponse,
@@ -31,6 +32,15 @@ router = APIRouter(
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     """Dashboard high-level metrics."""
     return await AdminService.get_dashboard_stats(db)
+
+
+@router.get("/jobs/daily-trend", response_model=JobsDailyTrendResponse)
+async def get_jobs_daily_trend(
+    days: int = Query(30, ge=7, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily new job counts for recent days (grouped by source and total)."""
+    return await AdminService.get_jobs_daily_trend(db, days=days)
 
 
 @router.get("/workers", response_model=WorkerMonitorResponse)

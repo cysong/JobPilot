@@ -5,11 +5,38 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-13
+**Last Updated:** 2026-03-14
 
 ---
 
 ## Work Log
+
+### 2026-03-14 - Admin Jobs Daily Trend Chart (Dashboard Drilldown)
+
+**Completed Tasks:**
+- Added backend admin trend API for daily new jobs:
+  - endpoint: `GET /api/v1/admin/jobs/daily-trend?days=30`
+  - uses system timezone (`settings.APP_TIMEZONE`) only
+  - groups by local day and `source`
+  - includes one `Total` series
+  - fills missing dates with `0`
+- Added backend response schemas:
+  - `JobsDailyTrendResponse`
+  - `JobsDailyTrendSeries`
+  - `JobsDailyTrendPoint`
+- Added frontend admin chart page:
+  - new page: `AdminJobsChartPage`
+  - route: `/admin/jobs/chart`
+  - title: `Jobs Daily Trend`
+  - line chart with source legend + total line
+- Added frontend API and hook:
+  - `adminApi.getJobsDailyTrend`
+  - `useJobsDailyTrend`
+- Updated dashboard card behavior:
+  - `Jobs` card is now clickable and navigates to `/admin/jobs/chart`
+- Validation:
+  - backend syntax check passed via `python -m compileall`
+  - frontend build currently fails due pre-existing TypeScript issues unrelated to this feature
 
 ### 2026-03-13 - Production Deployment Artifacts (Docker + GHCR + Nginx)
 

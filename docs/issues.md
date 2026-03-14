@@ -457,3 +457,25 @@ Validated parsing via `compile(source, path, 'exec')` over all modified backend 
 **Fixed On**: 2026-03-13
 **Status**: Completed
 **Scope**: Backend migration file encoding
+## 2026-03-14 - Frontend Type Check Baseline Failing (Pre-existing)
+
+### Problem
+- `pnpm run build` fails with many TypeScript errors in existing admin/query typing paths.
+- Errors include `AxiosResponse<T>` not matching expected query data shape and several unused/strict typing violations.
+
+### Root Cause
+- Existing API client typings and admin hooks rely on incompatible return types in strict TypeScript settings.
+- This issue exists outside the new admin jobs chart feature.
+
+### Temporary Handling
+- Proceeded with feature implementation and validated backend syntax.
+- Kept new code typed defensively to minimize additional type noise.
+
+### Verification
+- Command run:
+  - `python -m compileall backend/app/modules/admin backend/app/main.py` (passed)
+  - `pnpm run build` in `frontend/` (failed due pre-existing TS errors)
+
+### Next Steps
+- Normalize API client return typing (data vs AxiosResponse) and align hook query generics.
+- Re-run frontend build after baseline typing cleanup.

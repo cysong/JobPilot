@@ -16,6 +16,24 @@ export interface DashboardStats {
   tasks: TaskMetric
 }
 
+export interface JobsDailyTrendPoint {
+  date: string
+  count: number
+}
+
+export interface JobsDailyTrendSeries {
+  name: string
+  points: JobsDailyTrendPoint[]
+}
+
+export interface JobsDailyTrendResponse {
+  timezone: string
+  startDate: string
+  endDate: string
+  sources: string[]
+  series: JobsDailyTrendSeries[]
+}
+
 export interface WorkerStatus {
   id: string
   hostname: string

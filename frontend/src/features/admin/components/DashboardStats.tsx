@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/utils/cn'
+import { useNavigate } from 'react-router-dom'
 import type { DashboardStats } from '../types'
 
 interface Props {
@@ -17,12 +18,22 @@ const cards = [
 ] as const
 
 export function DashboardStats({ data, isLoading }: Props) {
+  const navigate = useNavigate()
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => {
         const item = (data as any)?.[card.key]
+        const isJobsCard = card.key === 'jobs'
         return (
-          <Card key={card.key} className="shadow-sm border-slate-200">
+          <Card
+            key={card.key}
+            className={cn(
+              'shadow-sm border-slate-200',
+              isJobsCard && 'cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all'
+            )}
+            onClick={isJobsCard ? () => navigate('/admin/jobs/chart') : undefined}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-600">{card.label}</CardTitle>
             </CardHeader>
