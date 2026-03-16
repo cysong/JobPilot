@@ -42,6 +42,15 @@
 - Added Alembic migration:
   - `20260316_1500_8b2c4d6e9f10_fix_source_resume_fk_behavior.py`
 
+### 2026-03-16 - Backend Static Cleanup for Jobs / Applications / Resumes
+
+**Completed Tasks:**
+- Added explicit `TYPE_CHECKING` imports for ORM relationship type hints in backend models.
+- Replaced SQLAlchemy boolean comparisons with `.is_(False)` / `.is_(True)` in repository and service queries.
+- Removed unused imports in jobs/applications/resumes modules.
+- Validation:
+  - `ruff check app/modules/jobs app/modules/applications app/modules/resumes` passed
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**

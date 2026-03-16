@@ -56,7 +56,7 @@ class JobRepository:
             select(SeekJob)
             .outerjoin(JobAnalysis, SeekJob.id == JobAnalysis.job_id)
             .where(JobAnalysis.id.is_(None))  # No analysis exists
-            .where(SeekJob.is_expired == False)  # Only active jobs
+            .where(SeekJob.is_expired.is_(False))  # Only active jobs
             .where(
                 SeekJob.listed_at.greater_than(
                     datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
@@ -93,7 +93,7 @@ class JobRepository:
                 ),
             )
             .where(TaskExecution.id.is_(None))  # No task exists
-            .where(SeekJob.is_expired == False)  # Only active jobs
+            .where(SeekJob.is_expired.is_(False))  # Only active jobs
             .where(
                 SeekJob.listed_at
                 > (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30))
@@ -179,7 +179,7 @@ class JobAnalysisRepository:
         """
         result = await db.execute(
             select(JobAnalysis)
-            .where(JobAnalysis.needs_reanalysis == True)
+            .where(JobAnalysis.needs_reanalysis.is_(True))
             .order_by(JobAnalysis.updated_at.asc())
             .limit(limit)
         )

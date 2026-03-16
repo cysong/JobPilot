@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

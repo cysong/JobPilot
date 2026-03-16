@@ -5,8 +5,6 @@ from app.core.llm.gateway import AgentGateway
 from app.modules.resumes.repository import ResumeRepository
 from app.modules.resumes.service import ResumeService
 from app.modules.workflow import DBTrackingTask
-from app.modules.workflow.service import TaskService, TaskSubmissionSpec
-from app.shared.enums import TaskType
 from agent_configs.schemas import AnalyzedResume
 
 

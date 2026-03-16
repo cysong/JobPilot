@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from uuid import uuid4
 import hashlib
 
-from app.modules.resumes.models import Resume, Document, DocumentFormat
+from app.modules.resumes.models import Resume, Document
 
 
 class DocumentRepository:

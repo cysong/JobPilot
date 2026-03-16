@@ -1,12 +1,10 @@
 """Celery tasks for job analysis."""
 import logging
 import time
-from uuid import uuid4
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.llm.gateway import AgentGateway
-from app.modules.jobs.models import SeekJob
 from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.workflow import DBTrackingTask, AsyncBaseTask, TaskService
 from app.shared.enums import TaskType

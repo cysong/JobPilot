@@ -3,13 +3,16 @@ Job models for read-only access to seek_jobs table.
 This table is maintained by external crawler system.
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.modules.auth.models import User
 
 
 def _uuid() -> str:

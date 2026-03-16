@@ -18,7 +18,6 @@ from app.modules.resumes.schemas import (
     ResumeAnalysisResponse,
     ResumeCreate,
     ResumeExportRequest,
-    ResumeExportResponse,
     ResumeListItem,
     ResumeListResponse,
     ResumeResponse,

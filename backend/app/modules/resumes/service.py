@@ -17,7 +17,7 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.response_codes import ResponseCode
-from app.modules.resumes.models import Document, DocumentFormat, Resume, ResumeSkill
+from app.modules.resumes.models import Document, Resume, ResumeSkill
 from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
@@ -152,7 +152,7 @@ class ResumeService:
         )
 
         if not include_deleted:
-            query = query.where(Resume.is_deleted == False)
+            query = query.where(Resume.is_deleted.is_(False))
 
         result = await db.execute(query)
         return list(result.scalars().all())
@@ -168,7 +168,7 @@ class ResumeService:
                 and_(
                     Resume.id == resume_id,
                     Resume.user_id == user_id,
-                    Resume.is_deleted == False,
+                    Resume.is_deleted.is_(False),
                 )
             )
             .options(selectinload(Resume.document))
@@ -298,8 +298,8 @@ class ResumeService:
             .where(
                 and_(
                     Resume.user_id == user_id,
-                    Resume.is_draft == False,
-                    Resume.is_deleted == False,
+                    Resume.is_draft.is_(False),
+                    Resume.is_deleted.is_(False),
                 )
             )
         )

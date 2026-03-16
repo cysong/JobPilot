@@ -390,7 +390,7 @@ class JobService:
             .where(
                 and_(
                     SeekJob.id != job_id,  # Exclude current job
-                    SeekJob.is_expired == False,
+                    SeekJob.is_expired.is_(False),
                     or_(
                         SeekJob.company_name == current_job.company_name,
                         SeekJob.advertiser_name == current_job.advertiser_name

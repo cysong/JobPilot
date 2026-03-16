@@ -7,14 +7,17 @@ Document uses chained version model:
 - Supports soft delete for Resume
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from enum import Enum
 
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, Integer, BigInteger, Index, UniqueConstraint
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, Integer, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import ProficiencyLevel
+
+if TYPE_CHECKING:
+    from app.modules.auth.models import User
 
 
 class DocumentFormat(str, Enum):

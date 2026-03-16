@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -20,6 +20,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import ApplicationStatus, TailoringLevel
+
+if TYPE_CHECKING:
+    from app.modules.auth.models import User
+    from app.modules.jobs.models import SeekJob
+    from app.modules.resumes.models import Document, Resume
 
 
 def _uuid() -> str:
