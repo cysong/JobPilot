@@ -131,7 +131,7 @@ async def get_my_match_detail(
     return UserJobMatchDetailResponse(
         id=match.id,
         job=JobDetail.model_validate(job),
-        job_analysis=JobAnalysisResponse.model_validate(job_analysis) if job_analysis else None,
+        job_analysis=JobAnalysisResponse.model_validate(job_analysis),
         skill_match_score=match.skill_match_score,
         skill_match_details=match.skill_match_details,
         resume_match_score=match.resume_match_score,

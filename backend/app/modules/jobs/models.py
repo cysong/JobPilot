@@ -7,7 +7,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
 
@@ -181,6 +181,12 @@ class SeekJob(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True)
 
+    analysis: Mapped[Optional["JobAnalysis"]] = relationship(
+        "JobAnalysis",
+        back_populates="job",
+        uselist=False,
+    )
+
     @property
     def effective_is_expired(self) -> bool:
         """Return effective expiration status from source + manual override."""
@@ -291,7 +297,7 @@ class JobAnalysis(Base, TimestampMixin):
     # ============================================
     # Relationships
     # ============================================
-    job: Mapped["SeekJob"] = relationship("SeekJob", backref=backref("analysis", uselist=False))
+    job: Mapped["SeekJob"] = relationship("SeekJob", back_populates="analysis")
 
 
 class UserSavedJob(Base, TimestampMixin):
