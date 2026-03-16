@@ -34,7 +34,7 @@ export interface DashboardApplicationItem {
   actionHref: string
   actionExternal?: boolean
   isExpired: boolean
-  updatedAt: string
+  addedAt: string
 }
 
 export interface DashboardApplicationSnapshot {

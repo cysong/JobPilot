@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
     ExternalLink,
@@ -359,7 +359,7 @@ export default function ApplicationListingPage() {
                                     <div className="flex items-center text-sm text-slate-500 gap-4">
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="h-4 w-4" />
-                                            <span>Applied {format(new Date(app.created_at), 'MMM d, yyyy')}</span>
+                                            <span>Added {formatDistanceToNow(new Date(app.created_at), { addSuffix: true })}</span>
                                         </div>
                                         {app.last_error && (
                                             <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">

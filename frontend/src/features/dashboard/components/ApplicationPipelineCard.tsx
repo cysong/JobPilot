@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { ApplicationStatus } from '@/types/application'
 import type { DashboardApplicationSnapshot } from '@/features/dashboard/types'
 
 interface ApplicationPipelineCardProps {
@@ -15,16 +14,6 @@ interface ApplicationPipelineCardProps {
   isLoading: boolean
   hasError: boolean
 }
-
-const STATUS_LABELS: Array<{ key: ApplicationStatus; label: string }> = [
-  { key: 'Pending', label: 'Pending' },
-  { key: 'Tailoring', label: 'Tailoring' },
-  { key: 'Ready', label: 'Ready' },
-  { key: 'Applied', label: 'Applied' },
-  { key: 'Interviewing', label: 'Interviewing' },
-  { key: 'Offer', label: 'Offer' },
-  { key: 'Rejected', label: 'Rejected' },
-]
 
 export function ApplicationPipelineCard({ data, isLoading, hasError }: ApplicationPipelineCardProps) {
   if (isLoading) {
@@ -52,13 +41,33 @@ export function ApplicationPipelineCard({ data, isLoading, hasError }: Applicati
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {STATUS_LABELS.map((item) => (
-            <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">{item.label}</div>
-              <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts[item.key]}</div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Preparing</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">
+              {data.counts.Pending + data.counts.Tailoring}
             </div>
-          ))}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Ready</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Ready}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Applied</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Applied}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Interviewing</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Interviewing}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Offer</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Offer}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm text-slate-500">Rejected</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Rejected}</div>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -84,17 +93,11 @@ export function ApplicationPipelineCard({ data, isLoading, hasError }: Applicati
                     </div>
                     <div className="text-sm text-slate-600">{item.company}</div>
                     <div className="text-xs text-slate-500">
-                      Updated {formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}
+                      Added {formatDistanceToNow(new Date(item.addedAt), { addSuffix: true })}
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={item.href}>
-                        View Application
-                        <ArrowUpRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm">
+                    <Button asChild size="sm" variant={item.actionLabel === 'View Application' ? 'outline' : 'default'}>
                       {item.actionExternal ? (
                         <a href={item.actionHref} target="_blank" rel="noopener noreferrer">
                           {item.actionLabel}

@@ -66,7 +66,11 @@ export function PriorityActionCard({ action, isLoading }: PriorityActionCardProp
       </CardHeader>
       <CardContent className="space-y-5">
         <p className="max-w-2xl text-sm leading-6 text-slate-600">{action.description}</p>
-        <Button asChild className="bg-slate-950 text-white hover:bg-slate-800">
+        <Button
+          asChild
+          variant={action.ctaLabel === 'View Application' ? 'outline' : 'default'}
+          className={action.ctaLabel === 'View Application' ? undefined : 'bg-slate-950 text-white hover:bg-slate-800'}
+        >
           {action.external ? (
             <a href={action.href} target="_blank" rel="noopener noreferrer">
               {action.ctaLabel}

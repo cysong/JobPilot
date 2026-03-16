@@ -42,17 +42,12 @@ const getCompanyName = (application: Application): string =>
 const buildApplicationItem = (application: Application): DashboardApplicationItem => {
   const detailHref = `/applications/${application.id}`
   const isExpired = Boolean(application.job?.is_expired)
-  const shareLink = application.job?.share_link || ''
 
-  let actionLabel = 'Open'
+  let actionLabel = 'View Application'
   let actionHref = detailHref
   let actionExternal = false
 
-  if (application.status === 'Ready' && shareLink) {
-    actionLabel = 'Apply'
-    actionHref = shareLink
-    actionExternal = true
-  } else if (application.status === 'Failed') {
+  if (application.status === 'Failed') {
     actionLabel = 'Review'
   } else if (application.status === 'Pending' || application.status === 'Tailoring') {
     actionLabel = 'Check Progress'
@@ -68,7 +63,7 @@ const buildApplicationItem = (application: Application): DashboardApplicationIte
     actionHref,
     actionExternal,
     isExpired,
-    updatedAt: application.updated_at,
+    addedAt: application.created_at,
   }
 }
 
@@ -195,17 +190,14 @@ const buildPriorityAction = ({
   matches: UserJobMatch[]
   resumeSummary: DashboardResumeSummary
 }): DashboardPriorityAction | null => {
-  const readyApplication = applications.find(
-    (application) => application.status === 'Ready' && application.job?.share_link
-  )
-  if (readyApplication?.job?.share_link) {
+  const readyApplication = applications.find((application) => application.status === 'Ready')
+  if (readyApplication) {
     return {
-      title: 'Apply while materials are ready',
-      description: `${readyApplication.job.title || 'This application'} is ready to submit with tailored materials.`,
-      ctaLabel: 'Apply Now',
-      href: readyApplication.job.share_link,
+      title: 'Review a ready application',
+      description: `${readyApplication.job?.title || 'This application'} has tailored materials ready for download and final review.`,
+      ctaLabel: 'View Application',
+      href: `/applications/${readyApplication.id}`,
       tone: 'success',
-      external: true,
     }
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import {
     ArrowLeft,
     ChevronLeft,
@@ -395,8 +395,8 @@ export default function ApplicationDetailPage() {
                 <div className="flex items-center gap-1.5">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    Applied{" "}
-                    {format(new Date(application.created_at), "MMM d, yyyy")}
+                    Added{" "}
+                    {formatDistanceToNow(new Date(application.created_at), { addSuffix: true })}
                   </span>
                 </div>
               </div>
