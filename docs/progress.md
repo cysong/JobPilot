@@ -60,6 +60,16 @@
   - jobs without analysis-task selection
   - similar jobs selection
 
+### 2026-03-16 - Application List Return Context and Detail Navigation
+
+**Completed Tasks:**
+- Added application-list query context preservation for detail navigation.
+- Added list return intent + scroll position restore for application detail back navigation.
+- Added current-page application order caching to support detail-page previous/next navigation.
+- Added previous/next buttons to the application detail page.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
     ArrowLeft,
+    ChevronLeft,
+    ChevronRight,
     Building2,
     Calendar,
     FileText,
@@ -79,9 +81,34 @@ const APPLIED_AND_AFTER_STATUSES: ApplicationStatus[] = [
   'Rejected',
 ];
 
+const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent';
+const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders';
+
+type DetailNavigationState = {
+  previousApplicationId: string | null;
+  nextApplicationId: string | null;
+  currentIndex: number | null;
+  total: number;
+};
+
+const normalizeSearchParams = (params: URLSearchParams): string => {
+  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
+    if (aKey === bKey) return aVal.localeCompare(bVal);
+    return aKey.localeCompare(bKey);
+  });
+  return entries
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+};
+
+const getContextKey = (params: URLSearchParams): string => {
+  return `applications:list:${normalizeSearchParams(params)}`;
+};
+
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
     const [searchParams] = useSearchParams();
+    const serializedSearchParams = searchParams.toString();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
     const { retryCoverLetter, updateStatus } = useApplicationMutations();
     const { setJobExpiration } = useJobExpirationMutations();
@@ -93,7 +120,55 @@ export default function ApplicationDetailPage() {
     const [isRetryDialogOpen, setIsRetryDialogOpen] = useState(false);
     const [retryResumeId, setRetryResumeId] = useState<string>('');
     const [retryTailoringLevel, setRetryTailoringLevel] = useState<TailoringLevel>('light');
+    const [detailNavigation, setDetailNavigation] = useState<DetailNavigationState>({
+      previousApplicationId: null,
+      nextApplicationId: null,
+      currentIndex: null,
+      total: 0,
+    });
     const backUrl = searchParams.toString() ? `/applications?${searchParams.toString()}` : '/applications';
+
+    useEffect(() => {
+      if (!applicationId) return;
+      const contextKey = getContextKey(searchParams);
+      sessionStorage.setItem(
+        APPLICATION_LIST_RETURN_INTENT_KEY,
+        JSON.stringify({ contextKey, applicationId }),
+      );
+    }, [applicationId, searchParams, serializedSearchParams]);
+
+    useEffect(() => {
+      if (!applicationId) return;
+      const contextKey = getContextKey(searchParams);
+
+      let orders: Record<string, { applicationIds: string[] }> = {};
+      try {
+        const raw = sessionStorage.getItem(APPLICATION_LIST_ORDERS_KEY);
+        orders = raw ? (JSON.parse(raw) as Record<string, { applicationIds: string[] }>) : {};
+      } catch {
+        orders = {};
+      }
+
+      const applicationIds = orders[contextKey]?.applicationIds || [];
+      const currentIndex = applicationIds.findIndex((id) => id === applicationId);
+
+      if (currentIndex < 0) {
+        setDetailNavigation({
+          previousApplicationId: null,
+          nextApplicationId: null,
+          currentIndex: null,
+          total: applicationIds.length,
+        });
+        return;
+      }
+
+      setDetailNavigation({
+        previousApplicationId: currentIndex > 0 ? applicationIds[currentIndex - 1] : null,
+        nextApplicationId: currentIndex < applicationIds.length - 1 ? applicationIds[currentIndex + 1] : null,
+        currentIndex,
+        total: applicationIds.length,
+      });
+    }, [applicationId, searchParams, serializedSearchParams]);
 
     const buildFilename = (label: string) => {
         const jobTitle = application?.job?.title || 'Job';
@@ -245,7 +320,35 @@ export default function ApplicationDetailPage() {
                   Back to Applications
                 </Link>
               </Button>
-              <ApplicationStatusBadge status={application.status} />
+              <div className="flex items-center gap-2">
+                {detailNavigation.previousApplicationId ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/applications/${detailNavigation.previousApplicationId}?${searchParams.toString()}`}>
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled>
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                )}
+                {detailNavigation.nextApplicationId ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/applications/${detailNavigation.nextApplicationId}?${searchParams.toString()}`}>
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled>
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+                <ApplicationStatusBadge status={application.status} />
+              </div>
             </div>
           </div>
         </div>
@@ -463,6 +566,35 @@ export default function ApplicationDetailPage() {
               />
               Retry Generation
             </Button>
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            {detailNavigation.previousApplicationId ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/applications/${detailNavigation.previousApplicationId}?${searchParams.toString()}`}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+            )}
+            {detailNavigation.nextApplicationId ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/applications/${detailNavigation.nextApplicationId}?${searchParams.toString()}`}>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
           </div>
         </main>
 

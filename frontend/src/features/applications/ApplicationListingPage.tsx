@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { format } from 'date-fns'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -33,12 +33,71 @@ import {
 } from '@/components/ui/tooltip'
 import { JobPagination } from '@/features/jobs/components/JobPagination'
 
+type ListPositionState = {
+    anchorApplicationId: string
+    scrollY: number
+    updatedAt: number
+}
+
+type ApplicationOrderState = {
+    applicationIds: string[]
+    updatedAt: number
+}
+
+const APPLICATION_LIST_POSITIONS_KEY = 'applications:list:positions'
+const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent'
+const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders'
+const RESTORE_HIGHLIGHT_MS = 2000
+
+const normalizeSearchParams = (params: URLSearchParams): string => {
+    const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
+        if (aKey === bKey) return aVal.localeCompare(bVal)
+        return aKey.localeCompare(bKey)
+    })
+    return entries
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&')
+}
+
+const getContextKey = (params: URLSearchParams): string => {
+    return `applications:list:${normalizeSearchParams(params)}`
+}
+
+const readPositions = (): Record<string, ListPositionState> => {
+    try {
+        const raw = sessionStorage.getItem(APPLICATION_LIST_POSITIONS_KEY)
+        return raw ? (JSON.parse(raw) as Record<string, ListPositionState>) : {}
+    } catch {
+        return {}
+    }
+}
+
+const writePositions = (positions: Record<string, ListPositionState>) => {
+    sessionStorage.setItem(APPLICATION_LIST_POSITIONS_KEY, JSON.stringify(positions))
+}
+
+const readOrders = (): Record<string, ApplicationOrderState> => {
+    try {
+        const raw = sessionStorage.getItem(APPLICATION_LIST_ORDERS_KEY)
+        return raw ? (JSON.parse(raw) as Record<string, ApplicationOrderState>) : {}
+    } catch {
+        return {}
+    }
+}
+
+const writeOrders = (orders: Record<string, ApplicationOrderState>) => {
+    sessionStorage.setItem(APPLICATION_LIST_ORDERS_KEY, JSON.stringify(orders))
+}
+
 export default function ApplicationListingPage() {
     const [searchParams, setSearchParams] = useSearchParams()
+    const [highlightedApplicationId, setHighlightedApplicationId] = useState<string | null>(null)
+    const previousContextKey = useRef<string | null>(null)
     const currentPage = parseInt(searchParams.get('page') || '1')
     const pageSize = parseInt(searchParams.get('page_size') || '20')
     const keywordParam = searchParams.get('keyword') || ''
     const statusParam = (searchParams.get('status') as ApplicationStatus | null) || null
+    const contextKey = getContextKey(searchParams)
     const [keyword, setKeyword] = useState(keywordParam)
 
     const { data, isLoading, isFetching, isError } = useApplications({
@@ -90,6 +149,71 @@ export default function ApplicationListingPage() {
     const handleStatusChange = (value: string) => {
         updateSearchParams({ status: value === 'all' ? null : value, page: 1 })
     }
+
+    const handleOpenApplication = (applicationId: string) => {
+        const positions = readPositions()
+        positions[contextKey] = {
+            anchorApplicationId: applicationId,
+            scrollY: window.scrollY,
+            updatedAt: Date.now(),
+        }
+        writePositions(positions)
+    }
+
+    useEffect(() => {
+        if (previousContextKey.current && previousContextKey.current !== contextKey) {
+            window.scrollTo({ top: 0, behavior: 'auto' })
+        }
+        previousContextKey.current = contextKey
+    }, [contextKey])
+
+    useEffect(() => {
+        if (isLoading || isError) return
+
+        const rawIntent = sessionStorage.getItem(APPLICATION_LIST_RETURN_INTENT_KEY)
+        if (!rawIntent) return
+
+        let intent: { contextKey: string; applicationId: string } | null = null
+        try {
+            intent = JSON.parse(rawIntent) as { contextKey: string; applicationId: string }
+        } catch {
+            sessionStorage.removeItem(APPLICATION_LIST_RETURN_INTENT_KEY)
+            return
+        }
+
+        if (!intent || intent.contextKey !== contextKey) {
+            return
+        }
+
+        sessionStorage.removeItem(APPLICATION_LIST_RETURN_INTENT_KEY)
+
+        const positions = readPositions()
+        const position = positions[contextKey]
+        const targetApplicationId = intent.applicationId || position?.anchorApplicationId
+        if (!targetApplicationId) return
+
+        requestAnimationFrame(() => {
+            const anchorElement = document.querySelector(`[data-application-id="${targetApplicationId}"]`)
+            if (anchorElement instanceof HTMLElement) {
+                anchorElement.scrollIntoView({ block: 'center', behavior: 'auto' })
+            } else if (position?.scrollY !== undefined) {
+                window.scrollTo({ top: position.scrollY, behavior: 'auto' })
+            }
+            setHighlightedApplicationId(targetApplicationId)
+            window.setTimeout(() => setHighlightedApplicationId(null), RESTORE_HIGHLIGHT_MS)
+        })
+    }, [contextKey, isError, isLoading])
+
+    useEffect(() => {
+        if (isLoading || isError || !data) return
+
+        const orders = readOrders()
+        orders[contextKey] = {
+            applicationIds: data.items.map((item) => item.id),
+            updatedAt: Date.now(),
+        }
+        writeOrders(orders)
+    }, [contextKey, data, isError, isLoading])
 
     return (
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
@@ -194,12 +318,18 @@ export default function ApplicationListingPage() {
                         const query = searchParams.toString()
                         const detailUrl = query ? `/applications/${app.id}?${query}` : `/applications/${app.id}`
                         return (
-                            <Card key={app.id} className="overflow-hidden">
+                            <Card
+                                key={app.id}
+                                data-application-id={app.id}
+                                className={`overflow-hidden ${
+                                    highlightedApplicationId === app.id ? 'ring-2 ring-amber-300 border-amber-300' : ''
+                                }`}
+                            >
                                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <Link to={detailUrl}>
+                                                <Link to={detailUrl} onClick={() => handleOpenApplication(app.id)}>
                                                     <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
                                                         {app.job?.title || 'Unknown Job'}
                                                     </CardTitle>
