@@ -11,6 +11,20 @@
 
 ## Work Log
 
+### 2026-03-17 - Migration Checklist for Shared-Write Tables
+
+- Added [migration checklist](d:/myprojects/JobPilot/docs/migration_checklist.md) covering schema-change safety rules for shared-write tables.
+- Documented the project rule that `seek_jobs` is currently the only known external-system shared-write table.
+- Added explicit guidance that new columns on `seek_jobs` must be nullable or have a database `server_default`.
+- Recorded follow-up guidance for backfills, ORM `server_default` alignment, and foreign-key safety on shared tables.
+
+### 2026-03-17 - Keep seek_jobs.manual_expired Default False
+
+- Added a follow-up Alembic migration to keep `seek_jobs.manual_expired` database default as `false`:
+  - `20260317_0900_c7a1f3e9d2b4_keep_seek_jobs_manual_expired_default_false.py`
+- Updated the `SeekJob.manual_expired` ORM mapping to include `server_default=false` so future autogenerate runs do not try to remove the default again.
+- Kept the other crawler-shared `seek_jobs` manual-expiration fields nullable, preserving the rule that new columns on crawler-owned tables must be nullable or have safe defaults.
+
 ### 2026-03-16 - User Dashboard MVP Implementation
 
 - Replaced the `/dashboard` placeholder route with a real user dashboard page.

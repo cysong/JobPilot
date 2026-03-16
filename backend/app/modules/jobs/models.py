@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 from uuid import uuid4
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -50,7 +51,11 @@ class SeekJob(Base):
     is_expired: Mapped[Optional[bool]] = mapped_column(
         Boolean, default=False, index=True)
     manual_expired: Mapped[Optional[bool]] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
+        Boolean,
+        default=False,
+        server_default=sa.text("false"),
+        nullable=False,
+        index=True,
     )
     manual_expired_by: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
