@@ -11,6 +11,30 @@
 
 ## Work Log
 
+### 2026-03-17 - Jobs / Applications Metadata Alignment and Lazy JD Panel
+
+- Unified job category display across jobs and applications pages to plain text format:
+  - `sub_classification (classification)` when both values exist
+  - fallback to whichever field is present
+- Added shared frontend job display components/utilities for:
+  - source metadata rendering
+  - company display fallback
+  - reusable job metadata row
+  - reusable job description language selector
+  - reusable job description HTML content block
+- Updated Jobs UI:
+  - job list cards now show category as plain text instead of split badges
+  - job detail page now uses the shared category formatting and shared language selector/description block
+- Updated Applications UI:
+  - application list cards now include job `source`, `location`, `type`, and formatted category
+  - application detail header now includes job `source`, `location`, `type`, and formatted category
+  - application detail page now supports click-to-expand lazy JD loading on the same page
+  - JD detail panel reuses the same English / Chinese switch behavior as the job detail page
+  - Chinese option is disabled when translated content is unavailable
+- Validation:
+  - `pnpm exec tsc -b` passed
+  - `pnpm run build` failed in the current environment due to Vite/esbuild `spawn EPERM` while loading `vite.config.ts`
+
 ### 2026-03-17 - Migration Checklist for Shared-Write Tables
 
 - Added [migration checklist](d:/myprojects/JobPilot/docs/migration_checklist.md) covering schema-change safety rules for shared-write tables.

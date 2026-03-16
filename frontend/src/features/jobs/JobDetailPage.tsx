@@ -16,8 +16,6 @@ import {
   Users,
   Code2,
   Zap,
-  Globe,
-  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -32,13 +30,6 @@ import { useApplicationByJob } from "@/features/applications/hooks/useApplicatio
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -50,8 +41,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import linkedinIcon from "@/assets/source-icons/linkedin.svg";
-import seekIcon from "@/assets/source-icons/seek.ico";
+import { JobDescriptionHtml } from "@/components/job/JobDescriptionHtml";
+import { JobLanguageSelect } from "@/components/job/JobLanguageSelect";
+import {
+  JobAttributeList,
+  formatJobCategory,
+  getCompanyDisplayName,
+  JobSourceCompanyLine,
+} from "@/components/job/jobDisplay";
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
@@ -77,32 +74,6 @@ const normalizeSearchParams = (params: URLSearchParams): string => {
 const getContextKey = (params: URLSearchParams): string => {
   return `jobs:list:${normalizeSearchParams(params)}`;
 };
-
-type SourceMeta = {
-  icon?: LucideIcon;
-  iconSrc?: string;
-  label: string;
-};
-
-const getSourceMeta = (source: string | null | undefined): SourceMeta => {
-  const raw = source?.trim();
-  const normalized = raw?.toLowerCase();
-  const label = raw && raw.length > 0 ? raw : "unknown";
-
-  if (normalized === "linkedin") {
-    return { iconSrc: linkedinIcon, label };
-  }
-  if (normalized === "seek") {
-    return { iconSrc: seekIcon, label };
-  }
-
-  return { icon: Globe, label };
-};
-
-const getCompanyDisplayName = (
-  companyName: string | null | undefined,
-  advertiserName: string | null | undefined,
-): string => advertiserName?.trim() || companyName?.trim() || "Unknown company";
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
@@ -261,8 +232,7 @@ export default function JobDetailPage() {
       ? job.content_cn || job.analysis?.cn_content || job.content
       : job.content;
   const isSaved = Boolean(savedStatus?.is_saved);
-  const sourceMeta = getSourceMeta(job.source);
-  const SourceIcon = sourceMeta.icon;
+  const categoryText = formatJobCategory(job);
 
   const handleToggleSaved = () => {
     if (isSaved) {
@@ -445,46 +415,26 @@ export default function JobDetailPage() {
                     <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-lg text-slate-600 mb-4">
-                  {sourceMeta.iconSrc ? (
-                    <img
-                      src={sourceMeta.iconSrc}
-                      alt={`${sourceMeta.label} icon`}
-                      className="h-5 w-5 rounded-sm object-contain"
-                    />
-                  ) : (
-                    SourceIcon && <SourceIcon className="h-5 w-5" />
-                  )}
-                  <span className="text-slate-500">{sourceMeta.label}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="font-medium">
-                    {getCompanyDisplayName(job.company_name, job.advertiser_name)}
-                  </span>
-                </div>
+                <JobSourceCompanyLine
+                  source={job.source}
+                  companyName={job.company_name}
+                  advertiserName={job.advertiser_name}
+                  className="mb-4 text-lg"
+                />
               </div>
 
-              <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-slate-600 mt-2">
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-slate-400" />
-                  <span>{job.location_label}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-slate-400" />
-                  <span>{job.work_types_label}</span>
-                </div>
+              <JobAttributeList
+                job={job}
+                className="mt-2 text-sm text-slate-600"
+                showCategory={false}
+              />
+
+              <div className="mt-6 flex flex-wrap gap-2">
                 {job.salary_label && (
-                  <div className="flex items-center gap-1.5">
-                    <span>{job.salary_label}</span>
-                  </div>
+                  <Badge variant="secondary">{job.salary_label}</Badge>
                 )}
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-6">
-                {job.classification && (
-                  <Badge variant="secondary">{job.classification}</Badge>
-                )}
-                {job.sub_classification && (
-                  <Badge variant="outline">{job.sub_classification}</Badge>
+                {categoryText && (
+                  <span className="text-xs text-slate-500">{categoryText}</span>
                 )}
                 <span className="text-xs text-slate-400 flex items-center ml-auto whitespace-nowrap">
                   Posted{" "}
@@ -504,34 +454,15 @@ export default function JobDetailPage() {
                   Job Description
                 </h2>
                 <div className="flex items-center gap-2">
-                  <Select value={language} onValueChange={handleLanguageChange}>
-                    <SelectTrigger className="h-9 w-[140px]">
-                      <SelectValue placeholder="Language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="zh" disabled={!hasCn}>
-                        {"\u4e2d\u6587"}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <JobLanguageSelect
+                    value={language}
+                    onValueChange={handleLanguageChange}
+                    hasChinese={hasCn}
+                  />
                 </div>
               </div>
 
-              <div
-                className="prose prose-slate max-w-none 
-                  prose-headings:font-bold prose-headings:text-slate-900 prose-headings:mb-3 prose-headings:mt-8 first:prose-headings:mt-0 prose-headings:tracking-tight
-                  prose-h3:text-lg 
-                  prose-p:text-slate-700 prose-p:leading-relaxed prose-p:mb-4
-                  prose-li:text-slate-700 prose-li:marker:text-slate-500 prose-li:my-0.5
-                  [&_li_p]:m-0
-                  prose-ul:my-4 prose-ul:mb-6
-                  prose-strong:font-bold prose-strong:text-slate-900
-                  prose-a:text-indigo-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline"
-                dangerouslySetInnerHTML={{
-                  __html: descriptionHtml || "<p>No description available.</p>",
-                }}
-              />
+              <JobDescriptionHtml html={descriptionHtml} />
             </div>
 
             <div className="flex items-center justify-center gap-3">

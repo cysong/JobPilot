@@ -1,15 +1,11 @@
 import {
   MapPin,
   Clock,
-  Globe,
   CircleCheck,
-  type LucideIcon,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 import { Link, useSearchParams } from 'react-router-dom'
-import linkedinIcon from '@/assets/source-icons/linkedin.svg'
-import seekIcon from '@/assets/source-icons/seek.ico'
 
 import type { Job, JobBriefInfo, UserJobMatch } from '@/types/job'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +14,10 @@ import {
     CardContent,
     CardHeader,
 } from '@/components/ui/card'
+import {
+  formatJobCategory,
+  getSourceMeta,
+} from '@/components/job/jobDisplay'
 
 interface JobCardProps {
     job: Job | JobBriefInfo // Accept both full Job and JobBriefInfo
@@ -27,31 +27,11 @@ interface JobCardProps {
     highlighted?: boolean
 }
 
-type SourceMeta = {
-  icon?: LucideIcon
-  iconSrc?: string
-  label: string
-}
-
-const getSourceMeta = (source: string | null | undefined): SourceMeta => {
-  const raw = source?.trim()
-  const normalized = raw?.toLowerCase()
-  const label = raw && raw.length > 0 ? raw : "unknown"
-
-  if (normalized === "linkedin") {
-    return { iconSrc: linkedinIcon, label }
-  }
-  if (normalized === "seek") {
-    return { iconSrc: seekIcon, label }
-  }
-
-  return { icon: Globe, label }
-}
-
 export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
     const sourceMeta = getSourceMeta(job.source)
     const SourceIcon = sourceMeta.icon
+    const categoryText = formatJobCategory(job)
 
     // Preserve current search params when navigating to detail page
     const detailUrl = `/jobs/${job.id}?${searchParams.toString()}`
@@ -150,18 +130,8 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {job.classification && (
-              <Badge variant="secondary" className="font-normal text-xs">
-                {job.classification}
-              </Badge>
-            )}
-            {job.sub_classification && (
-              <Badge
-                variant="outline"
-                className="font-normal text-xs text-slate-500"
-              >
-                {job.sub_classification}
-              </Badge>
+            {categoryText && (
+              <span className="text-xs text-slate-500">{categoryText}</span>
             )}
             <span className="ml-auto whitespace-nowrap text-xs text-slate-400 flex items-center">
               {savedAt

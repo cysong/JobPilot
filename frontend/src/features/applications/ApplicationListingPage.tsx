@@ -4,7 +4,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
     ExternalLink,
     RefreshCw,
-    Building2,
     Calendar,
     Search,
     X,
@@ -14,7 +13,7 @@ import { useApplications, useApplicationMutations } from '@/features/application
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge'
 import type { ApplicationStatus } from '@/types/application'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import {
@@ -32,6 +31,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { JobPagination } from '@/features/jobs/components/JobPagination'
+import {
+  JobAttributeList,
+  JobSourceCompanyLine,
+} from '@/components/job/jobDisplay'
 
 type ListPositionState = {
     anchorApplicationId: string
@@ -314,20 +317,19 @@ export default function ApplicationListingPage() {
                     )}
                     <div className="grid gap-4">
                     {data?.items.map((app) => {
-                        const company = app.job?.company_name || app.job?.advertiser_name || 'Unknown Company'
                         const query = searchParams.toString()
                         const detailUrl = query ? `/applications/${app.id}?${query}` : `/applications/${app.id}`
                         return (
                             <Card
                                 key={app.id}
                                 data-application-id={app.id}
-                                className={`overflow-hidden ${
+                                className={`overflow-hidden bg-slate-50/50 ${
                                     highlightedApplicationId === app.id ? 'ring-2 ring-amber-300 border-amber-300' : ''
                                 }`}
                             >
-                                <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+                                <CardContent className="space-y-4 p-5">
                                     <div className="flex justify-between items-start">
-                                        <div className="space-y-1">
+                                        <div className="space-y-1.5">
                                             <div className="flex items-center gap-2">
                                                 <Link to={detailUrl} onClick={() => handleOpenApplication(app.id)}>
                                                     <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
@@ -347,47 +349,53 @@ export default function ApplicationListingPage() {
                                                     </TooltipProvider>
                                                 )}
                                             </div>
-                                            <div className="flex items-center text-sm text-slate-500 gap-2">
-                                                <Building2 className="h-4 w-4" />
-                                                <span>{company}</span>
-                                            </div>
+                                            <JobSourceCompanyLine
+                                                source={app.job?.source}
+                                                companyName={app.job?.company_name}
+                                                advertiserName={app.job?.advertiser_name}
+                                                className="text-base"
+                                                iconClassName="h-4 w-4"
+                                            />
                                         </div>
                                         <ApplicationStatusBadge status={app.status} />
                                     </div>
-                                </CardHeader>
-                                <CardContent className="py-4">
-                                    <div className="flex items-center text-sm text-slate-500 gap-4">
-                                        <div className="flex items-center gap-1.5">
+
+                                    <JobAttributeList
+                                        job={app.job ?? {}}
+                                        className="text-sm text-slate-500"
+                                    />
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                                        <div className="flex items-center gap-1.5 text-sm text-slate-500">
                                             <Calendar className="h-4 w-4" />
                                             <span>Added {formatDistanceToNow(new Date(app.created_at), { addSuffix: true })}</span>
                                         </div>
-                                        {app.last_error && (
-                                            <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                            {app.last_error && (
+                                                <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">
                                                 Error: {app.last_error}
-                                            </span>
-                                        )}
+                                                </span>
+                                            )}
+                                            {app.status === 'Failed' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => retryCoverLetter.mutate({ id: app.id })}
+                                                    disabled={retryCoverLetter.isPending}
+                                                >
+                                                    <RefreshCw className={`h-3.5 w-3.5 mr-2 ${retryCoverLetter.isPending ? 'animate-spin' : ''}`} />
+                                                    Retry
+                                                </Button>
+                                            )}
+                                            <Button variant="outline" size="sm" asChild>
+                                                <Link to={`/jobs/${app.job_id}`}>
+                                                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                                                    View Job
+                                                </Link>
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardContent>
-                                <CardFooter className="bg-slate-50/50 border-t border-slate-100 py-3 flex gap-2 justify-end">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link to={`/jobs/${app.job_id}`}>
-                                            <ExternalLink className="h-3.5 w-3.5 mr-2" />
-                                            View Job
-                                        </Link>
-                                    </Button>
-
-                                    {app.status === 'Failed' && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => retryCoverLetter.mutate({ id: app.id })}
-                                            disabled={retryCoverLetter.isPending}
-                                        >
-                                            <RefreshCw className={`h-3.5 w-3.5 mr-2 ${retryCoverLetter.isPending ? 'animate-spin' : ''}`} />
-                                            Retry
-                                        </Button>
-                                    )}
-                                </CardFooter>
                             </Card>
                         )
                     })}

@@ -5,7 +5,6 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
-    Building2,
     Calendar,
     FileText,
     Download,
@@ -15,7 +14,7 @@ import {
 } from 'lucide-react';
 
 import { useApplication, useApplicationMutations } from '@/features/applications/hooks/useApplications';
-import { useJobExpirationMutations } from '@/features/jobs/hooks/useJobs';
+import { useJobDetail, useJobExpirationMutations } from '@/features/jobs/hooks/useJobs';
 import { useResumes } from '@/features/resumes/hooks/useResumes';
 import { applicationApi } from '@/api/applications';
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge';
@@ -45,6 +44,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { JobDescriptionHtml } from '@/components/job/JobDescriptionHtml';
+import { JobLanguageSelect } from '@/components/job/JobLanguageSelect';
+import {
+  JobAttributeList,
+  JobSourceCompanyLine,
+} from '@/components/job/jobDisplay';
 
 type StatusAction = {
   label: string;
@@ -83,6 +88,7 @@ const APPLIED_AND_AFTER_STATUSES: ApplicationStatus[] = [
 
 const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent';
 const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders';
+const APPLICATION_JD_LANGUAGE_STORAGE_KEY = 'application_detail_jd_language';
 
 type DetailNavigationState = {
   previousApplicationId: string | null;
@@ -120,6 +126,8 @@ export default function ApplicationDetailPage() {
     const [isRetryDialogOpen, setIsRetryDialogOpen] = useState(false);
     const [retryResumeId, setRetryResumeId] = useState<string>('');
     const [retryTailoringLevel, setRetryTailoringLevel] = useState<TailoringLevel>('light');
+    const [isJobDescriptionOpen, setIsJobDescriptionOpen] = useState(false);
+    const [jdLanguage, setJdLanguage] = useState<'en' | 'zh'>('en');
     const [detailNavigation, setDetailNavigation] = useState<DetailNavigationState>({
       previousApplicationId: null,
       nextApplicationId: null,
@@ -127,6 +135,24 @@ export default function ApplicationDetailPage() {
       total: 0,
     });
     const backUrl = searchParams.toString() ? `/applications?${searchParams.toString()}` : '/applications';
+    const {
+      data: jobDetail,
+      isLoading: isJobDetailLoading,
+      isError: isJobDetailError,
+    } = useJobDetail(isJobDescriptionOpen ? application?.job_id ?? null : null);
+    const hasChineseDescription = Boolean(
+      jobDetail?.content_cn?.trim() || jobDetail?.analysis?.cn_content?.trim(),
+    );
+
+    useEffect(() => {
+      if (!isJobDescriptionOpen) return;
+      const storedLanguage = localStorage.getItem(APPLICATION_JD_LANGUAGE_STORAGE_KEY);
+      if (storedLanguage === 'zh' && hasChineseDescription) {
+        setJdLanguage('zh');
+        return;
+      }
+      setJdLanguage('en');
+    }, [isJobDescriptionOpen, application?.job_id, hasChineseDescription]);
 
     useEffect(() => {
       if (!applicationId) return;
@@ -257,10 +283,13 @@ export default function ApplicationDetailPage() {
         );
     }
 
-    const company = application.job?.company_name || application.job?.advertiser_name || 'Unknown Company';
     const resumes = resumesData?.items || [];
     const selectedRetryResume = resumes.find((item) => item.id === retryResumeId);
     const retryDraftSelected = selectedRetryResume?.is_draft ?? false;
+    const descriptionHtml =
+      jdLanguage === 'zh' && hasChineseDescription
+        ? jobDetail?.content_cn || jobDetail?.analysis?.cn_content || jobDetail?.content
+        : jobDetail?.content;
 
     const openRetryDialog = () => {
         setRetryResumeId(application.source_resume_id);
@@ -297,12 +326,18 @@ export default function ApplicationDetailPage() {
       });
     };
 
+    const handleJdLanguageChange = (value: string) => {
+      if (value === 'zh' && !hasChineseDescription) return;
+      const nextLanguage = value === 'zh' ? 'zh' : 'en';
+      setJdLanguage(nextLanguage);
+      localStorage.setItem(APPLICATION_JD_LANGUAGE_STORAGE_KEY, nextLanguage);
+    };
+
     const availableStatusActions = STATUS_ACTIONS[application.status] || [];
     const statusActions = application.job?.is_expired
       ? availableStatusActions.filter((action) => action.nextStatus !== 'Applied')
       : availableStatusActions;
     const canToggleExpired = !APPLIED_AND_AFTER_STATUSES.includes(application.status);
-
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
         {/* Header */}
@@ -356,8 +391,8 @@ export default function ApplicationDetailPage() {
         <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
           {/* Job Info Card */}
           <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex justify-between items-start gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-2xl font-bold text-slate-900">
@@ -376,32 +411,89 @@ export default function ApplicationDetailPage() {
                       </TooltipProvider>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-slate-600 mt-2">
-                    <Building2 className="h-5 w-5 text-indigo-600" />
-                    <span className="font-medium">{company}</span>
-                  </div>
+                  <JobSourceCompanyLine
+                    source={application.job?.source}
+                    companyName={application.job?.company_name}
+                    advertiserName={application.job?.advertiser_name}
+                    className="mt-2 text-lg"
+                  />
                 </div>
                 {application.job?.company_logo && (
                   <img
                     src={application.job.company_logo}
-                    alt={company}
+                    alt={application.job?.title || 'Company logo'}
                     className="h-16 w-16 object-contain rounded-lg"
                   />
                 )}
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 text-sm text-slate-600">
-                <div className="flex items-center gap-1.5">
+
+              <JobAttributeList
+                job={application.job ?? {}}
+                className="text-sm text-slate-600"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-sm text-slate-500">
                   <Calendar className="h-4 w-4" />
                   <span>
                     Added{" "}
                     {formatDistanceToNow(new Date(application.created_at), { addSuffix: true })}
                   </span>
                 </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/jobs/${application.job_id}`}>
+                      <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                      View Job
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsJobDescriptionOpen((current) => !current)}
+                  >
+                    {isJobDescriptionOpen ? 'Hide JD Details' : 'Show JD Details'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {isJobDescriptionOpen && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle>Job Description</CardTitle>
+                  <JobLanguageSelect
+                    value={jdLanguage}
+                    onValueChange={handleJdLanguageChange}
+                    hasChinese={hasChineseDescription}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isJobDetailLoading && (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-28 w-full" />
+                  </div>
+                )}
+                {!isJobDetailLoading && isJobDetailError && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>
+                      Failed to load JD details.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {!isJobDetailLoading && !isJobDetailError && (
+                  <JobDescriptionHtml html={descriptionHtml} />
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Error Message */}
           {application.last_error && (
@@ -526,12 +618,6 @@ export default function ApplicationDetailPage() {
                 </a>
               </Button>
             )}
-            <Button variant="outline" asChild>
-              <Link to={`/jobs/${application.job_id}`}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View Job
-              </Link>
-            </Button>
             {canToggleExpired && (
               <Button
                 variant={application.job?.manual_expired ? 'destructive' : 'outline'}

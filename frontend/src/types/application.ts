@@ -28,9 +28,14 @@ export interface Application {
     job?: {
         id: number;
         title: string;
+        source?: string | null;
         advertiser_name?: string;
         company_name?: string;
         company_logo?: string;
+        location_label?: string | null;
+        work_types_label?: string | null;
+        classification?: string | null;
+        sub_classification?: string | null;
         share_link?: string;
         is_expired?: boolean;
         manual_expired?: boolean;
