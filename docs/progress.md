@@ -22,6 +22,14 @@
   - `pnpm exec tsc -b` passed
   - `pnpm run build` passed
 
+### 2026-03-16 - Requirements Alignment for Application Status Flow
+
+**Completed Tasks:**
+- Updated `docs/requirements.md` to remove `Resume Screened` from the application status flow.
+- Aligned requirements with the current implemented code path:
+  - `Pending -> Tailoring -> Ready -> Applied -> Phone Screen -> Interviewing -> Offer -> Rejected`
+- Updated the status extension note to keep `Phone Screen` only.
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**

@@ -88,8 +88,7 @@ job分析完成后，预计算该job与所有用户的技能仓库的匹配度�
   - 提供"紧急申请清单"专门视图（见"紧急度评分"）。【P1】
 - 状态与流转
   - 初始：加入"待申请"时自动设置状态为 Pending，并记录时间戳。
-  - 主状态流转：Pending → Tailoring → Ready → Applied → Resume Screened → Phone Screen → Interviewing → Offer → Rejected。【P0核心状态 + P1扩展状态】
-  - Resume Screened（简历筛查通过）：收到HR确认简历通过的通知。【P1】
+  - 主状态流转：Pending → Tailoring → Ready → Applied → Phone Screen → Interviewing → Offer → Rejected。【P0核心状态 + P1扩展状态】
   - Phone Screen（电话沟通）：完成初步电话/视频沟通，进入正式面试前的筛选阶段。【P1】
   - 每次状态更新均记录时间与变更记录（审计轨迹），可附加用户备注。
 - 唯一性与去重
@@ -269,7 +268,7 @@ job分析完成后，预计算该job与所有用户的技能仓库的匹配度�
 
 ### P1（重要增强，提升用户体验）
 - 紧急度评分与紧急申请清单
-- 申请状态扩展（Resume Screened、Phone Screen）
+- 申请状态扩展（Phone Screen）
 - 面试准备自动触发
 - 进度可视化看板
 - AI分析与优化建议（简历管理模块）
