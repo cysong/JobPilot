@@ -1,5 +1,44 @@
 # 问题修复记录
 
+## ✅ 已修复：应用源简历外键删除行为与非空约束冲突
+
+### 问题描述
+`applications.source_resume_id` 被定义为非空字段，但外键删除行为配置为 `ON DELETE SET NULL`。
+
+### 根本原因
+- 业务上应用记录必须始终保留来源简历引用
+- 简历删除当前是软删除，不应该允许数据库在硬删除时把应用的 `source_resume_id` 置空
+- `SET NULL` 与 `nullable=False` 组合会导致约束语义冲突
+
+### 修复方案
+- 模型层将 `source_resume_id` 的删除行为改为 `RESTRICT`
+- 新增 Alembic migration，同步数据库外键约束
+
+### 验证结果
+- 应用模型与数据库约束语义一致
+- 不再存在“要求非空但删除时置空”的矛盾配置
+
+---
+
+## ✅ 已修复：手动触发 Job Analysis 使用了错误的 TaskType / EntityType
+
+### 问题描述
+`POST /api/v1/jobs/{job_id}/analyze` 路由错误导入了 Celery 的 `TaskType`，并使用了不存在的 `EntityType.job`。
+
+### 根本原因
+- 路由文件混用了 Celery 类型和项目业务枚举
+- `EntityType` 在项目里定义为大写枚举成员（如 `EntityType.JOB`）
+
+### 修复方案
+- 改为使用 `app.shared.enums.TaskType`
+- 将 `EntityType.job.value` 改为 `EntityType.JOB.value`
+- 删除无用的任务函数导入
+
+### 验证结果
+- 手动触发 job analysis 的路由不再包含确定性的枚举访问错误
+
+---
+
 ## ✅ 已修复：登录失败时页面刷新导致错误信息消失
 
 ### 问题描述

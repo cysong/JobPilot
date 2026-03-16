@@ -30,6 +30,18 @@
   - `Pending -> Tailoring -> Ready -> Applied -> Phone Screen -> Interviewing -> Offer -> Rejected`
 - Updated the status extension note to keep `Phone Screen` only.
 
+### 2026-03-16 - Backend Runtime Fixes for Job Analysis and Application Resume FK
+
+**Completed Tasks:**
+- Fixed `POST /api/v1/jobs/{job_id}/analyze` to use the project task enum instead of Celery's `TaskType`.
+- Fixed manual job analysis task submission to use `EntityType.JOB.value`.
+- Removed an unused job task import from the analyze endpoint.
+- Aligned `applications.source_resume_id` model behavior with business rules:
+  - kept the field non-nullable
+  - changed FK delete behavior from `SET NULL` to `RESTRICT`
+- Added Alembic migration:
+  - `20260316_1500_8b2c4d6e9f10_fix_source_resume_fk_behavior.py`
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**

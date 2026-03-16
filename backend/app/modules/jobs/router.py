@@ -4,7 +4,6 @@ Job API endpoints.
 from typing import Annotated
 from datetime import datetime
 
-from celery.app.task import TaskType
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +34,7 @@ from app.modules.matching.repository import UserJobMatchRepository
 from app.modules.resumes.repository import ResumeRepository
 from app.shared.pagination import PaginationParams
 from app.modules.workflow import TaskService
-from app.shared.enums import EntityType
+from app.shared.enums import EntityType, TaskType
 from app.modules.applications.service import ApplicationService
 from app.modules.applications.schemas import ApplicationDetail
 from app.modules.applications.repositories.application_repo import ApplicationRepository
@@ -351,8 +350,6 @@ async def trigger_job_analysis(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Manually trigger job analysis (test/debug only)."""
-    from app.modules.jobs.tasks import analyze_job_task
-
     job = await JobRepository.get_by_id(db, job_id)
     if not job:
         raise NotFoundError("Job not found")
@@ -360,7 +357,7 @@ async def trigger_job_analysis(
     task = await TaskService.submit_task(
         db=db,
         task_type=TaskType.JOB_ANALYSIS,
-        entity_type=EntityType.job.value,
+        entity_type=EntityType.JOB.value,
         entity_id=job_id,
         user_id=current_user.id,
         input_data={"job_id": job_id},

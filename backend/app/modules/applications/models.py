@@ -66,7 +66,7 @@ class Application(Base, TimestampMixin):
     job_id: Mapped[int] = mapped_column(ForeignKey(
         "seek_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     source_resume_id: Mapped[str] = mapped_column(
-        ForeignKey("resumes.id", ondelete="SET NULL"), nullable=False)
+        ForeignKey("resumes.id", ondelete="RESTRICT"), nullable=False)
     resume_document_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
     cover_letter_document_id: Mapped[Optional[str]] = mapped_column(
