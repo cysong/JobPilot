@@ -7,6 +7,7 @@ from typing import Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
@@ -190,10 +191,16 @@ class SeekJob(Base):
         uselist=False,
     )
 
-    @property
+    @hybrid_property
     def effective_is_expired(self) -> bool:
         """Return effective expiration status from source + manual override."""
         return bool(self.is_expired or self.manual_expired)
+
+    @effective_is_expired.inplace.expression
+    @classmethod
+    def _effective_is_expired_expression(cls):
+        """SQL expression for effective expiration status."""
+        return cls.is_expired.is_(True) | cls.manual_expired.is_(True)
 
 
 class JobAnalysis(Base, TimestampMixin):

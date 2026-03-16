@@ -51,6 +51,15 @@
 - Validation:
   - `ruff check app/modules/jobs app/modules/applications app/modules/resumes` passed
 
+### 2026-03-16 - Effective Job Expiration Filtering Alignment
+
+**Completed Tasks:**
+- Upgraded `SeekJob.effective_is_expired` to a SQLAlchemy `hybrid_property` so it can be used consistently in both Python objects and SQL queries.
+- Updated backend active-job filtering to honor both crawler expiration and manual expiration flags in:
+  - unanalyzed job selection
+  - jobs without analysis-task selection
+  - similar jobs selection
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**
