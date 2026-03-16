@@ -11,6 +11,20 @@
 
 ## Work Log
 
+### 2026-03-16 - User Dashboard MVP Implementation
+
+- Replaced the `/dashboard` placeholder route with a real user dashboard page.
+- Added a new frontend dashboard feature module with:
+  - aggregated dashboard data hook based on existing applications, job matches, saved jobs, resumes, and skills APIs
+  - hero section with contextual next-step messaging
+  - summary metric cards for active applications, ready applications, saved jobs, and finalized resumes
+  - priority action card driven by application and job-match state
+  - application pipeline snapshot with status counts and attention items
+  - recommended jobs section with best matches and saved jobs tabs
+  - resume readiness, skills overview, and quick access cards
+- Kept MVP implementation frontend-only without introducing a new backend dashboard endpoint.
+- Planned future optimization path remains a dedicated dashboard summary API if request fan-out becomes an issue.
+
 ### 2026-03-16 - Frontend Build Failure Fixes
 
 **Completed Tasks:**

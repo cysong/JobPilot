@@ -8,6 +8,7 @@ import FullWidthLayout from '@/components/layout/FullWidthLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import LandingPage from '@/features/landing/LandingPage'
 import PlaceholderPage from '@/features/common/PlaceholderPage'
+import UserDashboardPage from '@/features/dashboard/UserDashboardPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
 import JobDetailPage from '@/features/jobs/JobDetailPage'
 import ApplicationListingPage from '@/features/applications/ApplicationListingPage'
@@ -50,7 +51,7 @@ function App() {
 
           {/* Protected routes - standard layout */}
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<PlaceholderPage />} />
+            <Route path="/dashboard" element={<UserDashboardPage />} />
             <Route path="/jobs" element={<JobListingPage />} />
             <Route path="/jobs/:jobId" element={<JobDetailPage />} />
             <Route path="/applications" element={<ApplicationListingPage />} />
