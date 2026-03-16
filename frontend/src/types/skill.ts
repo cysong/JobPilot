@@ -2,12 +2,14 @@
  * User skill management types
  */
 
-export enum ProficiencyLevel {
-  BEGINNER = 'beginner',
-  INTERMEDIATE = 'intermediate',
-  ADVANCED = 'advanced',
-  EXPERT = 'expert'
-}
+export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
+
+export const PROFICIENCY_LEVELS = {
+  BEGINNER: 'beginner',
+  INTERMEDIATE: 'intermediate',
+  ADVANCED: 'advanced',
+  EXPERT: 'expert',
+} as const satisfies Record<string, ProficiencyLevel>
 
 export interface UserSkill {
   id: string

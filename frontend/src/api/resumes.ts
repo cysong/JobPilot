@@ -1,7 +1,6 @@
 import client from './client'
 import type {
     Resume,
-    ResumeListItem,
     CreateResumeRequest,
     ResumeTitleUpdate,
     UpdateResumeRequest,

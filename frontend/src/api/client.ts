@@ -1,9 +1,9 @@
 import axios from 'axios'
-import type { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
+import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import type { ApiResponse } from '@/types/api'
 import { ApiError } from '@/types/api'
 
-const apiClient: AxiosInstance = axios.create({
+const rawClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
   headers: {
@@ -33,7 +33,7 @@ const handleApiError = (error: ApiError) => {
 }
 
 // Request interceptor for adding auth token
-apiClient.interceptors.request.use(
+rawClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
     if (token) {
@@ -44,65 +44,94 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor for unified format handling
-apiClient.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    const contentType = response.headers['content-type']
-    const isBinary =
-      response.request?.responseType === 'blob' ||
-      (typeof contentType === 'string' && contentType.includes('application/pdf'))
+const unwrapResponse = <TResult>(response: AxiosResponse<ApiResponse<TResult> | TResult>): TResult => {
+  const contentType = response.headers['content-type']
+  const isBinary =
+    response.config.responseType === 'blob' ||
+    (typeof contentType === 'string' && contentType.includes('application/pdf'))
 
-    // Pass through binary responses (export/download)
-    if (isBinary) {
-      return response.data
-    }
-
-    const payload = response.data as ApiResponse<unknown>
-    const looksLikeApiResponse =
-      payload &&
-      typeof payload === 'object' &&
-      'code' in payload &&
-      'message' in payload &&
-      'data' in payload
-
-    if (looksLikeApiResponse) {
-      if (payload.code === 0) {
-        return payload.data
-      }
-      const apiError = new ApiError(
-        Number(payload.code),
-        String(payload.message ?? 'Request failed'),
-        response.status,
-        payload.data,
-      )
-      handleApiError(apiError)
-      return Promise.reject(apiError)
-    }
-
-    // Fallback: return raw data for non-standard responses
-    return response.data
-  },
-  (error: AxiosError<ApiResponse<unknown>>) => {
-    const status = error.response?.status
-    const payload = error.response?.data
-
-    if (payload && typeof payload === 'object' && 'code' in payload && 'message' in payload) {
-      const apiError = new ApiError(
-        Number((payload as any).code),
-        String((payload as any).message ?? 'Request failed'),
-        status,
-        (payload as any).data,
-      )
-      handleApiError(apiError)
-      return Promise.reject(apiError)
-    }
-
-    if (status === 401 || status === 419) {
-      redirectToLogin()
-    }
-
-    return Promise.reject(error)
+  if (isBinary) {
+    return response.data as TResult
   }
-)
+
+  const payload = response.data
+  const looksLikeApiResponse =
+    payload &&
+    typeof payload === 'object' &&
+    'code' in payload &&
+    'message' in payload &&
+    'data' in payload
+
+  if (looksLikeApiResponse) {
+    const apiPayload = payload as ApiResponse<TResult>
+    if (apiPayload.code === 0) {
+      return apiPayload.data
+    }
+
+    const apiError = new ApiError(
+      Number(apiPayload.code),
+      String(apiPayload.message ?? 'Request failed'),
+      response.status,
+      apiPayload.data,
+    )
+    handleApiError(apiError)
+    throw apiError
+  }
+
+  return payload as TResult
+}
+
+const toApiError = (error: AxiosError<ApiResponse<unknown>>): never => {
+  const status = error.response?.status
+  const payload = error.response?.data
+
+  if (payload && typeof payload === 'object' && 'code' in payload && 'message' in payload) {
+    const apiError = new ApiError(
+      Number((payload as ApiResponse<unknown>).code),
+      String((payload as ApiResponse<unknown>).message ?? 'Request failed'),
+      status,
+      (payload as ApiResponse<unknown>).data,
+    )
+    handleApiError(apiError)
+    throw apiError
+  }
+
+  if (status === 401 || status === 419) {
+    redirectToLogin()
+  }
+
+  throw error
+}
+
+const request = async <TResult>(config: AxiosRequestConfig): Promise<TResult> => {
+  try {
+    const response = await rawClient.request<ApiResponse<TResult> | TResult>(config)
+    return unwrapResponse<TResult>(response)
+  } catch (error) {
+    return toApiError(error as AxiosError<ApiResponse<unknown>>)
+  }
+}
+
+const apiClient = {
+  get: <TResponse = unknown, TResult = TResponse>(url: string, config?: AxiosRequestConfig) =>
+    request<TResult>({ ...config, method: 'get', url }),
+  post: <TResponse = unknown, TResult = TResponse>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ) => request<TResult>({ ...config, method: 'post', url, data }),
+  put: <TResponse = unknown, TResult = TResponse>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ) => request<TResult>({ ...config, method: 'put', url, data }),
+  patch: <TResponse = unknown, TResult = TResponse>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ) => request<TResult>({ ...config, method: 'patch', url, data }),
+  delete: <TResponse = unknown, TResult = TResponse>(url: string, config?: AxiosRequestConfig) =>
+    request<TResult>({ ...config, method: 'delete', url }),
+}
 
 export default apiClient

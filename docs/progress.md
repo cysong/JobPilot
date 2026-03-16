@@ -11,6 +11,17 @@
 
 ## Work Log
 
+### 2026-03-16 - Frontend Build Failure Fixes
+
+**Completed Tasks:**
+- Refactored `frontend/src/api/client.ts` to use typed request helpers instead of returning unwrapped data from an Axios response interceptor.
+- Fixed admin React Query hooks to use payload types correctly with TanStack Query v5 placeholder handling.
+- Removed frontend TypeScript build blockers caused by unused imports/variables under strict compiler settings.
+- Replaced runtime `enum` usage in skill types with `ProficiencyLevel` string-literal typing plus `PROFICIENCY_LEVELS` constants compatible with `erasableSyntaxOnly`.
+- Validation:
+  - `pnpm exec tsc -b` passed
+  - `pnpm run build` passed
+
 ### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
 
 **Completed Tasks:**

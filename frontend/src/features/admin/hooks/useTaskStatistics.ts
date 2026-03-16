@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { adminApi } from '@/api/admin'
 import type { TaskStatisticsResponse } from '../types'
 
@@ -11,6 +11,6 @@ export function useTaskStatistics(params: {
   return useQuery<TaskStatisticsResponse, Error>({
     queryKey: ['admin', 'task-statistics', params],
     queryFn: () => adminApi.getTaskStatistics(params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   })
 }

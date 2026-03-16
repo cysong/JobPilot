@@ -1,5 +1,4 @@
 import { useEffect, useCallback } from 'react'
-import { useToast } from '@/components/ui/use-toast'
 
 interface UseAutoSaveProps<T> {
     data: T
@@ -16,8 +15,6 @@ export function useAutoSave<T>({
     enabled = true,
     storageKey
 }: UseAutoSaveProps<T>) {
-    const { toast } = useToast()
-
     const saveToStorage = useCallback((dataToSave: T) => {
         if (storageKey) {
             localStorage.setItem(storageKey, JSON.stringify({

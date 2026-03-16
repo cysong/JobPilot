@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query'
-import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
+import type { DocumentEditData } from '@/types/document'
 
 // Field configuration
 export interface FieldConfig {

@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ProficiencyLevel, type UserSkill } from '@/types/skill'
+import { PROFICIENCY_LEVELS, type ProficiencyLevel, type UserSkill } from '@/types/skill'
 
 interface EditSkillDialogProps {
   skill: UserSkill
@@ -26,10 +26,10 @@ interface EditSkillDialogProps {
 }
 
 const proficiencyOptions = [
-  { value: ProficiencyLevel.BEGINNER, label: 'Beginner' },
-  { value: ProficiencyLevel.INTERMEDIATE, label: 'Intermediate' },
-  { value: ProficiencyLevel.ADVANCED, label: 'Advanced' },
-  { value: ProficiencyLevel.EXPERT, label: 'Expert' },
+  { value: PROFICIENCY_LEVELS.BEGINNER, label: 'Beginner' },
+  { value: PROFICIENCY_LEVELS.INTERMEDIATE, label: 'Intermediate' },
+  { value: PROFICIENCY_LEVELS.ADVANCED, label: 'Advanced' },
+  { value: PROFICIENCY_LEVELS.EXPERT, label: 'Expert' },
 ]
 
 export const EditSkillDialog = ({ skill, open, onOpenChange }: EditSkillDialogProps) => {

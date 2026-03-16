@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ProficiencyLevel } from '@/types/skill'
+import { PROFICIENCY_LEVELS, type ProficiencyLevel } from '@/types/skill'
 
 interface AddSkillDialogProps {
   open: boolean
@@ -26,16 +26,16 @@ interface AddSkillDialogProps {
 }
 
 const proficiencyOptions = [
-  { value: ProficiencyLevel.BEGINNER, label: 'Beginner' },
-  { value: ProficiencyLevel.INTERMEDIATE, label: 'Intermediate' },
-  { value: ProficiencyLevel.ADVANCED, label: 'Advanced' },
-  { value: ProficiencyLevel.EXPERT, label: 'Expert' },
+  { value: PROFICIENCY_LEVELS.BEGINNER, label: 'Beginner' },
+  { value: PROFICIENCY_LEVELS.INTERMEDIATE, label: 'Intermediate' },
+  { value: PROFICIENCY_LEVELS.ADVANCED, label: 'Advanced' },
+  { value: PROFICIENCY_LEVELS.EXPERT, label: 'Expert' },
 ]
 
 export const AddSkillDialog = ({ open, onOpenChange }: AddSkillDialogProps) => {
   const { createSkill } = useSkillMutations()
   const [skillName, setSkillName] = useState('')
-  const [proficiency, setProficiency] = useState<ProficiencyLevel>(ProficiencyLevel.INTERMEDIATE)
+  const [proficiency, setProficiency] = useState<ProficiencyLevel>(PROFICIENCY_LEVELS.INTERMEDIATE)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,7 +50,7 @@ export const AddSkillDialog = ({ open, onOpenChange }: AddSkillDialogProps) => {
       {
         onSuccess: () => {
           setSkillName('')
-          setProficiency(ProficiencyLevel.INTERMEDIATE)
+          setProficiency(PROFICIENCY_LEVELS.INTERMEDIATE)
           onOpenChange(false)
         },
       }
