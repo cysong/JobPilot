@@ -1,6 +1,7 @@
 """
 Job service layer - business logic for job operations.
 """
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select, func, or_, and_, distinct, exists
@@ -19,6 +20,7 @@ from app.modules.jobs.schemas import (
     SavedJobListResponse,
     SavedJobStatus,
     JobViewedStatus,
+    JobExpirationStatus,
 )
 from app.modules.auth.models import User
 from app.core.exceptions import NotFoundError
@@ -57,7 +59,7 @@ class JobService:
         ).label("has_application")
 
         # Base query
-        query = select(SeekJob, has_application_expr).where(SeekJob.is_expired == False)
+        query = select(SeekJob, has_application_expr)
 
         # Apply keyword search (title + abstract + content + company names)
         if filters.keyword:
@@ -208,7 +210,6 @@ class JobService:
                 and_(
                     SeekJob.location_city.isnot(None),
                     SeekJob.location_city != "",
-                    SeekJob.is_expired == False
                 )
             )
             .order_by(SeekJob.location_city)
@@ -224,7 +225,6 @@ class JobService:
                 and_(
                     SeekJob.work_types_label.isnot(None),
                     SeekJob.work_types_label != "",
-                    SeekJob.is_expired == False
                 )
             )
             .limit(50)
@@ -239,7 +239,6 @@ class JobService:
                 and_(
                     SeekJob.company_name.isnot(None),
                     SeekJob.company_name != "",
-                    SeekJob.is_expired == False
                 )
             )
             .order_by(SeekJob.company_name)
@@ -254,11 +253,10 @@ class JobService:
                 select(distinct(SeekJob.advertiser_name))
                 .where(
                     and_(
-                        SeekJob.advertiser_name.isnot(None),
-                        SeekJob.advertiser_name != "",
-                        SeekJob.is_expired == False
-                    )
+                    SeekJob.advertiser_name.isnot(None),
+                    SeekJob.advertiser_name != "",
                 )
+            )
                 .order_by(SeekJob.advertiser_name)
                 .limit(100)
             )
@@ -272,7 +270,6 @@ class JobService:
                 and_(
                     SeekJob.source.isnot(None),
                     SeekJob.source != "",
-                    SeekJob.is_expired == False,
                 )
             )
             .order_by(SeekJob.source)
@@ -316,7 +313,6 @@ class JobService:
             select(normalized_company_name.label("company"))
             .where(
                 and_(
-                    SeekJob.is_expired == False,
                     SeekJob.company_name.isnot(None),
                     normalized_company_name != "",
                 )
@@ -326,7 +322,6 @@ class JobService:
             select(normalized_advertiser_name.label("company"))
             .where(
                 and_(
-                    SeekJob.is_expired == False,
                     SeekJob.advertiser_name.isnot(None),
                     normalized_advertiser_name != "",
                 )
@@ -544,4 +539,41 @@ class JobService:
             total=total,
             page=pagination.page,
             page_size=pagination.page_size,
+        )
+
+    @staticmethod
+    async def set_manual_expiration(
+        db: AsyncSession,
+        user: User,
+        job_id: int,
+        *,
+        manual_expired: bool,
+        note: str | None = None,
+    ) -> JobExpirationStatus:
+        """Set manual expiration status for a job."""
+        job = await JobRepository.get_by_id(db, job_id)
+        if not job:
+            raise NotFoundError("Job not found")
+
+        if manual_expired:
+            job.manual_expired = True
+            job.manual_expired_by = user.id
+            job.manual_expired_at = datetime.now(timezone.utc)
+            job.manual_expired_note = note
+        else:
+            job.manual_expired = False
+            job.manual_expired_by = None
+            job.manual_expired_at = None
+            job.manual_expired_note = None
+
+        await db.commit()
+        await db.refresh(job)
+
+        return JobExpirationStatus(
+            job_id=job.id,
+            is_expired=job.effective_is_expired,
+            manual_expired=bool(job.manual_expired),
+            manual_expired_by=job.manual_expired_by,
+            manual_expired_at=job.manual_expired_at,
+            manual_expired_note=job.manual_expired_note,
         )

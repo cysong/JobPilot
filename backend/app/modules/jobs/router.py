@@ -19,6 +19,8 @@ from app.modules.jobs.schemas import (
     JobBase,
     JobBriefInfo,
     JobDetail,
+    JobExpirationStatus,
+    JobExpirationUpdateRequest,
     JobFiltersOptions,
     JobFiltersRequest,
     JobListResponse,
@@ -266,6 +268,23 @@ async def save_job(
 ):
     """Save a job for current user."""
     return await service.JobService.save_job(db, current_user, job_id)
+
+
+@router.patch("/{job_id}/expiration", response_model=JobExpirationStatus)
+async def set_job_expiration(
+    job_id: int,
+    payload: JobExpirationUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Manually mark/unmark job as expired globally with operator tracking."""
+    return await service.JobService.set_manual_expiration(
+        db=db,
+        user=current_user,
+        job_id=job_id,
+        manual_expired=payload.manual_expired,
+        note=payload.note,
+    )
 
 
 @router.delete("/{job_id}/saved", response_model=SavedJobStatus)

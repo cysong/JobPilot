@@ -24,6 +24,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { JobPagination } from '@/features/jobs/components/JobPagination'
 
 export default function ApplicationListingPage() {
@@ -191,11 +198,25 @@ export default function ApplicationListingPage() {
                                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1">
-                                            <Link to={detailUrl}>
-                                                <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
-                                                    {app.job?.title || 'Unknown Job'}
-                                                </CardTitle>
-                                            </Link>
+                                            <div className="flex items-center gap-2">
+                                                <Link to={detailUrl}>
+                                                    <CardTitle className="text-lg font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer">
+                                                        {app.job?.title || 'Unknown Job'}
+                                                    </CardTitle>
+                                                </Link>
+                                                {app.job?.is_expired && (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                Posting marked as closed on source site.
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
+                                            </div>
                                             <div className="flex items-center text-sm text-slate-500 gap-2">
                                                 <Building2 className="h-4 w-4" />
                                                 <span>{company}</span>

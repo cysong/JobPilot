@@ -35,6 +35,10 @@ export interface Job {
 
   // Status flags
   is_expired: boolean
+  manual_expired?: boolean
+  manual_expired_by?: number | null
+  manual_expired_at?: string | null
+  manual_expired_note?: string | null
   status: string | null
 
   // Share link
@@ -224,6 +228,8 @@ export interface JobBriefInfo {
   work_types_label: string | null
   salary_label: string | null
   listed_at: string | null
+  is_expired?: boolean
+  manual_expired?: boolean
 
   // Additional fields for UI completeness
   company_logo: string | null
@@ -279,4 +285,18 @@ export interface JobMatchFiltersRequest {
 export interface SavedJobsRequest {
   page: number
   page_size: number
+}
+
+export interface JobExpirationUpdateRequest {
+  manual_expired: boolean
+  note?: string
+}
+
+export interface JobExpirationStatusResponse {
+  job_id: number
+  is_expired: boolean
+  manual_expired: boolean
+  manual_expired_by: number | null
+  manual_expired_at: string | null
+  manual_expired_note: string | null
 }

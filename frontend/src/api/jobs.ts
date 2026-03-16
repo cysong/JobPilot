@@ -15,6 +15,8 @@ import type {
   JobViewedStatusResponse,
   SavedJobListResponse,
   SavedJobsRequest,
+  JobExpirationUpdateRequest,
+  JobExpirationStatusResponse,
 } from '@/types/job'
 
 export const jobsApi = {
@@ -104,6 +106,17 @@ export const jobsApi = {
 
   markJobViewed: async (jobId: number): Promise<JobViewedStatusResponse> => {
     const result = await apiClient.post<JobViewedStatusResponse, JobViewedStatusResponse>(`/jobs/${jobId}/viewed`)
+    return result
+  },
+
+  setJobExpiration: async (
+    jobId: number,
+    payload: JobExpirationUpdateRequest,
+  ): Promise<JobExpirationStatusResponse> => {
+    const result = await apiClient.patch<JobExpirationStatusResponse, JobExpirationStatusResponse>(
+      `/jobs/${jobId}/expiration`,
+      payload,
+    )
     return result
   },
 

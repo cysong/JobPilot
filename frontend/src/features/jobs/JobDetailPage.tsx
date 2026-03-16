@@ -22,6 +22,7 @@ import {
 
 import {
   useJobDetail,
+  useJobExpirationMutations,
   useJobSavedMutations,
   useJobSavedStatus,
   useSimilarJobs,
@@ -127,6 +128,7 @@ export default function JobDetailPage() {
   } = useSimilarJobs(jobIdNum, 5);
   const { data: savedStatus } = useJobSavedStatus(jobIdNum);
   const { saveJob, unsaveJob } = useJobSavedMutations();
+  const { setJobExpiration } = useJobExpirationMutations();
   const { markViewed } = useJobViewedMutations();
 
   const hasCn = Boolean(job?.content_cn?.trim() || job?.analysis?.cn_content?.trim());
@@ -270,6 +272,13 @@ export default function JobDetailPage() {
     saveJob.mutate({ jobId: job.id, job });
   };
 
+  const handleToggleExpiration = () => {
+    setJobExpiration.mutate({
+      jobId: job.id,
+      manualExpired: !job.manual_expired,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
       {/* Header Navigation */}
@@ -303,6 +312,14 @@ export default function JobDetailPage() {
                   className={`h-4 w-4 mr-2 ${isSaved ? "fill-amber-500 text-amber-500" : ""}`}
                 />
                 {isSaved ? "Saved" : "Save"}
+              </Button>
+              <Button
+                variant={job.manual_expired ? "destructive" : "outline"}
+                size="sm"
+                onClick={handleToggleExpiration}
+                disabled={setJobExpiration.isPending}
+              >
+                {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
               </Button>
 
               {/* Application Button Logic */}
@@ -422,9 +439,12 @@ export default function JobDetailPage() {
               )}
 
               <div className="pr-28">
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                  {job.title}
-                </h1>
+                <div className="mb-2 flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
+                  {job.is_expired && (
+                    <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-lg text-slate-600 mb-4">
                   {sourceMeta.iconSrc ? (
                     <img

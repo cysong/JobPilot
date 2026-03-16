@@ -5,11 +5,39 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-14
+**Last Updated:** 2026-03-16
 
 ---
 
 ## Work Log
+
+### 2026-03-16 - Global Manual Job Expiration (Backend + Frontend)
+
+**Completed Tasks:**
+- Added global manual expiration fields to `seek_jobs`:
+  - `manual_expired`
+  - `manual_expired_by`
+  - `manual_expired_at`
+  - `manual_expired_note`
+- Added Alembic migration:
+  - `20260316_1030_f4d9a2b6c7e1_add_manual_expired_fields_to_seek_jobs.py`
+- Added backend effective-expiration model behavior:
+  - `SeekJob.effective_is_expired` combines crawler state + manual state
+- Added backend API endpoint for manual global expiration:
+  - `PATCH /api/v1/jobs/{job_id}/expiration`
+  - supports mark/unmark and optional note
+- Updated jobs response schemas to expose manual expiration metadata and effective `is_expired`.
+- Updated jobs listing logic to include expired jobs so UI can display expired badges in lists.
+- Frontend integration:
+  - added job expiration API client and React Query mutation
+  - added red `Expired` badge on job cards (list pages)
+  - added red `Expired` badge on job detail page
+  - added `Mark as Expired` / `Mark as Active` action in job detail page
+  - added `Mark as Expired` / `Mark as Active` action in application detail page
+  - kept `Apply` link action available (not disabled)
+- Validation:
+  - backend changed files pass read-only compile validation
+  - frontend build still fails due pre-existing TypeScript baseline issues unrelated to this feature
 
 ### 2026-03-14 - Admin Jobs Daily Trend Chart (Dashboard Drilldown)
 

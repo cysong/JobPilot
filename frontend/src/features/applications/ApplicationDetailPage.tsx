@@ -13,11 +13,13 @@ import {
 } from 'lucide-react';
 
 import { useApplication, useApplicationMutations } from '@/features/applications/hooks/useApplications';
+import { useJobExpirationMutations } from '@/features/jobs/hooks/useJobs';
 import { useResumes } from '@/features/resumes/hooks/useResumes';
 import { applicationApi } from '@/api/applications';
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -35,6 +37,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import type { ApplicationStatus, TailoringLevel } from '@/types/application';
 import { buildApplicationPdfFilename } from '@/utils/pdfFilename';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type StatusAction = {
   label: string;
@@ -63,11 +71,20 @@ const STATUS_ACTIONS: Record<ApplicationStatus, StatusAction[]> = {
   Failed: [],
 };
 
+const APPLIED_AND_AFTER_STATUSES: ApplicationStatus[] = [
+  'Applied',
+  'PhoneScreen',
+  'Interviewing',
+  'Offer',
+  'Rejected',
+];
+
 export default function ApplicationDetailPage() {
     const { applicationId } = useParams();
     const [searchParams] = useSearchParams();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
     const { retryCoverLetter, updateStatus } = useApplicationMutations();
+    const { setJobExpiration } = useJobExpirationMutations();
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes();
     const { user } = useAuthStore();
     const { toast } = useToast();
@@ -198,7 +215,18 @@ export default function ApplicationDetailPage() {
       updateStatus.mutate({ id: application.id, status });
     };
 
+    const handleToggleExpiration = () => {
+      setJobExpiration.mutate({
+        jobId: application.job_id,
+        manualExpired: !application.job?.manual_expired,
+      });
+    };
+
     const availableStatusActions = STATUS_ACTIONS[application.status] || [];
+    const statusActions = application.job?.is_expired
+      ? availableStatusActions.filter((action) => action.nextStatus !== 'Applied')
+      : availableStatusActions;
+    const canToggleExpired = !APPLIED_AND_AFTER_STATUSES.includes(application.status);
 
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
@@ -228,9 +256,23 @@ export default function ApplicationDetailPage() {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-2xl font-bold text-slate-900">
-                    {application.job?.title || "Unknown Job"}
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-2xl font-bold text-slate-900">
+                      {application.job?.title || "Unknown Job"}
+                    </CardTitle>
+                    {application.job?.is_expired && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Posting marked as closed on source site.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-slate-600 mt-2">
                     <Building2 className="h-5 w-5 text-indigo-600" />
                     <span className="font-medium">{company}</span>
@@ -387,7 +429,16 @@ export default function ApplicationDetailPage() {
                 View Job
               </Link>
             </Button>
-            {availableStatusActions.map((action) => (
+            {canToggleExpired && (
+              <Button
+                variant={application.job?.manual_expired ? 'destructive' : 'outline'}
+                onClick={handleToggleExpiration}
+                disabled={setJobExpiration.isPending}
+              >
+                {application.job?.manual_expired ? 'Mark as Active' : 'Mark as Expired'}
+              </Button>
+            )}
+            {statusActions.map((action) => (
               <Button
                 key={action.nextStatus}
                 variant={action.variant || 'default'}

@@ -45,6 +45,20 @@ class SeekJob(Base):
     # Boolean flags
     is_expired: Mapped[Optional[bool]] = mapped_column(
         Boolean, default=False, index=True)
+    manual_expired: Mapped[Optional[bool]] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    manual_expired_by: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    manual_expired_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    manual_expired_note: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
     is_link_out: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     is_verified: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
@@ -166,6 +180,11 @@ class SeekJob(Base):
         DateTime(timezone=True), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True)
+
+    @property
+    def effective_is_expired(self) -> bool:
+        """Return effective expiration status from source + manual override."""
+        return bool(self.is_expired or self.manual_expired)
 
 
 class JobAnalysis(Base, TimestampMixin):

@@ -11,6 +11,7 @@ import type {
   SavedJobStatusResponse,
   JobViewedStatusResponse,
   SavedJobsRequest,
+  JobExpirationStatusResponse,
 } from '@/types/job'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -307,4 +308,39 @@ export const useJobViewedMutations = () => {
   })
 
   return { markViewed }
+}
+
+/**
+ * Manual expired-state mutation for jobs.
+ */
+export const useJobExpirationMutations = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  const setJobExpiration = useMutation({
+    mutationFn: ({ jobId, manualExpired, note }: { jobId: number; manualExpired: boolean; note?: string }) =>
+      jobsApi.setJobExpiration(jobId, { manual_expired: manualExpired, note }),
+    onSuccess: (data: JobExpirationStatusResponse, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['job', variables.jobId] })
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['job-matches'] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['application', 'by-job', variables.jobId] })
+
+      toast({
+        title: 'Success',
+        description: data.manual_expired ? 'Job marked as expired' : 'Job marked as active',
+      })
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update job expiration status',
+        variant: 'destructive',
+      })
+    },
+  })
+
+  return { setJobExpiration }
 }

@@ -100,11 +100,13 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
               >
                 {job.title}
               </Link>
+              {job.is_expired && (
+                <Badge className="mt-0.5 bg-red-500 text-white hover:bg-red-600">Expired</Badge>
+              )}
               {job.has_application && (
                 <CircleCheck
                   className="mt-1 h-5 w-5 shrink-0 text-emerald-600"
                   aria-label="Added to applications"
-                  title="Added to applications"
                 />
               )}
             </div>

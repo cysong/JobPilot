@@ -42,7 +42,11 @@ class JobBase(BaseModel):
     expires_at: Optional[datetime] = None
 
     # Status flags
-    is_expired: Optional[bool] = False
+    is_expired: Optional[bool] = Field(default=False, validation_alias="effective_is_expired")
+    manual_expired: Optional[bool] = False
+    manual_expired_by: Optional[int] = None
+    manual_expired_at: Optional[datetime] = None
+    manual_expired_note: Optional[str] = None
     status: Optional[str] = None
 
     # Share link
@@ -160,6 +164,24 @@ class SavedJobListResponse(PaginatedResponse[SavedJobItem]):
     """Paginated saved jobs response."""
 
 
+class JobExpirationUpdateRequest(BaseModel):
+    """Request payload for manually marking job expiration."""
+
+    manual_expired: bool
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class JobExpirationStatus(BaseModel):
+    """Response payload for manual job expiration status."""
+
+    job_id: int
+    is_expired: bool
+    manual_expired: bool
+    manual_expired_by: Optional[int] = None
+    manual_expired_at: Optional[datetime] = None
+    manual_expired_note: Optional[str] = None
+
+
 class JobFiltersRequest(BaseModel):
     """Job filtering parameters"""
     # Search
@@ -254,6 +276,8 @@ class JobBriefInfo(BaseModel):
     work_types_label: Optional[str]
     salary_label: Optional[str]
     listed_at: Optional[datetime]
+    is_expired: Optional[bool] = Field(default=False, validation_alias="effective_is_expired")
+    manual_expired: Optional[bool] = False
 
     # Additional fields for UI completeness
     company_logo: Optional[str] = None

@@ -32,6 +32,8 @@ export interface Application {
         company_name?: string;
         company_logo?: string;
         share_link?: string;
+        is_expired?: boolean;
+        manual_expired?: boolean;
     };
 }
 
