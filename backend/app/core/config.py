@@ -34,8 +34,13 @@ class Settings(BaseSettings):
     USER_MONTHLY_APPLICATION_LIMIT: int = 20
 
     # AI Configuration
+    DEFAULT_LLM_PROVIDER: str = "openai"
     OPENAI_API_KEY: str
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
+    OPENAI_TRACING_ENABLED: bool = True
+    MINIMAX_API_KEY: str = ""
+    MINIMAX_API_BASE: str = "https://api.minimax.io/v1"
+    MINIMAX_TRACING_ENABLED: bool = False
     OPENROUTER_API_KEY: str = ""  # Preferred for DeepSeek via OpenRouter
     OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
 

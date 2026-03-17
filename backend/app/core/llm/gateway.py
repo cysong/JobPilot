@@ -13,12 +13,12 @@ from agents.run_config import RunConfig
 from app.core.database import async_session_factory
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
+from app.core.llm.providers import build_provider_runtime
 from app.core.llm.types import GatewayContext
 from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
 
 logger = structlog.get_logger()
-RUN_CONFIG_REASONING_IDS_OMIT = RunConfig(reasoning_item_id_policy="omit")
 
 
 class AgentGateway:
@@ -111,8 +111,13 @@ class AgentGateway:
         Returns:
             Tuple of (final_output, usage)
         """
+        provider_runtime = build_provider_runtime(getattr(agent, "provider", None))
         run_kwargs: dict[str, Any] = {
-            "run_config": RUN_CONFIG_REASONING_IDS_OMIT,
+            "run_config": RunConfig(
+                reasoning_item_id_policy="omit",
+                model_provider=provider_runtime.model_provider,
+                tracing_disabled=provider_runtime.tracing_disabled,
+            ),
         }
         max_turns = getattr(agent, "max_turns", None)
         if not isinstance(max_turns, int) or max_turns <= 0:
@@ -147,6 +152,7 @@ class AgentGateway:
             "agent_call_started",
             agent_id=agent_id,
             task_id=context.get("task_id"),
+            provider=getattr(agent, "provider", None),
             model=getattr(agent, "model", None),
             operation=context.get("operation"),
         )
@@ -170,6 +176,7 @@ class AgentGateway:
             "agent_call_completed",
             agent_id=agent_id,
             task_id=context.get("task_id"),
+            provider=getattr(agent, "provider", None),
             model=getattr(agent, "model", None),
             status="success",
             latency_ms=latency_ms,
@@ -196,6 +203,7 @@ class AgentGateway:
             "agent_call_failed",
             agent_id=agent_id,
             task_id=context.get("task_id"),
+            provider=getattr(agent, "provider", None),
             model=getattr(agent, "model", None),
             status=error_type,
             error=str(error),
@@ -286,6 +294,7 @@ class AgentGateway:
                     meta={
                         "operation": context.get("operation"),
                         "agent_id": agent_id,
+                        "provider": getattr(agent, "provider", None),
                     },
                 )
                 await db.commit()

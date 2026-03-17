@@ -1355,3 +1355,15 @@ None at this stage.
   - structured output validation
   - fallback support
   - strategy-based routing
+
+### 2026-03-18 - Multi-Provider LLM Phase 1 Provider Infrastructure
+
+**Completed Tasks:**
+- Added provider-aware backend settings for OpenAI and MiniMax:
+  - `DEFAULT_LLM_PROVIDER`
+  - `MINIMAX_API_KEY`
+  - `MINIMAX_API_BASE`
+  - provider-specific tracing toggles
+- Added `backend/app/core/llm/providers.py` to build provider runtime wiring for OpenAI and MiniMax.
+- Updated `AgentGateway` to construct provider-aware `RunConfig` instances through the new provider runtime helper.
+- Kept default behavior backward-compatible by continuing to use OpenAI unless a different provider is explicitly selected later.
