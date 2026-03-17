@@ -365,7 +365,7 @@ export default function ApplicationDetailPage() {
               <div ref={headerActionsRef} className="flex flex-wrap items-center justify-end gap-2">
                 {application.job?.share_link &&
                   !application.job?.is_expired &&
-                  ['Pending', 'Ready'].includes(application.status) && (
+                  (
                   <Button variant="default" size="sm" asChild>
                     <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
                       Apply
