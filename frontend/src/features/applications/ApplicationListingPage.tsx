@@ -35,6 +35,7 @@ import {
   JobAttributeList,
   JobSourceCompanyLine,
 } from '@/components/job/jobDisplay'
+import { usePersistedListSearchParams } from '@/hooks/usePersistedListSearchParams'
 
 type ListPositionState = {
     anchorApplicationId: string
@@ -50,7 +51,9 @@ type ApplicationOrderState = {
 const APPLICATION_LIST_POSITIONS_KEY = 'applications:list:positions'
 const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent'
 const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders'
+const APPLICATION_LIST_SEARCH_SNAPSHOT_KEY = 'applications:list:search-snapshot'
 const RESTORE_HIGHLIGHT_MS = 2000
+const APPLICATION_TRACKED_SEARCH_KEYS = ['page', 'page_size', 'keyword', 'status']
 
 const normalizeSearchParams = (params: URLSearchParams): string => {
     const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
@@ -102,15 +105,22 @@ export default function ApplicationListingPage() {
     const statusParam = (searchParams.get('status') as ApplicationStatus | null) || null
     const contextKey = getContextKey(searchParams)
     const [keyword, setKeyword] = useState(keywordParam)
+    const { isSearchParamsReady, clearPersistedSearchParams } = usePersistedListSearchParams({
+        searchParams,
+        setSearchParams,
+        storageKey: APPLICATION_LIST_SEARCH_SNAPSHOT_KEY,
+        trackedKeys: APPLICATION_TRACKED_SEARCH_KEYS,
+    })
 
     const { data, isLoading, isFetching, isError } = useApplications({
         page: currentPage,
         page_size: pageSize,
         keyword: keywordParam || undefined,
         status: statusParam || undefined,
-    })
+    }, isSearchParamsReady)
     const { retryCoverLetter } = useApplicationMutations()
     const hasActiveFilters = Boolean(keywordParam || statusParam)
+    const isListLoading = !isSearchParamsReady || isLoading
 
     useEffect(() => {
         setKeyword(keywordParam)
@@ -153,6 +163,12 @@ export default function ApplicationListingPage() {
         updateSearchParams({ status: value === 'all' ? null : value, page: 1 })
     }
 
+    const handleReset = () => {
+        clearPersistedSearchParams()
+        setKeyword('')
+        setSearchParams(new URLSearchParams(), { replace: true })
+    }
+
     const handleOpenApplication = (applicationId: string) => {
         const positions = readPositions()
         positions[contextKey] = {
@@ -171,7 +187,7 @@ export default function ApplicationListingPage() {
     }, [contextKey])
 
     useEffect(() => {
-        if (isLoading || isError) return
+        if (!isSearchParamsReady || isLoading || isError) return
 
         const rawIntent = sessionStorage.getItem(APPLICATION_LIST_RETURN_INTENT_KEY)
         if (!rawIntent) return
@@ -205,10 +221,10 @@ export default function ApplicationListingPage() {
             setHighlightedApplicationId(targetApplicationId)
             window.setTimeout(() => setHighlightedApplicationId(null), RESTORE_HIGHLIGHT_MS)
         })
-    }, [contextKey, isError, isLoading])
+    }, [contextKey, isError, isLoading, isSearchParamsReady])
 
     useEffect(() => {
-        if (isLoading || isError || !data) return
+        if (!isSearchParamsReady || isLoading || isError || !data) return
 
         const orders = readOrders()
         orders[contextKey] = {
@@ -216,7 +232,7 @@ export default function ApplicationListingPage() {
             updatedAt: Date.now(),
         }
         writeOrders(orders)
-    }, [contextKey, data, isError, isLoading])
+    }, [contextKey, data, isError, isLoading, isSearchParamsReady])
 
     return (
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
@@ -265,7 +281,7 @@ export default function ApplicationListingPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button onClick={() => updateSearchParams({ keyword: '', status: null, page: 1 })} variant="outline">
+                <Button onClick={handleReset} variant="outline">
                     Reset
                 </Button>
             </div>
@@ -278,7 +294,7 @@ export default function ApplicationListingPage() {
                 <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
                     <p className="text-red-500">Failed to load applications.</p>
                 </div>
-            ) : isLoading && !data ? (
+            ) : isListLoading && !data ? (
                 <div className="grid gap-4">
                     {[1, 2, 3].map((i) => (
                         <Skeleton key={i} className="h-32 w-full" />
@@ -308,7 +324,7 @@ export default function ApplicationListingPage() {
                 </div>
             ) : (
                 <div className="relative">
-                    {isFetching && (
+                    {isSearchParamsReady && isFetching && (
                         <div className="absolute inset-0 z-10 bg-white/65 backdrop-blur-[1px] rounded-lg border border-slate-100 p-4 space-y-3">
                             {[1, 2, 3].map((i) => (
                                 <Skeleton key={i} className="h-20 w-full" />

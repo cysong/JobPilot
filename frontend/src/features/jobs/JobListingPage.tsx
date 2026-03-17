@@ -24,6 +24,7 @@ import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistedListSearchParams } from "@/hooks/usePersistedListSearchParams";
 
 type ViewStatus = "all" | "viewed" | "unviewed";
 type ListPositionState = {
@@ -39,7 +40,20 @@ type JobOrderState = {
 const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
 const JOB_LIST_ORDERS_KEY = "jobs:list:orders";
+const JOB_LIST_SEARCH_SNAPSHOT_KEY = "jobs:list:search-snapshot";
 const RESTORE_HIGHLIGHT_MS = 2000;
+const JOB_TRACKED_SEARCH_KEYS = [
+  "view",
+  "page",
+  "keyword",
+  "sort_by",
+  "sort_order",
+  "view_status",
+  "location_cities",
+  "work_types",
+  "companies",
+  "sources",
+];
 
 const normalizeSearchParams = (params: URLSearchParams): string => {
   const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
@@ -86,6 +100,12 @@ export default function JobListingPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedJobId, setHighlightedJobId] = useState<number | null>(null);
   const previousContextKey = useRef<string | null>(null);
+  const { isSearchParamsReady } = usePersistedListSearchParams({
+    searchParams,
+    setSearchParams,
+    storageKey: JOB_LIST_SEARCH_SNAPSHOT_KEY,
+    trackedKeys: JOB_TRACKED_SEARCH_KEYS,
+  });
 
   // Get view mode from URL (default: recommended)
   const viewMode = searchParams.get("view") || "recommended";
@@ -121,17 +141,20 @@ export default function JobListingPage() {
     prevFilterCount.current = activeFilterCount;
   }, [activeFilterCount]);
 
+  const isRecommendedView = viewMode === "recommended";
+  const isSavedView = viewMode === "saved";
+
   // Recommended view: fetch matched jobs
   const matchFilters = {
     min_score: 40, // Only show jobs with skill match >= 70%
     limit: 10,
     offset: (currentPage - 1) * 10,
   };
-  const matchesQuery = useJobMatches(matchFilters);
+  const matchesQuery = useJobMatches(matchFilters, isSearchParamsReady && isRecommendedView);
   const savedJobsQuery = useSavedJobs({
     page: currentPage,
     page_size: 10,
-  });
+  }, isSearchParamsReady && isSavedView);
 
   // All jobs view: fetch with filters
   const jobFilters: JobFiltersRequest = {
@@ -146,11 +169,8 @@ export default function JobListingPage() {
     sources: searchParams.getAll("sources"),
     view_status: viewStatus,
   };
-  const jobsQuery = useJobs(jobFilters);
+  const jobsQuery = useJobs(jobFilters, isSearchParamsReady && !isRecommendedView && !isSavedView);
 
-  // Select data based on view mode
-  const isRecommendedView = viewMode === "recommended";
-  const isSavedView = viewMode === "saved";
   const {
     data: matchesData,
     isLoading: matchesLoading,
@@ -172,6 +192,7 @@ export default function JobListingPage() {
     : isSavedView
       ? savedLoading
       : jobsLoading;
+  const isListLoading = !isSearchParamsReady || isLoading;
   const isError = isRecommendedView
     ? matchesError
     : isSavedView
@@ -246,7 +267,7 @@ export default function JobListingPage() {
 
   // Restore anchor position only when returning from detail with same context.
   useEffect(() => {
-    if (isLoading || isError) return;
+    if (!isSearchParamsReady || isLoading || isError) return;
 
     const rawIntent = sessionStorage.getItem(JOB_LIST_RETURN_INTENT_KEY);
     if (!rawIntent) return;
@@ -280,11 +301,11 @@ export default function JobListingPage() {
       setHighlightedJobId(targetJobId);
       window.setTimeout(() => setHighlightedJobId(null), RESTORE_HIGHLIGHT_MS);
     });
-  }, [contextKey, isError, isLoading]);
+  }, [contextKey, isError, isLoading, isSearchParamsReady]);
 
   // Persist job order per context for detail page previous/next navigation.
   useEffect(() => {
-    if (isLoading || isError) return;
+    if (!isSearchParamsReady || isLoading || isError) return;
 
     let jobIds: number[] = [];
     if (isRecommendedView) {
@@ -310,6 +331,7 @@ export default function JobListingPage() {
     jobsData,
     matchesData,
     savedData,
+    isSearchParamsReady,
   ]);
 
   return (
@@ -452,7 +474,7 @@ export default function JobListingPage() {
           <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-slate-900">
-                {isLoading ? (
+                {isListLoading ? (
                   <Skeleton className="h-8 w-32" />
                 ) : isRecommendedView ? (
                   `${totalMatches} Matched Jobs`
@@ -464,7 +486,7 @@ export default function JobListingPage() {
               </h2>
             </div>
 
-            {isLoading ? (
+            {isListLoading ? (
               // Loading Skeletons
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (

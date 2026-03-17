@@ -11,6 +11,19 @@
 
 ## Work Log
 
+### 2026-03-17 - Persisted List Query Restore for Jobs and Applications
+
+- Added shared list search persistence hook at `frontend/src/hooks/usePersistedListSearchParams.ts`.
+- Implemented local snapshot restore for list query state when re-entering pages without URL params:
+  - applications list
+  - jobs list
+- Kept URL query params as the source of truth and only used local storage as a fallback restore source.
+- Kept existing `sessionStorage`-based detail-return behavior for anchor item and scroll restoration.
+- Updated list query hooks to support conditional enabling so pages can wait for restored search params before fetching.
+- Added explicit applications reset behavior to clear the persisted query snapshot before resetting URL state.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Document Editor Save Guard Alignment
 
 - Fixed the shared markdown document editor so keyboard save behavior matches the disabled Save button state.

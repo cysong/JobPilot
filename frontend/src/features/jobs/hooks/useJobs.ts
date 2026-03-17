@@ -18,10 +18,11 @@ import { useToast } from '@/components/ui/use-toast'
 /**
  * Hook to fetch paginated job list with filters
  */
-export const useJobs = (filters: JobFiltersRequest) => {
+export const useJobs = (filters: JobFiltersRequest, enabled = true) => {
   return useQuery({
     queryKey: ['jobs', filters],
     queryFn: () => jobsApi.getJobs(filters),
+    enabled,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
@@ -76,10 +77,11 @@ export const useCompanyFilterOptions = (keyword: string, limit = 20, enabled = t
 /**
  * Hook to fetch matched jobs for current user
  */
-export const useJobMatches = (filters: JobMatchFiltersRequest) => {
+export const useJobMatches = (filters: JobMatchFiltersRequest, enabled = true) => {
   return useQuery({
     queryKey: ['job-matches', filters],
     queryFn: () => jobsApi.getJobMatches(filters),
+    enabled,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
 }
@@ -109,10 +111,11 @@ export const useJobViewedStatus = (jobId: number | null) => {
 /**
  * Hook to fetch current user's saved jobs
  */
-export const useSavedJobs = (filters: SavedJobsRequest) => {
+export const useSavedJobs = (filters: SavedJobsRequest, enabled = true) => {
   return useQuery({
     queryKey: ['saved-jobs', filters],
     queryFn: () => jobsApi.getSavedJobs(filters),
+    enabled,
   })
 }
 

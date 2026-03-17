@@ -27,11 +27,12 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
     return fallback
 }
 
-export const useApplications = (filters: ApplicationListRequest) => {
+export const useApplications = (filters: ApplicationListRequest, enabled = true) => {
     return useQuery({
         queryKey: ['applications', filters],
         queryFn: () => applicationApi.list(filters),
         placeholderData: keepPreviousData,
+        enabled,
     })
 }
 
