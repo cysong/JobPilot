@@ -10,6 +10,8 @@ import type { UserJobMatch } from '@/types/job'
 import type { ResumeListItem } from '@/types/resume'
 import type { UserSkill } from '@/types/skill'
 import type {
+  DashboardApplicationActivity,
+  DashboardApplicationActivityPoint,
   DashboardApplicationItem,
   DashboardApplicationSnapshot,
   DashboardMetric,
@@ -20,6 +22,7 @@ import type {
 } from '@/features/dashboard/types'
 
 const DASHBOARD_APPLICATION_PAGE_SIZE = 100
+const DASHBOARD_ACTIVITY_DAYS = 14
 const DASHBOARD_MATCH_LIMIT = 6
 const DASHBOARD_SAVED_LIMIT = 4
 const DASHBOARD_TOP_SKILLS_LIMIT = 8
@@ -111,6 +114,105 @@ const buildApplicationSnapshot = (applications: Application[]): DashboardApplica
       counts.PhoneScreen +
       counts.Interviewing,
     attentionItems: getAttentionApplications(applications),
+  }
+}
+
+const getLocalDateKey = (value: Date): string => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  return formatter.format(value)
+}
+
+const buildActivityPoints = (
+  applications: Application[],
+  periodDays: number
+): DashboardApplicationActivityPoint[] => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const labelFormatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+  const shortLabelFormatter = new Intl.DateTimeFormat('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+  })
+
+  const buckets = new Map<string, DashboardApplicationActivityPoint>()
+
+  for (let index = periodDays - 1; index >= 0; index -= 1) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - index)
+    const dateKey = getLocalDateKey(date)
+    buckets.set(dateKey, {
+      dateKey,
+      label: labelFormatter.format(date),
+      shortLabel: shortLabelFormatter.format(date),
+      addedCount: 0,
+      appliedCount: 0,
+    })
+  }
+
+  for (const application of applications) {
+    const createdKey = getLocalDateKey(new Date(application.created_at))
+    const createdBucket = buckets.get(createdKey)
+    if (createdBucket) {
+      createdBucket.addedCount += 1
+    }
+
+    if (!application.applied_at) continue
+    const appliedKey = getLocalDateKey(new Date(application.applied_at))
+    const appliedBucket = buckets.get(appliedKey)
+    if (appliedBucket) {
+      appliedBucket.appliedCount += 1
+    }
+  }
+
+  return Array.from(buckets.values())
+}
+
+const buildApplicationActivity = (
+  applications: Application[],
+  periodDays: number
+): DashboardApplicationActivity => {
+  const points = buildActivityPoints(applications, periodDays)
+  const addedCount = points.reduce((sum, point) => sum + point.addedCount, 0)
+  const appliedCount = points.reduce((sum, point) => sum + point.appliedCount, 0)
+  const backlogCount = applications.filter((application) => !application.applied_at).length
+
+  const leadTimeValues = applications
+    .filter((application) => application.applied_at)
+    .map((application) => {
+      const createdAt = new Date(application.created_at).getTime()
+      const appliedAt = new Date(application.applied_at as string).getTime()
+      return Math.max(0, appliedAt - createdAt) / (1000 * 60 * 60 * 24)
+    })
+
+  const averageDaysToApply =
+    leadTimeValues.length > 0
+      ? leadTimeValues.reduce((sum, value) => sum + value, 0) / leadTimeValues.length
+      : null
+
+  return {
+    periodDays,
+    points,
+    workflow: {
+      addedCount,
+      appliedCount,
+      backlogCount,
+      averageDaysToApply,
+      averageDaysToApplyLabel:
+        averageDaysToApply === null ? 'N/A' : `${averageDaysToApply.toFixed(1)}d`,
+    },
+    outcomes: {
+      phoneScreens: applications.filter((application) => application.status === 'PhoneScreen').length,
+      interviewing: applications.filter((application) => application.status === 'Interviewing').length,
+      offers: applications.filter((application) => application.status === 'Offer').length,
+    },
   }
 }
 
@@ -293,6 +395,28 @@ const buildHeroMessage = ({
   return 'Your dashboard is clear. Use today to review fresh opportunities.'
 }
 
+const fetchAllApplications = async (): Promise<Application[]> => {
+  const firstPage = await applicationApi.list({
+    page: 1,
+    page_size: DASHBOARD_APPLICATION_PAGE_SIZE,
+  })
+
+  if (firstPage.total_pages <= 1) {
+    return firstPage.items
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.total_pages - 1 }, (_, index) =>
+      applicationApi.list({
+        page: index + 2,
+        page_size: DASHBOARD_APPLICATION_PAGE_SIZE,
+      })
+    )
+  )
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.items)
+}
+
 export const useUserDashboard = () => {
   const user = useAuthStore((state) => state.user)
 
@@ -300,11 +424,7 @@ export const useUserDashboard = () => {
     queries: [
       {
         queryKey: ['dashboard', 'applications'],
-        queryFn: () =>
-          applicationApi.list({
-            page: 1,
-            page_size: DASHBOARD_APPLICATION_PAGE_SIZE,
-          }),
+        queryFn: fetchAllApplications,
       },
       {
         queryKey: ['dashboard', 'job-matches'],
@@ -335,7 +455,7 @@ export const useUserDashboard = () => {
   })
 
   const [applicationsQuery, matchesQuery, savedJobsQuery, resumesQuery, skillsQuery] = results
-  const applications = applicationsQuery.data?.items || []
+  const applications = applicationsQuery.data || []
   const matches = matchesQuery.data || []
   const savedJobs =
     savedJobsQuery.data?.items.map<UserJobMatch>((item) => ({
@@ -357,6 +477,7 @@ export const useUserDashboard = () => {
   const skills = skillsQuery.data?.items || []
 
   const applicationSnapshot = buildApplicationSnapshot(applications)
+  const applicationActivity = buildApplicationActivity(applications, DASHBOARD_ACTIVITY_DAYS)
   const resumeSummary = buildResumeSummary(resumes)
   const skillsSummary = buildSkillsSummary(
     skills,
@@ -383,6 +504,7 @@ export const useUserDashboard = () => {
       resumeSummary,
     }),
     applications: applicationSnapshot,
+    applicationActivity,
     recommendedJobs: matches,
     savedJobs,
     resumeSummary,

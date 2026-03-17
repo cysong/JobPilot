@@ -1211,3 +1211,20 @@ None at this stage.
   - detect historical `startedAt` offsets (~10-14h behind `createdAt`)
   - auto-normalize displayed running duration for affected legacy rows
 - Extended timezone migration with data repair SQL for shifted `task_executions.started_at` in `Running` status.
+
+### 2026-03-17 - Dashboard Application Activity Insights
+
+**Completed Tasks:**
+- Added dashboard application activity analytics card on `/dashboard`.
+- Introduced `Added` vs `Applied` daily volume chart for the last 14 days using browser local timezone bucketing.
+- Updated dashboard applications loading to aggregate all application pages before computing stats, avoiding partial first-page-only counts.
+- Added workflow summary metrics:
+  - `Added`
+  - `Applied`
+  - `Backlog`
+  - `Avg time to apply`
+- Added outcomes summary metrics:
+  - `Phone Screens`
+  - `Interviews`
+  - `Offers`
+- Aligned frontend application typing with backend timestamp fields by adding `applied_at` and `offered_at`.

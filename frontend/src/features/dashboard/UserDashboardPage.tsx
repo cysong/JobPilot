@@ -2,6 +2,7 @@ import { DashboardHero } from '@/features/dashboard/components/DashboardHero'
 import { DashboardMetricCards } from '@/features/dashboard/components/DashboardMetricCards'
 import { PriorityActionCard } from '@/features/dashboard/components/PriorityActionCard'
 import { ApplicationPipelineCard } from '@/features/dashboard/components/ApplicationPipelineCard'
+import { ApplicationActivityCard } from '@/features/dashboard/components/ApplicationActivityCard'
 import { RecommendedJobsCard } from '@/features/dashboard/components/RecommendedJobsCard'
 import { ResumeReadinessCard } from '@/features/dashboard/components/ResumeReadinessCard'
 import { SkillsOverviewCard } from '@/features/dashboard/components/SkillsOverviewCard'
@@ -27,6 +28,11 @@ export default function UserDashboardPage() {
           <PriorityActionCard action={data.priorityAction} isLoading={dashboard.isLoading} />
           <ApplicationPipelineCard
             data={data.applications}
+            isLoading={dashboard.isLoading}
+            hasError={dashboard.isApplicationsError}
+          />
+          <ApplicationActivityCard
+            data={data.applicationActivity}
             isLoading={dashboard.isLoading}
             hasError={dashboard.isApplicationsError}
           />

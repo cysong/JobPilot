@@ -43,6 +43,31 @@ export interface DashboardApplicationSnapshot {
   attentionItems: DashboardApplicationItem[]
 }
 
+export interface DashboardApplicationActivityPoint {
+  dateKey: string
+  label: string
+  shortLabel: string
+  addedCount: number
+  appliedCount: number
+}
+
+export interface DashboardApplicationActivity {
+  periodDays: number
+  points: DashboardApplicationActivityPoint[]
+  workflow: {
+    addedCount: number
+    appliedCount: number
+    backlogCount: number
+    averageDaysToApply: number | null
+    averageDaysToApplyLabel: string
+  }
+  outcomes: {
+    phoneScreens: number
+    interviewing: number
+    offers: number
+  }
+}
+
 export interface DashboardResumeSummary {
   finalizedCount: number
   draftCount: number
@@ -63,6 +88,7 @@ export interface UserDashboardData {
   metrics: DashboardMetric[]
   priorityAction: DashboardPriorityAction | null
   applications: DashboardApplicationSnapshot
+  applicationActivity: DashboardApplicationActivity
   recommendedJobs: UserJobMatch[]
   savedJobs: UserJobMatch[]
   resumeSummary: DashboardResumeSummary

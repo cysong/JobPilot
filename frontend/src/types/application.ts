@@ -22,6 +22,8 @@ export interface Application {
     tailoring_level: TailoringLevel;
     last_error?: string;
     created_at: string;
+    applied_at?: string | null;
+    offered_at?: string | null;
     updated_at: string;
 
     // Expanded fields for listing
