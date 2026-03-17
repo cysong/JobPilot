@@ -36,17 +36,15 @@ import {
   JobSourceCompanyLine,
 } from '@/components/job/jobDisplay'
 import { usePersistedListSearchParams } from '@/hooks/usePersistedListSearchParams'
-
-type ListPositionState = {
-    anchorApplicationId: string
-    scrollY: number
-    updatedAt: number
-}
-
-type ApplicationOrderState = {
-    applicationIds: string[]
-    updatedAt: number
-}
+import {
+    clearSessionStorageKeys,
+    getListContextKey,
+    readSessionRecord,
+    type ListOrderState,
+    type ListPositionState,
+    type ListReturnIntent,
+    writeSessionRecord,
+} from '@/utils/listState'
 
 const APPLICATION_LIST_POSITIONS_KEY = 'applications:list:positions'
 const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent'
@@ -54,46 +52,7 @@ const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders'
 const APPLICATION_LIST_SEARCH_SNAPSHOT_KEY = 'applications:list:search-snapshot'
 const RESTORE_HIGHLIGHT_MS = 2000
 const APPLICATION_TRACKED_SEARCH_KEYS = ['page', 'page_size', 'keyword', 'status']
-
-const normalizeSearchParams = (params: URLSearchParams): string => {
-    const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
-        if (aKey === bKey) return aVal.localeCompare(bVal)
-        return aKey.localeCompare(bKey)
-    })
-    return entries
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-        .join('&')
-}
-
-const getContextKey = (params: URLSearchParams): string => {
-    return `applications:list:${normalizeSearchParams(params)}`
-}
-
-const readPositions = (): Record<string, ListPositionState> => {
-    try {
-        const raw = sessionStorage.getItem(APPLICATION_LIST_POSITIONS_KEY)
-        return raw ? (JSON.parse(raw) as Record<string, ListPositionState>) : {}
-    } catch {
-        return {}
-    }
-}
-
-const writePositions = (positions: Record<string, ListPositionState>) => {
-    sessionStorage.setItem(APPLICATION_LIST_POSITIONS_KEY, JSON.stringify(positions))
-}
-
-const readOrders = (): Record<string, ApplicationOrderState> => {
-    try {
-        const raw = sessionStorage.getItem(APPLICATION_LIST_ORDERS_KEY)
-        return raw ? (JSON.parse(raw) as Record<string, ApplicationOrderState>) : {}
-    } catch {
-        return {}
-    }
-}
-
-const writeOrders = (orders: Record<string, ApplicationOrderState>) => {
-    sessionStorage.setItem(APPLICATION_LIST_ORDERS_KEY, JSON.stringify(orders))
-}
+const getContextKey = (params: URLSearchParams): string => getListContextKey('applications:list', params)
 
 export default function ApplicationListingPage() {
     const [searchParams, setSearchParams] = useSearchParams()
@@ -166,17 +125,22 @@ export default function ApplicationListingPage() {
     const handleReset = () => {
         clearPersistedSearchParams()
         setKeyword('')
+        clearSessionStorageKeys([
+            APPLICATION_LIST_POSITIONS_KEY,
+            APPLICATION_LIST_RETURN_INTENT_KEY,
+            APPLICATION_LIST_ORDERS_KEY,
+        ])
         setSearchParams(new URLSearchParams(), { replace: true })
     }
 
     const handleOpenApplication = (applicationId: string) => {
-        const positions = readPositions()
+        const positions = readSessionRecord<ListPositionState<string>>(APPLICATION_LIST_POSITIONS_KEY)
         positions[contextKey] = {
-            anchorApplicationId: applicationId,
+            anchorItemId: applicationId,
             scrollY: window.scrollY,
             updatedAt: Date.now(),
         }
-        writePositions(positions)
+        writeSessionRecord(APPLICATION_LIST_POSITIONS_KEY, positions)
     }
 
     useEffect(() => {
@@ -189,26 +153,17 @@ export default function ApplicationListingPage() {
     useEffect(() => {
         if (!isSearchParamsReady || isLoading || isError) return
 
-        const rawIntent = sessionStorage.getItem(APPLICATION_LIST_RETURN_INTENT_KEY)
-        if (!rawIntent) return
-
-        let intent: { contextKey: string; applicationId: string } | null = null
-        try {
-            intent = JSON.parse(rawIntent) as { contextKey: string; applicationId: string }
-        } catch {
-            sessionStorage.removeItem(APPLICATION_LIST_RETURN_INTENT_KEY)
-            return
-        }
-
+        const intentMap = readSessionRecord<ListReturnIntent<string>>(APPLICATION_LIST_RETURN_INTENT_KEY)
+        const intent = intentMap.current || null
         if (!intent || intent.contextKey !== contextKey) {
             return
         }
 
         sessionStorage.removeItem(APPLICATION_LIST_RETURN_INTENT_KEY)
 
-        const positions = readPositions()
+        const positions = readSessionRecord<ListPositionState<string>>(APPLICATION_LIST_POSITIONS_KEY)
         const position = positions[contextKey]
-        const targetApplicationId = intent.applicationId || position?.anchorApplicationId
+        const targetApplicationId = intent.itemId || position?.anchorItemId
         if (!targetApplicationId) return
 
         requestAnimationFrame(() => {
@@ -226,12 +181,12 @@ export default function ApplicationListingPage() {
     useEffect(() => {
         if (!isSearchParamsReady || isLoading || isError || !data) return
 
-        const orders = readOrders()
+        const orders = readSessionRecord<ListOrderState<string>>(APPLICATION_LIST_ORDERS_KEY)
         orders[contextKey] = {
-            applicationIds: data.items.map((item) => item.id),
+            itemIds: data.items.map((item) => item.id),
             updatedAt: Date.now(),
         }
-        writeOrders(orders)
+        writeSessionRecord(APPLICATION_LIST_ORDERS_KEY, orders)
     }, [contextKey, data, isError, isLoading, isSearchParamsReady])
 
     return (

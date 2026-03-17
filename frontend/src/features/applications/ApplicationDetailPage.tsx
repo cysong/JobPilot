@@ -53,6 +53,13 @@ import {
   JobAttributeList,
   JobSourceCompanyLine,
 } from '@/components/job/jobDisplay';
+import {
+  getListContextKey,
+  readSessionRecord,
+  type ListOrderState,
+  type ListReturnIntent,
+  writeSessionRecord,
+} from '@/utils/listState';
 
 type StatusAction = {
   label: string;
@@ -100,19 +107,7 @@ type DetailNavigationState = {
   total: number;
 };
 
-const normalizeSearchParams = (params: URLSearchParams): string => {
-  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
-    if (aKey === bKey) return aVal.localeCompare(bVal);
-    return aKey.localeCompare(bKey);
-  });
-  return entries
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
-};
-
-const getContextKey = (params: URLSearchParams): string => {
-  return `applications:list:${normalizeSearchParams(params)}`;
-};
+const getContextKey = (params: URLSearchParams): string => getListContextKey('applications:list', params);
 
 export default function ApplicationDetailPage() {
     const [headerActionsRef] = useAutoAnimate<HTMLDivElement>({
@@ -164,25 +159,17 @@ export default function ApplicationDetailPage() {
     useEffect(() => {
       if (!applicationId) return;
       const contextKey = getContextKey(searchParams);
-      sessionStorage.setItem(
-        APPLICATION_LIST_RETURN_INTENT_KEY,
-        JSON.stringify({ contextKey, applicationId }),
-      );
+      writeSessionRecord<ListReturnIntent<string>>(APPLICATION_LIST_RETURN_INTENT_KEY, {
+        current: { contextKey, itemId: applicationId },
+      });
     }, [applicationId, searchParams, serializedSearchParams]);
 
     useEffect(() => {
       if (!applicationId) return;
       const contextKey = getContextKey(searchParams);
 
-      let orders: Record<string, { applicationIds: string[] }> = {};
-      try {
-        const raw = sessionStorage.getItem(APPLICATION_LIST_ORDERS_KEY);
-        orders = raw ? (JSON.parse(raw) as Record<string, { applicationIds: string[] }>) : {};
-      } catch {
-        orders = {};
-      }
-
-      const applicationIds = orders[contextKey]?.applicationIds || [];
+      const orders = readSessionRecord<ListOrderState<string>>(APPLICATION_LIST_ORDERS_KEY);
+      const applicationIds = orders[contextKey]?.itemIds || [];
       const currentIndex = applicationIds.findIndex((id) => id === applicationId);
 
       if (currentIndex < 0) {

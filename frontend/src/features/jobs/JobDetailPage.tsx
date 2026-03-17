@@ -49,6 +49,13 @@ import {
   getCompanyDisplayName,
   JobSourceCompanyLine,
 } from "@/components/job/jobDisplay";
+import {
+  getListContextKey,
+  readSessionRecord,
+  type ListOrderState,
+  type ListReturnIntent,
+  writeSessionRecord,
+} from "@/utils/listState";
 
 const LANGUAGE_STORAGE_KEY = "job_detail_language";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
@@ -61,19 +68,7 @@ type DetailNavigationState = {
   total: number;
 };
 
-const normalizeSearchParams = (params: URLSearchParams): string => {
-  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
-    if (aKey === bKey) return aVal.localeCompare(bVal);
-    return aKey.localeCompare(bKey);
-  });
-  return entries
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join("&");
-};
-
-const getContextKey = (params: URLSearchParams): string => {
-  return `jobs:list:${normalizeSearchParams(params)}`;
-};
+const getContextKey = (params: URLSearchParams): string => getListContextKey("jobs:list", params);
 
 export default function JobDetailPage() {
   const { jobId } = useParams();
@@ -116,10 +111,9 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!jobIdNum) return;
     const contextKey = getContextKey(searchParams);
-    sessionStorage.setItem(
-      JOB_LIST_RETURN_INTENT_KEY,
-      JSON.stringify({ contextKey, jobId: jobIdNum }),
-    );
+    writeSessionRecord<ListReturnIntent<number>>(JOB_LIST_RETURN_INTENT_KEY, {
+      current: { contextKey, itemId: jobIdNum },
+    });
   }, [jobIdNum, serializedSearchParams, searchParams]);
 
   useEffect(() => {
@@ -138,15 +132,8 @@ export default function JobDetailPage() {
     if (!jobIdNum) return;
     const contextKey = getContextKey(searchParams);
 
-    let orders: Record<string, { jobIds: number[] }> = {};
-    try {
-      const raw = sessionStorage.getItem(JOB_LIST_ORDERS_KEY);
-      orders = raw ? (JSON.parse(raw) as Record<string, { jobIds: number[] }>) : {};
-    } catch {
-      orders = {};
-    }
-
-    const jobIds = orders[contextKey]?.jobIds || [];
+    const orders = readSessionRecord<ListOrderState<number>>(JOB_LIST_ORDERS_KEY);
+    const jobIds = orders[contextKey]?.itemIds || [];
     const currentIndex = jobIds.findIndex((id) => id === jobIdNum);
 
     if (currentIndex < 0) {

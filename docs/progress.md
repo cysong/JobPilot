@@ -11,6 +11,21 @@
 
 ## Work Log
 
+### 2026-03-17 - Shared Session List State Utilities and Reset Alignment
+
+- Extracted shared list session-state utilities into `frontend/src/utils/listState.ts`.
+- Unified reused logic for:
+  - normalized list context keys
+  - per-context scroll anchor storage
+  - per-context item order storage
+  - detail return intent storage
+- Updated jobs and applications list/detail pages to use the shared utility instead of duplicating session storage parsing logic.
+- Aligned reset behavior:
+  - applications reset now clears persisted query snapshot and list session state
+  - jobs clear-all now clears persisted query snapshot and list session state
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Persisted List Query Restore for Jobs and Applications
 
 - Added shared list search persistence hook at `frontend/src/hooks/usePersistedListSearchParams.ts`.

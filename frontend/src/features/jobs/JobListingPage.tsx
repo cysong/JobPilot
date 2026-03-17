@@ -25,17 +25,17 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersistedListSearchParams } from "@/hooks/usePersistedListSearchParams";
+import {
+  clearSessionStorageKeys,
+  getListContextKey,
+  readSessionRecord,
+  type ListOrderState,
+  type ListPositionState,
+  type ListReturnIntent,
+  writeSessionRecord,
+} from "@/utils/listState";
 
 type ViewStatus = "all" | "viewed" | "unviewed";
-type ListPositionState = {
-  anchorJobId: number;
-  scrollY: number;
-  updatedAt: number;
-};
-type JobOrderState = {
-  jobIds: number[];
-  updatedAt: number;
-};
 
 const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
@@ -55,52 +55,14 @@ const JOB_TRACKED_SEARCH_KEYS = [
   "sources",
 ];
 
-const normalizeSearchParams = (params: URLSearchParams): string => {
-  const entries = Array.from(params.entries()).sort(([aKey, aVal], [bKey, bVal]) => {
-    if (aKey === bKey) return aVal.localeCompare(bVal);
-    return aKey.localeCompare(bKey);
-  });
-  return entries
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join("&");
-};
-
-const getContextKey = (params: URLSearchParams): string => {
-  return `jobs:list:${normalizeSearchParams(params)}`;
-};
-
-const readPositions = (): Record<string, ListPositionState> => {
-  try {
-    const raw = sessionStorage.getItem(JOB_LIST_POSITIONS_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, ListPositionState>) : {};
-  } catch {
-    return {};
-  }
-};
-
-const writePositions = (positions: Record<string, ListPositionState>) => {
-  sessionStorage.setItem(JOB_LIST_POSITIONS_KEY, JSON.stringify(positions));
-};
-
-const readOrders = (): Record<string, JobOrderState> => {
-  try {
-    const raw = sessionStorage.getItem(JOB_LIST_ORDERS_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, JobOrderState>) : {};
-  } catch {
-    return {};
-  }
-};
-
-const writeOrders = (orders: Record<string, JobOrderState>) => {
-  sessionStorage.setItem(JOB_LIST_ORDERS_KEY, JSON.stringify(orders));
-};
+const getContextKey = (params: URLSearchParams): string => getListContextKey("jobs:list", params);
 
 export default function JobListingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [highlightedJobId, setHighlightedJobId] = useState<number | null>(null);
   const previousContextKey = useRef<string | null>(null);
-  const { isSearchParamsReady } = usePersistedListSearchParams({
+  const { isSearchParamsReady, clearPersistedSearchParams } = usePersistedListSearchParams({
     searchParams,
     setSearchParams,
     storageKey: JOB_LIST_SEARCH_SNAPSHOT_KEY,
@@ -237,6 +199,12 @@ export default function JobListingPage() {
 
   // Handle clear all filters
   const handleClearAllFilters = () => {
+    clearPersistedSearchParams();
+    clearSessionStorageKeys([
+      JOB_LIST_POSITIONS_KEY,
+      JOB_LIST_RETURN_INTENT_KEY,
+      JOB_LIST_ORDERS_KEY,
+    ]);
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("location_cities");
     newParams.delete("work_types");
@@ -247,14 +215,27 @@ export default function JobListingPage() {
     setSearchParams(newParams);
   };
 
+  const handleResetAllJobsSearch = () => {
+    clearPersistedSearchParams();
+    clearSessionStorageKeys([
+      JOB_LIST_POSITIONS_KEY,
+      JOB_LIST_RETURN_INTENT_KEY,
+      JOB_LIST_ORDERS_KEY,
+    ]);
+    const newParams = new URLSearchParams();
+    newParams.set("view", "all");
+    newParams.set("page", "1");
+    setSearchParams(newParams, { replace: true });
+  };
+
   const handleOpenJob = (jobId: number) => {
-    const positions = readPositions();
+    const positions = readSessionRecord<ListPositionState<number>>(JOB_LIST_POSITIONS_KEY);
     positions[contextKey] = {
-      anchorJobId: jobId,
+      anchorItemId: jobId,
       scrollY: window.scrollY,
       updatedAt: Date.now(),
     };
-    writePositions(positions);
+    writeSessionRecord(JOB_LIST_POSITIONS_KEY, positions);
   };
 
   // Reset to top when list context changes (filters/search/sort/view/page)
@@ -269,26 +250,17 @@ export default function JobListingPage() {
   useEffect(() => {
     if (!isSearchParamsReady || isLoading || isError) return;
 
-    const rawIntent = sessionStorage.getItem(JOB_LIST_RETURN_INTENT_KEY);
-    if (!rawIntent) return;
-
-    let intent: { contextKey: string; jobId: number } | null = null;
-    try {
-      intent = JSON.parse(rawIntent) as { contextKey: string; jobId: number };
-    } catch {
-      sessionStorage.removeItem(JOB_LIST_RETURN_INTENT_KEY);
-      return;
-    }
-
+    const intentMap = readSessionRecord<ListReturnIntent<number>>(JOB_LIST_RETURN_INTENT_KEY);
+    const intent = intentMap.current || null;
     if (!intent || intent.contextKey !== contextKey) {
       return;
     }
 
     sessionStorage.removeItem(JOB_LIST_RETURN_INTENT_KEY);
 
-    const positions = readPositions();
+    const positions = readSessionRecord<ListPositionState<number>>(JOB_LIST_POSITIONS_KEY);
     const position = positions[contextKey];
-    const targetJobId = intent.jobId || position?.anchorJobId;
+    const targetJobId = intent.itemId || position?.anchorItemId;
     if (!targetJobId) return;
 
     requestAnimationFrame(() => {
@@ -316,12 +288,12 @@ export default function JobListingPage() {
       jobIds = (jobsData?.items || []).map((item) => item.id);
     }
 
-    const orders = readOrders();
+    const orders = readSessionRecord<ListOrderState<number>>(JOB_LIST_ORDERS_KEY);
     orders[contextKey] = {
-      jobIds,
+      itemIds: jobIds,
       updatedAt: Date.now(),
     };
-    writeOrders(orders);
+    writeSessionRecord(JOB_LIST_ORDERS_KEY, orders);
   }, [
     contextKey,
     isError,
@@ -582,7 +554,7 @@ export default function JobListingPage() {
                 </p>
                 <Button
                   variant="link"
-                  onClick={() => (window.location.href = "/jobs")}
+                  onClick={handleResetAllJobsSearch}
                   className="mt-2 text-indigo-600"
                 >
                   Clear all filters
