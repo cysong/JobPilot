@@ -284,10 +284,15 @@ export default function JobDetailPage() {
                 {isSaved ? "Saved" : "Save"}
               </Button>
               <Button
-                variant={job.manual_expired ? "destructive" : "outline"}
+                variant="outline"
                 size="sm"
                 onClick={handleToggleExpiration}
                 disabled={setJobExpiration.isPending}
+                className={
+                  job.manual_expired
+                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                    : "border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                }
               >
                 {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
               </Button>

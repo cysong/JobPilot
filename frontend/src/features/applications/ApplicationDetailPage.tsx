@@ -359,6 +359,7 @@ export default function ApplicationDetailPage() {
               </Button>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {application.job?.share_link &&
+                  !application.job?.is_expired &&
                   ['Pending', 'Ready'].includes(application.status) && (
                   <Button variant="default" size="sm" asChild>
                     <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
@@ -383,10 +384,15 @@ export default function ApplicationDetailPage() {
                 ))}
                 {canToggleExpired && (
                   <Button
-                    variant={application.job?.manual_expired ? 'destructive' : 'outline'}
+                    variant="outline"
                     size="sm"
                     onClick={handleToggleExpiration}
                     disabled={setJobExpiration.isPending}
+                    className={
+                      application.job?.manual_expired
+                        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'
+                        : 'border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800'
+                    }
                   >
                     {application.job?.manual_expired ? 'Mark as Active' : 'Mark as Expired'}
                   </Button>
@@ -621,7 +627,7 @@ export default function ApplicationDetailPage() {
               {['Ready', 'Failed'].includes(application.status) && (
                 <div className="flex justify-end pt-2">
                   <Button
-                    variant="default"
+                    variant="outline"
                     onClick={openRetryDialog}
                     disabled={retryCoverLetter.isPending}
                   >
