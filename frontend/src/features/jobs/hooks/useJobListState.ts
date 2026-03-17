@@ -3,6 +3,11 @@ import { useSearchParams } from "react-router-dom";
 
 import { usePersistedListSearchParams } from "@/hooks/usePersistedListSearchParams";
 import { clearSessionStorageKeys, getListContextKey } from "@/utils/listState";
+import {
+  cloneSearchParams,
+  replaceMultiValueSearchParam,
+  setOptionalSearchParam,
+} from "@/utils/searchParams";
 
 export type ViewStatus = "all" | "viewed" | "unviewed";
 
@@ -70,7 +75,7 @@ export const useJobListState = () => {
   }, [activeFilterCount]);
 
   const handleViewChange = (newView: string) => {
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = cloneSearchParams(searchParams);
     newParams.set("view", newView);
     newParams.set("page", "1");
     setSearchParams(newParams);
@@ -80,20 +85,15 @@ export const useJobListState = () => {
     filterKey: "location_cities" | "work_types" | "companies" | "sources",
     values: string[],
   ) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete(filterKey);
-    values.forEach((value) => newParams.append(filterKey, value));
+    const newParams = cloneSearchParams(searchParams);
+    replaceMultiValueSearchParam(newParams, filterKey, values);
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
 
   const handleViewStatusChange = (nextStatus: ViewStatus) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (nextStatus === "all") {
-      newParams.delete("view_status");
-    } else {
-      newParams.set("view_status", nextStatus);
-    }
+    const newParams = cloneSearchParams(searchParams);
+    setOptionalSearchParam(newParams, "view_status", nextStatus === "all" ? null : nextStatus);
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
@@ -101,7 +101,7 @@ export const useJobListState = () => {
   const handleClearAllFilters = () => {
     clearPersistedSearchParams();
     clearJobListSessionState();
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = cloneSearchParams(searchParams);
     newParams.delete("location_cities");
     newParams.delete("work_types");
     newParams.delete("companies");

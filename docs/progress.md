@@ -11,6 +11,20 @@
 
 ## Work Log
 
+### 2026-03-17 - Shared Search Params Helpers for List State Hooks
+
+- Added shared query-param helpers at `frontend/src/utils/searchParams.ts`.
+- Reduced duplicated URLSearchParams mutation logic in:
+  - `useJobListState`
+  - `useApplicationListState`
+- Centralized common operations for:
+  - cloning search params
+  - setting optional single-value params
+  - replacing multi-value params
+- Kept list-state hooks feature-specific while removing repeated low-level query mutation code.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Shared Generic List Return Restore Hook
 
 - Added shared generic restore hook at `frontend/src/hooks/useListReturnRestore.ts`.

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 
 import { usePersistedListSearchParams } from '@/hooks/usePersistedListSearchParams'
 import { clearSessionStorageKeys, getListContextKey } from '@/utils/listState'
+import { cloneSearchParams, setOptionalSearchParam } from '@/utils/searchParams'
 import type { ApplicationStatus } from '@/types/application'
 
 const APPLICATION_LIST_POSITIONS_KEY = 'applications:list:positions'
@@ -31,22 +32,13 @@ export const useApplicationListState = () => {
   }, [keywordParam])
 
   const updateSearchParams = (next: { keyword?: string; status?: string | null; page?: number }) => {
-    const newParams = new URLSearchParams(searchParams)
+    const newParams = cloneSearchParams(searchParams)
     const nextKeyword = next.keyword ?? keywordParam
     const nextStatus = next.status === undefined ? statusParam : next.status
     const nextPage = next.page ?? 1
 
-    if (nextKeyword) {
-      newParams.set('keyword', nextKeyword)
-    } else {
-      newParams.delete('keyword')
-    }
-
-    if (nextStatus) {
-      newParams.set('status', nextStatus)
-    } else {
-      newParams.delete('status')
-    }
+    setOptionalSearchParam(newParams, 'keyword', nextKeyword)
+    setOptionalSearchParam(newParams, 'status', nextStatus)
 
     newParams.set('page', nextPage.toString())
     newParams.set('page_size', pageSize.toString())
