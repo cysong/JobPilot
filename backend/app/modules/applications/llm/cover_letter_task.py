@@ -25,7 +25,7 @@ async def run_cover_letter_task(
     task_id: str,
     is_retry: bool = False,
 ):
-    """Execute cover letter generation task via cover_letter_writer only."""
+    """Execute two-pass cover letter generation via writer and polisher agents."""
     from app.modules.jobs.repository import JobAnalysisRepository
     from app.modules.resumes.repository import ResumeRepository
 
@@ -79,10 +79,21 @@ async def run_cover_letter_task(
         },
     )
     draft = draft_output if isinstance(draft_output, CoverLetterDraft) else CoverLetterDraft(**draft_output)
-    cover_letter_content = (draft.content or "").strip()
+    initial_content = (draft.content or "").strip()
 
-    if not cover_letter_content:
+    if not initial_content:
         raise ValueError("Cover letter writer returned empty content")
+
+    polished_draft = await _polish_cover_letter(
+        db=db,
+        application=application,
+        task_id=task_id,
+        initial_content=initial_content,
+        candidate_name=(resume_analysis.candidate_name or "").strip(),
+    )
+    cover_letter_content = (polished_draft.content or "").strip()
+    if not cover_letter_content:
+        raise ValueError("Cover letter polisher returned empty content")
 
     if is_retry:
         logger.info(
@@ -120,7 +131,7 @@ async def run_cover_letter_task(
                 "job_id": application.job_id,
                 "is_retry": is_retry,
                 "task_id": task_id,
-                "word_count": draft.word_count,
+                "polished": True,
             },
         )
         logger.info(
@@ -144,7 +155,7 @@ async def run_cover_letter_task(
                 "application_id": application.id,
                 "job_id": application.job_id,
                 "task_id": task_id,
-                "word_count": draft.word_count,
+                "polished": True,
             },
             created_by=application.user_id,
         )
@@ -159,7 +170,6 @@ async def run_cover_letter_task(
 
     return {
         "cover_letter_document_id": cover_document.id,
-        "word_count": draft.word_count,
         "is_retry": is_retry,
     }
 
@@ -190,6 +200,61 @@ def _build_writer_prompt(
         f"tailored_resume_markdown: |\n{resume_excerpt}\n"
     )
 
+
+async def _polish_cover_letter(
+    db: AsyncSession,
+    application: Application,
+    task_id: str,
+    initial_content: str,
+    candidate_name: str,
+) -> CoverLetterDraft:
+    """Run a lightweight second-pass polish to humanize tone without changing facts."""
+    polisher_input = _build_polisher_prompt(application, initial_content, candidate_name)
+    polished_output = await AgentGateway.get().call(
+        agent_id="cover_letter_polisher",
+        input_data=polisher_input,
+        context={
+            "db": db,
+            "task_id": task_id,
+            "user_id": application.user_id,
+        },
+    )
+    polished_draft = (
+        polished_output
+        if isinstance(polished_output, CoverLetterDraft)
+        else CoverLetterDraft(**polished_output)
+    )
+    polished_content = (polished_draft.content or "").strip()
+    if not polished_content:
+        raise ValueError("Cover letter polisher returned empty content")
+    return CoverLetterDraft(content=polished_content)
+
+
+def _build_polisher_prompt(
+    application: Application,
+    initial_content: str,
+    candidate_name: str,
+) -> str:
+    """Build compact second-pass edit input from first draft and light role context."""
+    role_bits: list[str] = []
+    job = application.job
+    if job:
+        title = (job.title or "").strip()
+        company = (job.company_name or job.advertiser_name or "").strip()
+        work_types = (job.work_types_label or "").strip()
+        if title:
+            role_bits.append(f"Job Title: {title}")
+        if company:
+            role_bits.append(f"Company: {company}")
+        if work_types:
+            role_bits.append(f"Work Type: {work_types}")
+
+    role_context = "\n".join(role_bits)
+    return (
+        f"role_context: |\n{role_context}\n"
+        f"candidate_name: {candidate_name}\n"
+        f"draft: |\n{initial_content}\n"
+    )
 
 def _build_jd_raw(job: SeekJob | None) -> str:
     """Build rich JD context from original job fields for higher-quality personalization."""
