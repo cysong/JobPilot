@@ -11,6 +11,18 @@
 
 ## Work Log
 
+### 2026-03-17 - Job Listing Return Restore Hook Extraction
+
+- Extracted jobs-list return restoration logic into `frontend/src/features/jobs/hooks/useJobListReturnRestore.ts`.
+- Moved jobs-list session-state behavior into the new hook:
+  - clicked item anchor persistence
+  - same-context scroll restore from detail page
+  - temporary return highlight
+  - per-context visible item order persistence for detail previous/next navigation
+- Simplified `JobListingPage` by keeping it focused on list-state consumption, data queries, and rendering.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Job Listing State Hook Extraction
 
 - Extracted `JobListingPage` URL/search/filter/reset state management into `frontend/src/features/jobs/hooks/useJobListState.ts`.

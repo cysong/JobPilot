@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useMemo } from "react";
 import {
   Sparkles,
   Briefcase,
@@ -15,6 +15,7 @@ import {
   useSavedJobs,
 } from "@/features/jobs/hooks/useJobs";
 import { useJobListState, type ViewStatus } from "@/features/jobs/hooks/useJobListState";
+import { useJobListReturnRestore } from "@/features/jobs/hooks/useJobListReturnRestore";
 import type { JobFiltersRequest } from "@/types/job";
 import { JobCard } from "@/features/jobs/components/JobCard";
 import { FilterDropdown } from "@/features/jobs/components/FilterDropdown";
@@ -24,22 +25,8 @@ import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  readSessionRecord,
-  type ListOrderState,
-  type ListPositionState,
-  type ListReturnIntent,
-  writeSessionRecord,
-} from "@/utils/listState";
-
-const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
-const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
-const JOB_LIST_ORDERS_KEY = "jobs:list:orders";
-const RESTORE_HIGHLIGHT_MS = 2000;
 
 export default function JobListingPage() {
-  const [highlightedJobId, setHighlightedJobId] = useState<number | null>(null);
-  const previousContextKey = useRef<string | null>(null);
   const {
     showFilters,
     setShowFilters,
@@ -128,83 +115,23 @@ export default function JobListingPage() {
   const matchesTotal = totalMatches; // We'll use the array length as total
   const matchesTotalPages = Math.ceil(matchesTotal / 10);
 
-  const handleOpenJob = (jobId: number) => {
-    const positions = readSessionRecord<ListPositionState<number>>(JOB_LIST_POSITIONS_KEY);
-    positions[contextKey] = {
-      anchorItemId: jobId,
-      scrollY: window.scrollY,
-      updatedAt: Date.now(),
-    };
-    writeSessionRecord(JOB_LIST_POSITIONS_KEY, positions);
-  };
-
-  // Reset to top when list context changes (filters/search/sort/view/page)
-  useEffect(() => {
-    if (previousContextKey.current && previousContextKey.current !== contextKey) {
-      window.scrollTo({ top: 0, behavior: "auto" });
-    }
-    previousContextKey.current = contextKey;
-  }, [contextKey]);
-
-  // Restore anchor position only when returning from detail with same context.
-  useEffect(() => {
-    if (!isSearchParamsReady || isLoading || isError) return;
-
-    const intentMap = readSessionRecord<ListReturnIntent<number>>(JOB_LIST_RETURN_INTENT_KEY);
-    const intent = intentMap.current || null;
-    if (!intent || intent.contextKey !== contextKey) {
-      return;
-    }
-
-    sessionStorage.removeItem(JOB_LIST_RETURN_INTENT_KEY);
-
-    const positions = readSessionRecord<ListPositionState<number>>(JOB_LIST_POSITIONS_KEY);
-    const position = positions[contextKey];
-    const targetJobId = intent.itemId || position?.anchorItemId;
-    if (!targetJobId) return;
-
-    requestAnimationFrame(() => {
-      const anchorElement = document.querySelector(`[data-job-id="${targetJobId}"]`);
-      if (anchorElement instanceof HTMLElement) {
-        anchorElement.scrollIntoView({ block: "center", behavior: "auto" });
-      } else if (position?.scrollY !== undefined) {
-        window.scrollTo({ top: position.scrollY, behavior: "auto" });
-      }
-      setHighlightedJobId(targetJobId);
-      window.setTimeout(() => setHighlightedJobId(null), RESTORE_HIGHLIGHT_MS);
-    });
-  }, [contextKey, isError, isLoading, isSearchParamsReady]);
-
-  // Persist job order per context for detail page previous/next navigation.
-  useEffect(() => {
-    if (!isSearchParamsReady || isLoading || isError) return;
-
-    let jobIds: number[] = [];
+  const visibleJobIds = useMemo(() => {
     if (isRecommendedView) {
-      jobIds = (matchesData || []).map((item) => item.job.id);
-    } else if (isSavedView) {
-      jobIds = (savedData?.items || []).map((item) => item.job.id);
-    } else {
-      jobIds = (jobsData?.items || []).map((item) => item.id);
+      return (matchesData || []).map((item) => item.job.id);
     }
+    if (isSavedView) {
+      return (savedData?.items || []).map((item) => item.job.id);
+    }
+    return (jobsData?.items || []).map((item) => item.id);
+  }, [isRecommendedView, isSavedView, jobsData, matchesData, savedData]);
 
-    const orders = readSessionRecord<ListOrderState<number>>(JOB_LIST_ORDERS_KEY);
-    orders[contextKey] = {
-      itemIds: jobIds,
-      updatedAt: Date.now(),
-    };
-    writeSessionRecord(JOB_LIST_ORDERS_KEY, orders);
-  }, [
+  const { highlightedJobId, handleOpenJob } = useJobListReturnRestore({
     contextKey,
-    isError,
-    isLoading,
-    isRecommendedView,
-    isSavedView,
-    jobsData,
-    matchesData,
-    savedData,
     isSearchParamsReady,
-  ]);
+    isLoading,
+    isError,
+    itemIds: visibleJobIds,
+  });
 
   return (
     <div className="flex flex-col h-full">
