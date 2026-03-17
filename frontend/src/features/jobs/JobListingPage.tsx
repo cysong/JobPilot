@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
 import {
   Sparkles,
   Briefcase,
@@ -15,6 +14,7 @@ import {
   useJobFilterOptions,
   useSavedJobs,
 } from "@/features/jobs/hooks/useJobs";
+import { useJobListState, type ViewStatus } from "@/features/jobs/hooks/useJobListState";
 import type { JobFiltersRequest } from "@/types/job";
 import { JobCard } from "@/features/jobs/components/JobCard";
 import { FilterDropdown } from "@/features/jobs/components/FilterDropdown";
@@ -24,10 +24,7 @@ import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { usePersistedListSearchParams } from "@/hooks/usePersistedListSearchParams";
 import {
-  clearSessionStorageKeys,
-  getListContextKey,
   readSessionRecord,
   type ListOrderState,
   type ListPositionState,
@@ -35,76 +32,41 @@ import {
   writeSessionRecord,
 } from "@/utils/listState";
 
-type ViewStatus = "all" | "viewed" | "unviewed";
-
 const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
 const JOB_LIST_ORDERS_KEY = "jobs:list:orders";
-const JOB_LIST_SEARCH_SNAPSHOT_KEY = "jobs:list:search-snapshot";
 const RESTORE_HIGHLIGHT_MS = 2000;
-const JOB_TRACKED_SEARCH_KEYS = [
-  "view",
-  "page",
-  "keyword",
-  "sort_by",
-  "sort_order",
-  "view_status",
-  "location_cities",
-  "work_types",
-  "companies",
-  "sources",
-];
-
-const getContextKey = (params: URLSearchParams): string => getListContextKey("jobs:list", params);
 
 export default function JobListingPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [showFilters, setShowFilters] = useState(false);
   const [highlightedJobId, setHighlightedJobId] = useState<number | null>(null);
   const previousContextKey = useRef<string | null>(null);
-  const { isSearchParamsReady, clearPersistedSearchParams } = usePersistedListSearchParams({
-    searchParams,
-    setSearchParams,
-    storageKey: JOB_LIST_SEARCH_SNAPSHOT_KEY,
-    trackedKeys: JOB_TRACKED_SEARCH_KEYS,
-  });
-
-  // Get view mode from URL (default: recommended)
-  const viewMode = searchParams.get("view") || "recommended";
-  const currentPage = parseInt(searchParams.get("page") || "1");
-  const viewStatus = (searchParams.get("view_status") as ViewStatus) || "all";
-  const contextKey = getContextKey(searchParams);
-
-  // Get active filters
-  const locationCities = searchParams.getAll("location_cities");
-  const workTypes = searchParams.getAll("work_types");
-  const companies = searchParams.getAll("companies");
-  const sources = searchParams.getAll("sources");
-  const activeFilterCount =
-    locationCities.length +
-    workTypes.length +
-    companies.length +
-    sources.length +
-    (viewStatus === "all" ? 0 : 1);
+  const {
+    showFilters,
+    setShowFilters,
+    isSearchParamsReady,
+    viewMode,
+    currentPage,
+    viewStatus,
+    contextKey,
+    keyword,
+    sortBy,
+    sortOrder,
+    locationCities,
+    workTypes,
+    companies,
+    sources,
+    isRecommendedView,
+    isSavedView,
+    activeFilterCount,
+    handleViewChange,
+    handleFilterChange,
+    handleViewStatusChange,
+    handleClearAllFilters,
+    handleResetAllJobsSearch,
+  } = useJobListState();
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
-
-  // Track previous filter count to detect 0 -> >0 transition
-  const prevFilterCount = useRef(0);
-
-  // Auto-show filters only when transitioning from no filters to having filters
-  useEffect(() => {
-    // Only auto-show when filters go from 0 to > 0 (first filter added)
-    // This allows users to manually hide the panel even when filters are active
-    if (prevFilterCount.current === 0 && activeFilterCount > 0) {
-      setShowFilters(true);
-    }
-    prevFilterCount.current = activeFilterCount;
-  }, [activeFilterCount]);
-
-  const isRecommendedView = viewMode === "recommended";
-  const isSavedView = viewMode === "saved";
 
   // Recommended view: fetch matched jobs
   const matchFilters = {
@@ -122,13 +84,13 @@ export default function JobListingPage() {
   const jobFilters: JobFiltersRequest = {
     page: currentPage,
     page_size: 10,
-    sort_by: searchParams.get("sort_by") || "listed_at",
-    sort_order: (searchParams.get("sort_order") as "asc" | "desc") || "desc",
-    keyword: searchParams.get("keyword") || undefined,
-    location_cities: searchParams.getAll("location_cities"),
-    work_types: searchParams.getAll("work_types"),
-    companies: searchParams.getAll("companies"),
-    sources: searchParams.getAll("sources"),
+    sort_by: sortBy,
+    sort_order: sortOrder,
+    keyword,
+    location_cities: locationCities,
+    work_types: workTypes,
+    companies,
+    sources,
     view_status: viewStatus,
   };
   const jobsQuery = useJobs(jobFilters, isSearchParamsReady && !isRecommendedView && !isSavedView);
@@ -165,68 +127,6 @@ export default function JobListingPage() {
   const totalMatches = matchesData?.length || 0;
   const matchesTotal = totalMatches; // We'll use the array length as total
   const matchesTotalPages = Math.ceil(matchesTotal / 10);
-
-  // Handle view mode change
-  const handleViewChange = (newView: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("view", newView);
-    newParams.set("page", "1"); // Reset to first page
-    setSearchParams(newParams);
-  };
-
-  // Handle filter selection change
-  const handleFilterChange = (
-    filterKey: "location_cities" | "work_types" | "companies" | "sources",
-    values: string[],
-  ) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete(filterKey);
-    values.forEach((v) => newParams.append(filterKey, v));
-    newParams.set("page", "1");
-    setSearchParams(newParams);
-  };
-
-  const handleViewStatusChange = (nextStatus: ViewStatus) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (nextStatus === "all") {
-      newParams.delete("view_status");
-    } else {
-      newParams.set("view_status", nextStatus);
-    }
-    newParams.set("page", "1");
-    setSearchParams(newParams);
-  };
-
-  // Handle clear all filters
-  const handleClearAllFilters = () => {
-    clearPersistedSearchParams();
-    clearSessionStorageKeys([
-      JOB_LIST_POSITIONS_KEY,
-      JOB_LIST_RETURN_INTENT_KEY,
-      JOB_LIST_ORDERS_KEY,
-    ]);
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("location_cities");
-    newParams.delete("work_types");
-    newParams.delete("companies");
-    newParams.delete("sources");
-    newParams.delete("view_status");
-    newParams.set("page", "1");
-    setSearchParams(newParams);
-  };
-
-  const handleResetAllJobsSearch = () => {
-    clearPersistedSearchParams();
-    clearSessionStorageKeys([
-      JOB_LIST_POSITIONS_KEY,
-      JOB_LIST_RETURN_INTENT_KEY,
-      JOB_LIST_ORDERS_KEY,
-    ]);
-    const newParams = new URLSearchParams();
-    newParams.set("view", "all");
-    newParams.set("page", "1");
-    setSearchParams(newParams, { replace: true });
-  };
 
   const handleOpenJob = (jobId: number) => {
     const positions = readSessionRecord<ListPositionState<number>>(JOB_LIST_POSITIONS_KEY);

@@ -11,6 +11,19 @@
 
 ## Work Log
 
+### 2026-03-17 - Job Listing State Hook Extraction
+
+- Extracted `JobListingPage` URL/search/filter/reset state management into `frontend/src/features/jobs/hooks/useJobListState.ts`.
+- Moved jobs-list state concerns into the hook:
+  - persisted search param restore
+  - view mode and filter parsing
+  - active filter counting
+  - filter panel auto-open behavior
+  - clear/reset handlers
+- Kept query fetching, detail-return restore, and page rendering in `JobListingPage` for a low-risk first refactor step.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Shared Session List State Utilities and Reset Alignment
 
 - Extracted shared list session-state utilities into `frontend/src/utils/listState.ts`.
