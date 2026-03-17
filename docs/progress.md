@@ -1321,3 +1321,25 @@ None at this stage.
   - `Interviews`
   - `Offers`
 - Aligned frontend application typing with backend timestamp fields by adding `applied_at` and `offered_at`.
+
+### 2026-03-17 - Two-Pass Cover Letter Generation Refinement
+
+**Completed Tasks:**
+- Split cover letter generation into two LLM passes while keeping the existing AgentGateway and task orchestration flow:
+  - first pass: `cover_letter_writer`
+  - second pass: `cover_letter_polisher`
+- Added `backend/agent_configs/config/cover_letter_polisher.yaml` for a lightweight humanization pass focused on opening, closing, and reducing dense technical stacking.
+- Tightened `cover_letter_writer` prompt without changing its overall structure or output schema:
+  - stronger candidate-voice instruction
+  - capped evidence density to at most 2 main examples
+  - reduced technology stacking and overly summary-like closing behavior
+- Updated `backend/app/modules/applications/llm/cover_letter_task.py` to:
+  - generate first draft, then polish it in a second pass
+  - keep final persistence/document versioning flow unchanged
+  - store `polished=true` metadata on generated cover letter documents
+
+### 2026-03-18 - Cover Letter Draft Schema Simplification
+
+**Completed Tasks:**
+- Removed `word_count` from `CoverLetterDraft`; cover letter agents now return only `content`.
+- Removed `word_count` handling from cover letter prompts, task runtime, and generated document metadata.

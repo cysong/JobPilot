@@ -148,7 +148,6 @@ class CoverLetterDraft(BaseModel):
     __version__ = "v1.0.0"
 
     content: str = Field(..., description="Complete cover letter in markdown/plain text")
-    word_count: int
 
 
 class ReviewResult(BaseModel):
