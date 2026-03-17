@@ -1343,3 +1343,15 @@ None at this stage.
 **Completed Tasks:**
 - Removed `word_count` from `CoverLetterDraft`; cover letter agents now return only `content`.
 - Removed `word_count` handling from cover letter prompts, task runtime, and generated document metadata.
+
+### 2026-03-18 - Multi-Provider LLM Integration Plan
+
+**Completed Tasks:**
+- Added `docs/llm_multi_provider_plan.md` documenting a phased rollout plan for multi-provider LLM support.
+- Defined a gradual path from OpenAI-only execution to provider-aware agent routing with MiniMax as the first OpenAI-compatible provider.
+- Split implementation into staged milestones:
+  - provider infrastructure
+  - agent-level provider/model config
+  - structured output validation
+  - fallback support
+  - strategy-based routing
