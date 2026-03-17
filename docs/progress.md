@@ -11,6 +11,21 @@
 
 ## Work Log
 
+### 2026-03-17 - Shared Generic List Return Restore Hook
+
+- Added shared generic restore hook at `frontend/src/hooks/useListReturnRestore.ts`.
+- Merged duplicated return-restore behavior from jobs and applications into the shared hook:
+  - anchor item persistence
+  - same-context scroll restore
+  - temporary return highlight
+  - per-context visible item order persistence
+- Kept feature-specific wrappers for now:
+  - `useJobListReturnRestore`
+  - `useApplicationListReturnRestore`
+- Reduced duplicated side-effect logic while preserving existing page APIs.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Application Listing State and Return Restore Hook Extraction
 
 - Extracted `ApplicationListingPage` URL/search/filter/reset state management into `frontend/src/features/applications/hooks/useApplicationListState.ts`.
