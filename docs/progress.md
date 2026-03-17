@@ -11,6 +11,17 @@
 
 ## Work Log
 
+### 2026-03-17 - Document Editor Save Guard Alignment
+
+- Fixed the shared markdown document editor so keyboard save behavior matches the disabled Save button state.
+- Added a shared `canSave` guard in `DocumentEditPage` and reused it for:
+  - Save button disabled state
+  - `Ctrl+S` / `Cmd+S` shortcut handling
+  - submit-path early exit protection
+- Prevented no-op or in-flight saves from being triggered through keyboard shortcuts when the Save button is unavailable.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Jobs / Applications Metadata Alignment and Lazy JD Panel
 
 - Unified job category display across jobs and applications pages to plain text format:

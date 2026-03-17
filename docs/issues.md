@@ -518,3 +518,25 @@ Validated parsing via `compile(source, path, 'exec')` over all modified backend 
 ### Next Steps
 - Normalize API client return typing (data vs AxiosResponse) and align hook query generics.
 - Re-run frontend build after baseline typing cleanup.
+
+---
+
+## 2026-03-17 - Document Editor Ctrl+S Bypassed Disabled Save Button
+
+### Problem
+- In the shared markdown editor, the Save button could be disabled while `Ctrl+S` or `Cmd+S` still triggered a save request.
+
+### Root Cause
+- The Save button used a UI-only disabled condition based on dirty state and mutation pending state.
+- The keyboard shortcut listener called `form.handleSubmit(handleSubmit)()` directly.
+- The submit handler itself did not guard against "save not allowed" conditions.
+
+### Solution
+- Added a shared `canSave` condition in `DocumentEditPage`.
+- Reused `canSave` for the Save button disabled state.
+- Blocked keyboard shortcut submission when `canSave` is false.
+- Added an early return inside the submit handler so other entry points cannot bypass the same rule.
+
+### Verification
+- When the Save button is disabled, `Ctrl+S` / `Cmd+S` no longer triggers save.
+- When content is dirty and no save is in progress, both button click and keyboard shortcut still work.

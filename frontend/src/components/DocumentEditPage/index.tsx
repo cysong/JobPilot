@@ -141,6 +141,8 @@ export function DocumentEditPage<TData = any>({
   // Auto-save to localStorage
   const watchedValues = form.watch()
   const isContentDirty = form.getFieldState('content', form.formState).isDirty
+  const isSaving = Boolean(updateMutation?.isPending || createMutation?.isPending)
+  const canSave = isContentDirty && !isSaving
   const noopSave = useCallback(() => {}, [])
   useAutoSave({
     data: { content: watchedValues.content },
@@ -186,6 +188,10 @@ export function DocumentEditPage<TData = any>({
 
   // Submit handler
   const handleSubmit = useCallback(async (values: any) => {
+    if (!canSave) {
+      return
+    }
+
     // Validation
     if (!values.content?.trim()) {
       toast({
@@ -252,19 +258,22 @@ export function DocumentEditPage<TData = any>({
         })
       }
     })
-  }, [config, isCreating, id, createMutation, updateMutation, storageKey, toast, form])
+  }, [canSave, config, isCreating, id, createMutation, updateMutation, storageKey, toast, form])
 
   // Keyboard shortcut: Ctrl+S
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
+        if (!canSave) {
+          return
+        }
         form.handleSubmit(handleSubmit)()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [form, handleSubmit])
+  }, [canSave, form, handleSubmit])
 
   // Export PDF
   const handleExportPdf = async () => {
@@ -368,9 +377,9 @@ export function DocumentEditPage<TData = any>({
 
           <Button
             onClick={form.handleSubmit(handleSubmit)}
-            disabled={!isContentDirty || updateMutation?.isPending || createMutation?.isPending}
+            disabled={!canSave}
           >
-            {updateMutation?.isPending || createMutation?.isPending ? (
+            {isSaving ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <Save className="w-4 h-4 mr-2" />
