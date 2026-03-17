@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -114,6 +115,10 @@ const getContextKey = (params: URLSearchParams): string => {
 };
 
 export default function ApplicationDetailPage() {
+    const [headerActionsRef] = useAutoAnimate<HTMLDivElement>({
+      duration: 180,
+      easing: 'ease-out',
+    });
     const { applicationId } = useParams();
     const [searchParams] = useSearchParams();
     const serializedSearchParams = searchParams.toString();
@@ -357,7 +362,7 @@ export default function ApplicationDetailPage() {
                   Back to Applications
                 </Link>
               </Button>
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div ref={headerActionsRef} className="flex flex-wrap items-center justify-end gap-2">
                 {application.job?.share_link &&
                   !application.job?.is_expired &&
                   ['Pending', 'Ready'].includes(application.status) && (
