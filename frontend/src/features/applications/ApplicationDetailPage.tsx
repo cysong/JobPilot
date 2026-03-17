@@ -5,6 +5,8 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     Calendar,
     FileText,
     Download,
@@ -343,7 +345,7 @@ export default function ApplicationDetailPage() {
         {/* Header */}
         <div className="sticky top-0 z-20 bg-slate-50">
           <div className="max-w-4xl mx-auto px-4">
-            <div className="bg-white border rounded-lg border-slate-200 h-16 px-4 flex items-center justify-between">
+            <div className="bg-white border rounded-lg border-slate-200 min-h-16 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -355,31 +357,38 @@ export default function ApplicationDetailPage() {
                   Back to Applications
                 </Link>
               </Button>
-              <div className="flex items-center gap-2">
-                {detailNavigation.previousApplicationId ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/applications/${detailNavigation.previousApplicationId}?${searchParams.toString()}`}>
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled>
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {application.job?.share_link &&
+                  ['Pending', 'Ready'].includes(application.status) && (
+                  <Button variant="default" size="sm" asChild>
+                    <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
+                      Apply
+                      <ExternalLink className="h-4 w-4 ml-2" />
+                    </a>
                   </Button>
                 )}
-                {detailNavigation.nextApplicationId ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/applications/${detailNavigation.nextApplicationId}?${searchParams.toString()}`}>
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Link>
+                {statusActions.map((action) => (
+                  <Button
+                    key={action.nextStatus}
+                    variant={action.variant || 'default'}
+                    size="sm"
+                    onClick={() => handleStatusUpdate(action.nextStatus)}
+                    disabled={updateStatus.isPending}
+                  >
+                    {updateStatus.isPending && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
+                    {action.label}
                   </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled>
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                ))}
+                {canToggleExpired && (
+                  <Button
+                    variant={application.job?.manual_expired ? 'destructive' : 'outline'}
+                    size="sm"
+                    onClick={handleToggleExpiration}
+                    disabled={setJobExpiration.isPending}
+                  >
+                    {application.job?.manual_expired ? 'Mark as Active' : 'Mark as Expired'}
                   </Button>
                 )}
                 <ApplicationStatusBadge status={application.status} />
@@ -398,6 +407,11 @@ export default function ApplicationDetailPage() {
                     <CardTitle className="text-2xl font-bold text-slate-900">
                       {application.job?.title || "Unknown Job"}
                     </CardTitle>
+                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
+                      <Link to={`/jobs/${application.job_id}`} aria-label="View job details">
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </Button>
                     {application.job?.is_expired && (
                       <TooltipProvider>
                         <Tooltip>
@@ -441,17 +455,16 @@ export default function ApplicationDetailPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/jobs/${application.job_id}`}>
-                      <ExternalLink className="h-3.5 w-3.5 mr-2" />
-                      View Job
-                    </Link>
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsJobDescriptionOpen((current) => !current)}
                   >
+                    {isJobDescriptionOpen ? (
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                    )}
                     {isJobDescriptionOpen ? 'Hide JD Details' : 'Show JD Details'}
                   </Button>
                 </div>
@@ -604,56 +617,27 @@ export default function ApplicationDetailPage() {
                   </Button>
                 )}
               </div>
+
+              {['Ready', 'Failed'].includes(application.status) && (
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="default"
+                    onClick={openRetryDialog}
+                    disabled={retryCoverLetter.isPending}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-2 ${
+                        retryCoverLetter.isPending ? "animate-spin" : ""
+                      }`}
+                    />
+                    Retry Generation
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end">
-            {application.job?.share_link &&
-              ['Pending', 'Ready'].includes(application.status) && (
-              <Button variant="default" asChild>
-                <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
-                  Apply
-                  <ExternalLink className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
-            )}
-            {canToggleExpired && (
-              <Button
-                variant={application.job?.manual_expired ? 'destructive' : 'outline'}
-                onClick={handleToggleExpiration}
-                disabled={setJobExpiration.isPending}
-              >
-                {application.job?.manual_expired ? 'Mark as Active' : 'Mark as Expired'}
-              </Button>
-            )}
-            {statusActions.map((action) => (
-              <Button
-                key={action.nextStatus}
-                variant={action.variant || 'default'}
-                onClick={() => handleStatusUpdate(action.nextStatus)}
-                disabled={updateStatus.isPending}
-              >
-                {updateStatus.isPending && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                {action.label}
-              </Button>
-            ))}
-              <Button
-              variant="default"
-              onClick={openRetryDialog}
-              disabled={retryCoverLetter.isPending || !['Ready', 'Failed'].includes(application.status)}
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-2 ${
-                  retryCoverLetter.isPending ? "animate-spin" : ""
-                }`}
-              />
-              Retry Generation
-            </Button>
-          </div>
-
           <div className="flex items-center justify-center gap-3">
             {detailNavigation.previousApplicationId ? (
               <Button variant="outline" size="sm" asChild>
