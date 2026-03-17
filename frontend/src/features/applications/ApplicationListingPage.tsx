@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useMemo } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
     ExternalLink,
     RefreshCw,
@@ -11,7 +11,6 @@ import {
 
 import { useApplications, useApplicationMutations } from '@/features/applications/hooks/useApplications'
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge'
-import type { ApplicationStatus } from '@/types/application'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -35,41 +34,26 @@ import {
   JobAttributeList,
   JobSourceCompanyLine,
 } from '@/components/job/jobDisplay'
-import { usePersistedListSearchParams } from '@/hooks/usePersistedListSearchParams'
-import {
-    clearSessionStorageKeys,
-    getListContextKey,
-    readSessionRecord,
-    type ListOrderState,
-    type ListPositionState,
-    type ListReturnIntent,
-    writeSessionRecord,
-} from '@/utils/listState'
-
-const APPLICATION_LIST_POSITIONS_KEY = 'applications:list:positions'
-const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent'
-const APPLICATION_LIST_ORDERS_KEY = 'applications:list:orders'
-const APPLICATION_LIST_SEARCH_SNAPSHOT_KEY = 'applications:list:search-snapshot'
-const RESTORE_HIGHLIGHT_MS = 2000
-const APPLICATION_TRACKED_SEARCH_KEYS = ['page', 'page_size', 'keyword', 'status']
-const getContextKey = (params: URLSearchParams): string => getListContextKey('applications:list', params)
+import { useApplicationListState } from '@/features/applications/hooks/useApplicationListState'
+import { useApplicationListReturnRestore } from '@/features/applications/hooks/useApplicationListReturnRestore'
 
 export default function ApplicationListingPage() {
-    const [searchParams, setSearchParams] = useSearchParams()
-    const [highlightedApplicationId, setHighlightedApplicationId] = useState<string | null>(null)
-    const previousContextKey = useRef<string | null>(null)
-    const currentPage = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('page_size') || '20')
-    const keywordParam = searchParams.get('keyword') || ''
-    const statusParam = (searchParams.get('status') as ApplicationStatus | null) || null
-    const contextKey = getContextKey(searchParams)
-    const [keyword, setKeyword] = useState(keywordParam)
-    const { isSearchParamsReady, clearPersistedSearchParams } = usePersistedListSearchParams({
+    const {
         searchParams,
-        setSearchParams,
-        storageKey: APPLICATION_LIST_SEARCH_SNAPSHOT_KEY,
-        trackedKeys: APPLICATION_TRACKED_SEARCH_KEYS,
-    })
+        currentPage,
+        pageSize,
+        keywordParam,
+        statusParam,
+        contextKey,
+        keyword,
+        setKeyword,
+        isSearchParamsReady,
+        handleSearch,
+        handleClearSearch,
+        handleStatusChange,
+        handleReset,
+        updateSearchParams,
+    } = useApplicationListState()
 
     const { data, isLoading, isFetching, isError } = useApplications({
         page: currentPage,
@@ -80,114 +64,17 @@ export default function ApplicationListingPage() {
     const { retryCoverLetter } = useApplicationMutations()
     const hasActiveFilters = Boolean(keywordParam || statusParam)
     const isListLoading = !isSearchParamsReady || isLoading
-
-    useEffect(() => {
-        setKeyword(keywordParam)
-    }, [keywordParam])
-
-    const updateSearchParams = (next: { keyword?: string; status?: string | null; page?: number }) => {
-        const newParams = new URLSearchParams(searchParams)
-        const nextKeyword = next.keyword ?? keywordParam
-        const nextStatus = next.status === undefined ? statusParam : next.status
-        const nextPage = next.page ?? 1
-
-        if (nextKeyword) {
-            newParams.set('keyword', nextKeyword)
-        } else {
-            newParams.delete('keyword')
-        }
-
-        if (nextStatus) {
-            newParams.set('status', nextStatus)
-        } else {
-            newParams.delete('status')
-        }
-
-        newParams.set('page', nextPage.toString())
-        newParams.set('page_size', pageSize.toString())
-        setSearchParams(newParams)
-    }
-
-    const handleSearch = (e: FormEvent) => {
-        e.preventDefault()
-        updateSearchParams({ keyword, page: 1 })
-    }
-
-    const handleClearSearch = () => {
-        setKeyword('')
-        updateSearchParams({ keyword: '', page: 1 })
-    }
-
-    const handleStatusChange = (value: string) => {
-        updateSearchParams({ status: value === 'all' ? null : value, page: 1 })
-    }
-
-    const handleReset = () => {
-        clearPersistedSearchParams()
-        setKeyword('')
-        clearSessionStorageKeys([
-            APPLICATION_LIST_POSITIONS_KEY,
-            APPLICATION_LIST_RETURN_INTENT_KEY,
-            APPLICATION_LIST_ORDERS_KEY,
-        ])
-        setSearchParams(new URLSearchParams(), { replace: true })
-    }
-
-    const handleOpenApplication = (applicationId: string) => {
-        const positions = readSessionRecord<ListPositionState<string>>(APPLICATION_LIST_POSITIONS_KEY)
-        positions[contextKey] = {
-            anchorItemId: applicationId,
-            scrollY: window.scrollY,
-            updatedAt: Date.now(),
-        }
-        writeSessionRecord(APPLICATION_LIST_POSITIONS_KEY, positions)
-    }
-
-    useEffect(() => {
-        if (previousContextKey.current && previousContextKey.current !== contextKey) {
-            window.scrollTo({ top: 0, behavior: 'auto' })
-        }
-        previousContextKey.current = contextKey
-    }, [contextKey])
-
-    useEffect(() => {
-        if (!isSearchParamsReady || isLoading || isError) return
-
-        const intentMap = readSessionRecord<ListReturnIntent<string>>(APPLICATION_LIST_RETURN_INTENT_KEY)
-        const intent = intentMap.current || null
-        if (!intent || intent.contextKey !== contextKey) {
-            return
-        }
-
-        sessionStorage.removeItem(APPLICATION_LIST_RETURN_INTENT_KEY)
-
-        const positions = readSessionRecord<ListPositionState<string>>(APPLICATION_LIST_POSITIONS_KEY)
-        const position = positions[contextKey]
-        const targetApplicationId = intent.itemId || position?.anchorItemId
-        if (!targetApplicationId) return
-
-        requestAnimationFrame(() => {
-            const anchorElement = document.querySelector(`[data-application-id="${targetApplicationId}"]`)
-            if (anchorElement instanceof HTMLElement) {
-                anchorElement.scrollIntoView({ block: 'center', behavior: 'auto' })
-            } else if (position?.scrollY !== undefined) {
-                window.scrollTo({ top: position.scrollY, behavior: 'auto' })
-            }
-            setHighlightedApplicationId(targetApplicationId)
-            window.setTimeout(() => setHighlightedApplicationId(null), RESTORE_HIGHLIGHT_MS)
-        })
-    }, [contextKey, isError, isLoading, isSearchParamsReady])
-
-    useEffect(() => {
-        if (!isSearchParamsReady || isLoading || isError || !data) return
-
-        const orders = readSessionRecord<ListOrderState<string>>(APPLICATION_LIST_ORDERS_KEY)
-        orders[contextKey] = {
-            itemIds: data.items.map((item) => item.id),
-            updatedAt: Date.now(),
-        }
-        writeSessionRecord(APPLICATION_LIST_ORDERS_KEY, orders)
-    }, [contextKey, data, isError, isLoading, isSearchParamsReady])
+    const visibleApplicationIds = useMemo(
+        () => (data?.items || []).map((item) => item.id),
+        [data],
+    )
+    const { highlightedApplicationId, handleOpenApplication } = useApplicationListReturnRestore({
+        contextKey,
+        isSearchParamsReady,
+        isLoading,
+        isError,
+        itemIds: visibleApplicationIds,
+    })
 
     return (
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">

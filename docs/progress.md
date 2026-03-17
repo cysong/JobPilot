@@ -11,6 +11,17 @@
 
 ## Work Log
 
+### 2026-03-17 - Application Listing State and Return Restore Hook Extraction
+
+- Extracted `ApplicationListingPage` URL/search/filter/reset state management into `frontend/src/features/applications/hooks/useApplicationListState.ts`.
+- Extracted applications-list return restoration logic into `frontend/src/features/applications/hooks/useApplicationListReturnRestore.ts`.
+- Aligned application-list structure with the earlier jobs-list refactor:
+  - page-level state parsing moved into a dedicated state hook
+  - return scroll/highlight/order persistence moved into a dedicated restore hook
+- Kept application list queries and rendering in `ApplicationListingPage` to limit refactor risk.
+- Validation:
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-17 - Job Listing Return Restore Hook Extraction
 
 - Extracted jobs-list return restoration logic into `frontend/src/features/jobs/hooks/useJobListReturnRestore.ts`.
