@@ -38,7 +38,7 @@ async def analyze_job_task(
     # Translate to Chinese (source assumed en, target zh) with strict formatting preservation
     # Build YAML-formatted string as agent expects
     translation_input = f"""source_language: en
-            target_language: zh
+            target_language: zh-CN
             content_format: auto
             keep_placeholders: true
             style_hint: formal

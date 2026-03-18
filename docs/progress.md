@@ -11,6 +11,13 @@
 
 ## Work Log
 
+### 2026-03-19 - Universal Translator Simplified Chinese Locale Fix
+
+- Tightened `universal_translator` language parameter semantics from generic language codes to explicit locale-aware tags.
+- Updated translator instructions so `zh`, `zh-CN`, and Simplified Chinese requests must return Simplified Chinese only.
+- Explicitly changed job-analysis translation calls from `target_language: zh` to `target_language: zh-CN`.
+- Normalized the translator YAML input construction in job analysis so multiline content is indented consistently for the agent.
+
 ### 2026-03-18 - Admin AI Usage Charts Page and Dashboard Links
 
 - Added backend admin daily AI usage trend APIs:
