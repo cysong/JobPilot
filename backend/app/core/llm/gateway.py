@@ -268,6 +268,11 @@ class AgentGateway:
         # Convert agent version to string (config_version may be int from YAML)
         version = getattr(agent, "config_version", None)
         agent_version_str = str(version) if version is not None else ""
+        model_provider = getattr(agent, "provider", None)
+        if not model_provider:
+            raise ValueError(
+                f"Agent '{agent_id}' is missing required provider for AI call tracking"
+            )
 
         try:
             # Persist usage records in an independent transaction so task rollbacks
