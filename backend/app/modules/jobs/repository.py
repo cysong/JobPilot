@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob, UserJobView
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskType
+from app.shared.utils import sanitize_nested_text_for_storage
 
 
 class JobRepository:
@@ -222,6 +223,7 @@ class JobAnalysisRepository:
         Returns:
             Created JobAnalysis instance
         """
+        analysis_data = sanitize_nested_text_for_storage(analysis_data)
         analysis = JobAnalysis(
             job_id=job_id,
             normalized_job_title=analysis_data.get("normalized_job_title"),
@@ -266,6 +268,7 @@ class JobAnalysisRepository:
         Returns:
             JobAnalysis instance (created or updated)
         """
+        analysis_data = sanitize_nested_text_for_storage(analysis_data)
         # Check if analysis exists
         existing = await JobAnalysisRepository.get_by_job_id(db, job_id)
 

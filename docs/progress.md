@@ -1374,3 +1374,9 @@ None at this stage.
 - Extended `AgentLoader` to read an optional `provider` field from agent YAML and attach normalized provider metadata to loaded agents.
 - Kept backward compatibility so agents without `provider` continue to use the default provider.
 - Switched `backend/agent_configs/config/job_analyzer.yaml` to MiniMax for the pilot provider-routing path.
+
+### 2026-03-18 - Storage Text Sanitization for Analysis Persistence
+
+**Completed Tasks:**
+- Added shared recursive storage sanitization helpers to strip NUL bytes and unsupported control characters from strings before DB persistence.
+- Applied the shared sanitization path to job analysis create/upsert persistence so both plain text and JSON-backed analysis fields are cleaned consistently.
