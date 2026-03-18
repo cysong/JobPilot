@@ -8,12 +8,19 @@ export interface TaskMetric extends MetricCount {
   failed: number
 }
 
+export interface FloatMetricCount {
+  total: number
+  todayNew: number
+}
+
 export interface DashboardStats {
   users: MetricCount
   jobs: MetricCount
   matches: MetricCount
   applications: MetricCount
   tasks: TaskMetric
+  aiTokens: MetricCount
+  aiCost: FloatMetricCount
 }
 
 export interface JobsDailyTrendPoint {

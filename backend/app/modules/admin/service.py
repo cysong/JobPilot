@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.modules.admin.schemas import (
     DashboardStats,
+    FloatMetricCount,
     JobsDailyTrendPoint,
     JobsDailyTrendResponse,
     JobsDailyTrendSeries,
@@ -22,7 +23,7 @@ from app.modules.applications.models import Application
 from app.modules.auth.models import User
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.models import UserJobMatch
-from app.modules.workflow.models import TaskExecution
+from app.modules.workflow.models import AICall, TaskExecution
 from app.shared.enums import TaskStatus
 from app.core.cache import jcache
 
@@ -103,6 +104,23 @@ class AdminService:
             )
         ).one()
 
+        ai_tokens_total, ai_tokens_today, ai_cost_total, ai_cost_today = (
+            await db.execute(
+                select(
+                    func.coalesce(func.sum(AICall.total_tokens), 0),
+                    func.coalesce(
+                        func.sum(AICall.total_tokens).filter(AICall.created_at >= today_start),
+                        0,
+                    ),
+                    func.coalesce(func.sum(AICall.estimated_cost), 0.0),
+                    func.coalesce(
+                        func.sum(AICall.estimated_cost).filter(AICall.created_at >= today_start),
+                        0.0,
+                    ),
+                )
+            )
+        ).one()
+
         return DashboardStats(
             users=MetricCount(total=users_total or 0, today_new=users_today or 0),
             jobs=MetricCount(total=jobs_total or 0, today_new=jobs_today or 0),
@@ -113,6 +131,14 @@ class AdminService:
                 today_new=tasks_today or 0,
                 running=tasks_running or 0,
                 failed=tasks_failed or 0,
+            ),
+            ai_tokens=MetricCount(
+                total=int(ai_tokens_total or 0),
+                today_new=int(ai_tokens_today or 0),
+            ),
+            ai_cost=FloatMetricCount(
+                total=float(ai_cost_total or 0.0),
+                today_new=float(ai_cost_today or 0.0),
             ),
         )
 

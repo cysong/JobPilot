@@ -11,6 +11,30 @@
 
 ## Work Log
 
+### 2026-03-18 - Admin Dashboard AI Usage Metrics
+
+- Extended admin dashboard stats with two new top-level metrics from `ai_calls`:
+  - `aiTokens`: total tokens consumed and today's new tokens
+  - `aiCost`: total estimated USD cost and today's new cost
+- Updated backend dashboard stats aggregation to sum:
+  - `AICall.total_tokens`
+  - `AICall.estimated_cost`
+- Added backend schema support for float-based metric counts used by estimated cost.
+- Updated admin dashboard metric cards to render 7 cards total:
+  - Users
+  - Jobs
+  - Matches
+  - Applications
+  - Tasks
+  - Tokens
+  - Est. Cost
+- Added frontend formatting rules:
+  - tokens use compact units such as `12.4K` / `1.2M`
+  - estimated cost uses USD formatting with sensible precision and compact notation for large values
+- Validation:
+  - `python -m compileall backend/app/modules/admin` passed
+  - `pnpm exec tsc -b` passed
+
 ### 2026-03-18 - Admin Hourly Jobs Scatter Chart
 
 - Added backend admin scatter API for hourly job-ingestion visualization:

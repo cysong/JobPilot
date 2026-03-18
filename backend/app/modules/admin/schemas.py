@@ -22,12 +22,19 @@ class TaskMetric(MetricCount):
     failed: int
 
 
+class FloatMetricCount(AdminBase):
+    total: float
+    today_new: float = Field(..., alias="todayNew")
+
+
 class DashboardStats(AdminBase):
     users: MetricCount
     jobs: MetricCount
     matches: MetricCount
     applications: MetricCount
     tasks: TaskMetric
+    ai_tokens: MetricCount = Field(..., alias="aiTokens")
+    ai_cost: FloatMetricCount = Field(..., alias="aiCost")
 
 
 class JobsDailyTrendPoint(AdminBase):
