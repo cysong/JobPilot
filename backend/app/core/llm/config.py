@@ -37,6 +37,22 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
         "input": 0.14 / 1_000_000,   # $0.14 per 1M input tokens
         "output": 0.28 / 1_000_000,  # $0.28 per 1M output tokens
     },
+    "MiniMax-M2.5": {
+        "input": 0.30 / 1_000_000,
+        "output": 1.20 / 1_000_000,
+    },
+    "MiniMax-M2.5-highspeed": {
+        "input": 0.30 / 1_000_000,
+        "output": 2.40 / 1_000_000,
+    },
+    "MiniMax-M2.1": {
+        "input": 0.30 / 1_000_000,
+        "output": 1.20 / 1_000_000,
+    },
+    "MiniMax-M2.1-highspeed": {
+        "input": 0.30 / 1_000_000,
+        "output": 2.40 / 1_000_000,
+    },
     "gpt-5": {
         "input": 1.25 / 1_000_000,
         "output": 10.0 / 1_000_000,
