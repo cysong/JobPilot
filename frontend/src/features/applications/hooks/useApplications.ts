@@ -4,6 +4,7 @@ import type {
     ApplicationListRequest,
     CreateApplicationRequest,
     RetryApplicationRequest,
+    ApplicationResolution,
     ApplicationStatus,
 } from '@/types/application'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
@@ -139,9 +140,29 @@ export const useApplicationMutations = () => {
         }
     })
 
+    const updateResolution = useMutation({
+        mutationFn: ({ id, resolution, note }: { id: string; resolution: ApplicationResolution; note?: string }) =>
+            applicationApi.updateResolution(id, { resolution, note }),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['applications'] })
+            queryClient.invalidateQueries({ queryKey: ['applications', data.id] })
+            queryClient.invalidateQueries({ queryKey: ['application', 'by-job', data.job_id] })
+            toast({ title: 'Success', description: 'Application resolution updated' })
+        },
+        onError: (error: unknown) => {
+            const message = extractErrorMessage(error, 'Failed to update application resolution')
+            toast({
+                title: 'Error',
+                description: message,
+                variant: 'destructive'
+            })
+        }
+    })
+
     return {
         createApplication,
         retryCoverLetter,
         updateStatus,
+        updateResolution,
     }
 }

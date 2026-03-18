@@ -11,6 +11,7 @@ from app.modules.applications.schemas import (
     ApplicationCreateRequest,
     ApplicationDetail,
     ApplicationListResponse,
+    ApplicationResolutionUpdateRequest,
     ApplicationRetryRequest,
     ApplicationStatusUpdateRequest,
 )
@@ -20,7 +21,7 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.shared.pagination import PaginationParams
-from app.shared.enums import ApplicationStatus
+from app.shared.enums import ApplicationResolution, ApplicationStatus
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -32,6 +33,10 @@ async def list_applications(
     params: Annotated[PaginationParams, Depends()],
     keyword: str | None = Query(None, description="Search by job title or company"),
     status: ApplicationStatus | None = Query(None, description="Filter by application status"),
+    resolution: ApplicationResolution | None = Query(
+        ApplicationResolution.ACTIVE,
+        description="Filter by application resolution; defaults to ACTIVE",
+    ),
 ):
     """List applications for the current user with pagination."""
     return await ApplicationService.list_applications(
@@ -40,6 +45,7 @@ async def list_applications(
         params,
         keyword=keyword,
         status=status,
+        resolution=resolution,
     )
 
 
@@ -195,5 +201,22 @@ async def update_application_status(
         application_id=application_id,
         user=current_user,
         target_status=payload.status,
+        note=payload.note,
+    )
+
+
+@router.patch("/{application_id}/resolution", response_model=ApplicationDetail)
+async def update_application_resolution(
+    application_id: str,
+    payload: ApplicationResolutionUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Manually update application resolution with guarded transitions."""
+    return await ApplicationService.update_resolution(
+        db=db,
+        application_id=application_id,
+        user=current_user,
+        target_resolution=payload.resolution,
         note=payload.note,
     )

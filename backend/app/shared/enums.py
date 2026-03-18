@@ -23,6 +23,15 @@ class ApplicationStatus(str, Enum):
     FAILED = "Failed"                # Application failed
 
 
+class ApplicationResolution(str, Enum):
+    """Application queue resolution enumeration."""
+
+    ACTIVE = "ACTIVE"
+    JOB_CLOSED = "JOB_CLOSED"
+    USER_SKIPPED = "USER_SKIPPED"
+    STALE_NO_RESPONSE = "STALE_NO_RESPONSE"
+
+
 class TailoringLevel(str, Enum):
     """Resume tailoring intensity levels."""
 

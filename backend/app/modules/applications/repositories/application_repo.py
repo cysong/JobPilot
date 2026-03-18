@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.applications.models import Application
 from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Resume
-from app.shared.enums import ApplicationStatus
+from app.shared.enums import ApplicationResolution, ApplicationStatus
 from app.shared.pagination import PaginationParams
 
 
@@ -83,6 +83,7 @@ class ApplicationRepository:
         params: PaginationParams,
         keyword: str | None = None,
         status: ApplicationStatus | None = None,
+        resolution: ApplicationResolution | None = None,
     ) -> tuple[list[Application], int]:
         base_query = (
             select(Application)
@@ -102,6 +103,9 @@ class ApplicationRepository:
 
         if status:
             base_query = base_query.where(Application.status == status)
+
+        if resolution:
+            base_query = base_query.where(Application.resolution == resolution)
 
         result = await db.execute(
             base_query.options(selectinload(Application.job))

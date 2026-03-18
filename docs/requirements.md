@@ -146,6 +146,34 @@ job分析完成后，预计算该job与所有用户的技能仓库的匹配度�
 - 限制与边界
   - 使用分页；暂不考虑速率限制与每日配额展示。
 
+### Application Resolution Model 【P0】
+
+- Application lifecycle uses two dimensions:
+  - `status`: pipeline stage only, such as `Pending -> Tailoring -> Ready -> Applied -> Phone Screen -> Interviewing -> Offer -> Rejected`
+  - `resolution`: whether the application is still actionable in the user's active queue
+- `status` and `resolution` must not duplicate each other:
+  - `Offer` and `Rejected` remain part of `status`
+  - they must not be represented again in `resolution`
+- `resolution` values for the first rollout:
+  - `ACTIVE`: default state, still visible in the main actionable queue
+  - `JOB_CLOSED`: the posting is closed before the user submits the application
+  - `USER_SKIPPED`: the user actively decides not to apply
+  - `STALE_NO_RESPONSE`: reserved for future automation; not enabled in the first rollout
+- Default list behavior:
+  - "My Applications" defaults to `resolution = ACTIVE`
+  - stopped applications must remain queryable through explicit filters
+- Job closed behavior:
+  - replace the current "mark expired" application action with `Mark as Job Closed`
+  - this action must mark the job as manually expired and set the related application `resolution = JOB_CLOSED`
+  - this action must not overwrite the application pipeline `status`
+- User skip behavior:
+  - users can explicitly move `Pending`, `Tailoring`, or `Ready` applications out of the active queue with `resolution = USER_SKIPPED`
+  - skipped items remain visible in history and filters
+- Historical data backfill:
+  - when this feature is introduced, applications linked to manually expired jobs should be backfilled to `JOB_CLOSED`
+  - only pre-submit applications should be backfilled: `Pending`, `Tailoring`, `Ready`
+  - already submitted applications (`Applied` and after) must keep their current `resolution = ACTIVE` unless updated later by a user action or future automation
+
 ### 进度可视化
 - 进度可视化看板 【P1】
   - 提供Kanban风格的可视化看板，按状态分列展示申请（Pending/Tailoring/Ready/Applied/Interviewing/Offer/Rejected）。

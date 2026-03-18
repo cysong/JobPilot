@@ -18,7 +18,13 @@ from app.modules.resumes.models import Document, Resume
 from app.modules.resumes.repository import DocumentRepository
 from app.modules.resumes.service import ResumeService
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
-from app.shared.enums import ApplicationStatus, EntityType, TailoringLevel, TaskType
+from app.shared.enums import (
+    ApplicationResolution,
+    ApplicationStatus,
+    EntityType,
+    TailoringLevel,
+    TaskType,
+)
 from app.shared.pagination import PaginatedResponse, PaginationParams
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 
@@ -26,6 +32,20 @@ from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 class ApplicationService:
     """Business logic for job applications and workflow orchestration."""
 
+    MANUAL_RESOLUTION_TRANSITIONS: dict[ApplicationResolution, set[ApplicationResolution]] = {
+        ApplicationResolution.ACTIVE: {
+            ApplicationResolution.JOB_CLOSED,
+            ApplicationResolution.USER_SKIPPED,
+        },
+        ApplicationResolution.JOB_CLOSED: set(),
+        ApplicationResolution.USER_SKIPPED: set(),
+        ApplicationResolution.STALE_NO_RESPONSE: set(),
+    }
+    RESOLUTION_ALLOWED_STATUSES: set[ApplicationStatus] = {
+        ApplicationStatus.PENDING,
+        ApplicationStatus.TAILORING,
+        ApplicationStatus.READY,
+    }
     ALLOWED_STATUS_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
         ApplicationStatus.PENDING: {ApplicationStatus.TAILORING},
         ApplicationStatus.TAILORING: {ApplicationStatus.READY, ApplicationStatus.FAILED},
@@ -62,6 +82,29 @@ class ApplicationService:
         application.tailoring_progress = progress
 
     @staticmethod
+    def _append_resolution_history(
+        application: Application,
+        from_resolution: ApplicationResolution,
+        to_resolution: ApplicationResolution,
+        operator_user_id: int,
+        note: str | None = None,
+    ) -> None:
+        """Append resolution transition record into tailoring_progress JSON."""
+        progress = dict(application.tailoring_progress or {})
+        history = list(progress.get("resolution_history", []))
+        history.append(
+            {
+                "changed_at": datetime.now(timezone.utc).isoformat(),
+                "from_resolution": from_resolution.value,
+                "to_resolution": to_resolution.value,
+                "operator_user_id": operator_user_id,
+                "note": note,
+            }
+        )
+        progress["resolution_history"] = history
+        application.tailoring_progress = progress
+
+    @staticmethod
     async def update_status(
         db: AsyncSession,
         application_id: str,
@@ -77,6 +120,12 @@ class ApplicationService:
         current_status = application.status
         if current_status == target_status:
             raise BadRequestError("Application is already in the target status")
+
+        if application.resolution != ApplicationResolution.ACTIVE:
+            raise BadRequestError(
+                f"Cannot change status while application resolution is {application.resolution.value}. "
+                "Only active applications can advance in the pipeline."
+            )
 
         allowed_targets = ApplicationService.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
         if target_status not in allowed_targets:
@@ -103,6 +152,71 @@ class ApplicationService:
         application.updated_at = now
         if target_status != ApplicationStatus.FAILED:
             application.last_error = None
+
+        await db.commit()
+        await db.refresh(application)
+        return application
+
+    @staticmethod
+    async def update_resolution(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+        target_resolution: ApplicationResolution,
+        note: str | None = None,
+    ) -> Application:
+        """Update application resolution with guarded transitions."""
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+
+        current_resolution = application.resolution
+        if current_resolution == target_resolution:
+            raise BadRequestError("Application is already in the target resolution")
+
+        if target_resolution == ApplicationResolution.STALE_NO_RESPONSE:
+            raise BadRequestError("STALE_NO_RESPONSE is reserved for future automatic workflows")
+
+        if application.status not in ApplicationService.RESOLUTION_ALLOWED_STATUSES:
+            allowed_labels = ", ".join(
+                sorted(status.value for status in ApplicationService.RESOLUTION_ALLOWED_STATUSES)
+            )
+            raise BadRequestError(
+                f"Resolution can only be changed for pre-submit applications. "
+                f"Allowed statuses: {allowed_labels}."
+            )
+
+        allowed_targets = ApplicationService.MANUAL_RESOLUTION_TRANSITIONS.get(current_resolution, set())
+        if target_resolution not in allowed_targets:
+            allowed_labels = ", ".join(
+                resolution.value for resolution in sorted(allowed_targets, key=lambda x: x.value)
+            )
+            raise BadRequestError(
+                f"Invalid resolution transition: {current_resolution.value} -> {target_resolution.value}. "
+                f"Allowed next resolutions: {allowed_labels or 'none'}."
+            )
+
+        now = datetime.now(timezone.utc)
+        ApplicationService._append_resolution_history(
+            application=application,
+            from_resolution=current_resolution,
+            to_resolution=target_resolution,
+            operator_user_id=user.id,
+            note=note,
+        )
+        application.resolution = target_resolution
+        application.resolved_at = now
+        application.resolution_note = note
+        application.updated_at = now
+
+        if target_resolution == ApplicationResolution.JOB_CLOSED:
+            job = application.job
+            if not job:
+                raise NotFoundError("Job not found")
+            job.manual_expired = True
+            job.manual_expired_by = user.id
+            job.manual_expired_at = now
+            job.manual_expired_note = note
 
         await db.commit()
         await db.refresh(application)
@@ -413,6 +527,7 @@ class ApplicationService:
         params: PaginationParams,
         keyword: str | None = None,
         status: ApplicationStatus | None = None,
+        resolution: ApplicationResolution | None = ApplicationResolution.ACTIVE,
     ) -> PaginatedResponse[Application]:
         """List applications for the current user with pagination helpers."""
         items, total = await ApplicationRepository.list_for_user(
@@ -421,6 +536,7 @@ class ApplicationService:
             params,
             keyword=keyword,
             status=status,
+            resolution=resolution,
         )
 
         return PaginatedResponse.create(
@@ -449,6 +565,11 @@ class ApplicationService:
         application = await ApplicationService.get_application_by_id(db, application_id, user)
         if not application:
             raise NotFoundError("Application not found")
+        if application.resolution != ApplicationResolution.ACTIVE:
+            raise BadRequestError(
+                f"Cannot retry application while resolution is {application.resolution.value}. "
+                "Only active applications can be retried."
+            )
         selected_tailoring_level = payload.tailoring_level or application.tailoring_level
 
         target_resume_id = payload.resume_template_id or application.source_resume_id

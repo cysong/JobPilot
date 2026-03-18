@@ -44,7 +44,7 @@ const getCompanyName = (application: Application): string =>
 
 const buildApplicationItem = (application: Application): DashboardApplicationItem => {
   const detailHref = `/applications/${application.id}`
-  const isExpired = Boolean(application.job?.is_expired)
+  const isExpired = application.resolution === 'JOB_CLOSED'
 
   let actionLabel = 'View Application'
   let actionHref = detailHref

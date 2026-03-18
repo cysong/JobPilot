@@ -1099,6 +1099,13 @@ enum ApplicationStatus {
   Rejected        // 被拒绝
 }
 
+enum ApplicationResolution {
+  ACTIVE              // still actionable in the main queue
+  JOB_CLOSED          // posting closed before submission
+  USER_SKIPPED        // user intentionally removed it from the active queue
+  STALE_NO_RESPONSE   // reserved for future automation; not used in first rollout
+}
+
 enum TaskStatus {
   PENDING         // 等待执行
   RUNNING         // 执行中
@@ -1309,6 +1316,9 @@ CREATE TABLE applications (
   source_resume_id TEXT NOT NULL,
   tailoring_level TEXT NOT NULL DEFAULT 'light',
   status application_status NOT NULL DEFAULT 'Pending',
+  resolution application_resolution NOT NULL DEFAULT 'ACTIVE',
+  resolved_at TIMESTAMPTZ,
+  resolution_note TEXT,
   resume_document_id TEXT,
   cover_letter_document_id TEXT,
   resume_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1328,11 +1338,34 @@ CREATE TABLE applications (
 
 CREATE INDEX idx_applications_user_updated_desc ON applications (user_id, updated_at DESC);
 CREATE INDEX idx_applications_user_status_deleted ON applications (user_id, status, is_deleted);
+CREATE INDEX idx_applications_user_resolution_updated_desc ON applications (user_id, resolution, updated_at DESC);
 CREATE INDEX idx_applications_user_deleted ON applications (user_id, is_deleted);
 CREATE INDEX idx_applications_status ON applications (status);
+CREATE INDEX idx_applications_resolution ON applications (resolution);
 CREATE INDEX idx_applications_resume_document_id ON applications (resume_document_id);
 CREATE INDEX idx_applications_cover_letter_document_id ON applications (cover_letter_document_id);
 ```
+
+#### Application lifecycle rules
+
+- `status` tracks pipeline progress only.
+- `resolution` tracks whether the application remains actionable.
+- `Offer` and `Rejected` stay in `status` and must not be duplicated in `resolution`.
+- First-rollout `resolution` values:
+  - `ACTIVE`
+  - `JOB_CLOSED`
+  - `USER_SKIPPED`
+  - `STALE_NO_RESPONSE` reserved for future automatic aging logic
+- Default applications list behavior should filter to `resolution = ACTIVE`.
+- `Mark as Job Closed` replaces the previous application-level expired toggle wording and must:
+  - set `seek_jobs.manual_expired = true`
+  - set `applications.resolution = JOB_CLOSED`
+  - preserve the current pipeline `status`
+- Historical backfill on migration:
+  - locate manually expired jobs
+  - update linked applications in `Pending`, `Tailoring`, or `Ready`
+  - set `resolution = JOB_CLOSED`
+  - keep submitted applications (`Applied` and after) unchanged
 
 ### timeline_events
 ```sql

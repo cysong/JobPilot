@@ -5,6 +5,7 @@ import type {
     ApplicationListResponse,
     CreateApplicationRequest,
     RetryApplicationRequest,
+    UpdateApplicationResolutionRequest,
     UpdateApplicationStatusRequest,
 } from '@/types/application';
 import type { ResumeExportRequest } from '@/types/resume';
@@ -36,6 +37,9 @@ export const applicationApi = {
         if (filters.status) {
             params.append('status', filters.status);
         }
+        if (filters.resolution && filters.resolution !== 'ACTIVE') {
+            params.append('resolution', filters.resolution);
+        }
 
         const result = await client.get<ApplicationListResponse, ApplicationListResponse>(
             `/applications?${params.toString()}`
@@ -50,6 +54,11 @@ export const applicationApi = {
 
     updateStatus: async (id: string, data: UpdateApplicationStatusRequest) => {
         const result = await client.patch<Application, Application>(`/applications/${id}/status`, data);
+        return result;
+    },
+
+    updateResolution: async (id: string, data: UpdateApplicationResolutionRequest) => {
+        const result = await client.patch<Application, Application>(`/applications/${id}/resolution`, data);
         return result;
     },
 

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 
 import { useApplications, useApplicationMutations } from '@/features/applications/hooks/useApplications'
+import { ApplicationResolutionBadge } from '@/features/applications/components/ApplicationResolutionBadge'
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
@@ -22,13 +23,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { JobPagination } from '@/features/jobs/components/JobPagination'
 import {
   JobAttributeList,
@@ -44,6 +38,7 @@ export default function ApplicationListingPage() {
         pageSize,
         keywordParam,
         statusParam,
+        resolutionParam,
         contextKey,
         keyword,
         setKeyword,
@@ -51,6 +46,7 @@ export default function ApplicationListingPage() {
         handleSearch,
         handleClearSearch,
         handleStatusChange,
+        handleResolutionChange,
         handleReset,
         updateSearchParams,
     } = useApplicationListState()
@@ -60,9 +56,10 @@ export default function ApplicationListingPage() {
         page_size: pageSize,
         keyword: keywordParam || undefined,
         status: statusParam || undefined,
+        resolution: resolutionParam || 'ACTIVE',
     }, isSearchParamsReady)
     const { retryCoverLetter } = useApplicationMutations()
-    const hasActiveFilters = Boolean(keywordParam || statusParam)
+    const hasActiveFilters = Boolean(keywordParam || statusParam || resolutionParam)
     const isListLoading = !isSearchParamsReady || isLoading
     const visibleApplicationIds = useMemo(
         () => (data?.items || []).map((item) => item.id),
@@ -123,6 +120,18 @@ export default function ApplicationListingPage() {
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="w-full sm:w-56">
+                    <Select value={resolutionParam || 'ACTIVE'} onValueChange={handleResolutionChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter by queue" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ACTIVE">Active Queue</SelectItem>
+                            <SelectItem value="JOB_CLOSED">Job Closed</SelectItem>
+                            <SelectItem value="USER_SKIPPED">Skipped</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
                 <Button onClick={handleReset} variant="outline">
                     Reset
                 </Button>
@@ -150,7 +159,7 @@ export default function ApplicationListingPage() {
                             <Button
                                 variant="link"
                                 className="mt-2 text-indigo-600"
-                                onClick={() => updateSearchParams({ keyword: '', status: null, page: 1 })}
+                                onClick={() => updateSearchParams({ keyword: '', status: null, resolution: null, page: 1 })}
                             >
                                 Clear filters
                             </Button>
@@ -194,17 +203,8 @@ export default function ApplicationListingPage() {
                                                         {app.job?.title || 'Unknown Job'}
                                                     </CardTitle>
                                                 </Link>
-                                                {app.job?.is_expired && (
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                Posting marked as closed on source site.
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
+                                                {app.resolution !== 'ACTIVE' && (
+                                                    <ApplicationResolutionBadge resolution={app.resolution} />
                                                 )}
                                             </div>
                                             <JobSourceCompanyLine
@@ -215,7 +215,9 @@ export default function ApplicationListingPage() {
                                                 iconClassName="h-4 w-4"
                                             />
                                         </div>
-                                        <ApplicationStatusBadge status={app.status} />
+                                        <div className="flex flex-col items-end gap-2">
+                                            <ApplicationStatusBadge status={app.status} />
+                                        </div>
                                     </div>
 
                                     <JobAttributeList
@@ -234,7 +236,7 @@ export default function ApplicationListingPage() {
                                                 Error: {app.last_error}
                                                 </span>
                                             )}
-                                            {app.status === 'Failed' && (
+                                            {app.status === 'Failed' && app.resolution === 'ACTIVE' && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"

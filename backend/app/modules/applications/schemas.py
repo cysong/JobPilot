@@ -4,8 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.shared.enums import ApplicationStatus, TailoringLevel
-from app.modules.jobs.schemas import JobBase
+from app.shared.enums import ApplicationResolution, ApplicationStatus, TailoringLevel
 from app.shared.pagination import PaginatedResponse
 
 
@@ -42,6 +41,35 @@ class ApplicationStatusUpdateRequest(BaseModel):
     )
 
 
+class ApplicationResolutionUpdateRequest(BaseModel):
+    """Request payload for updating application resolution manually."""
+
+    resolution: ApplicationResolution = Field(..., description="Target application resolution")
+    note: Optional[str] = Field(
+        default=None,
+        description="Optional note for resolution change history",
+        max_length=500,
+    )
+
+
+class ApplicationJobInfo(BaseModel):
+    """Job fields exposed within application responses."""
+
+    id: int
+    title: str
+    source: Optional[str] = None
+    advertiser_name: Optional[str] = None
+    company_name: Optional[str] = None
+    company_logo: Optional[str] = None
+    location_label: Optional[str] = None
+    work_types_label: Optional[str] = None
+    classification: Optional[str] = None
+    sub_classification: Optional[str] = None
+    share_link: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ApplicationResponse(BaseModel):
     """Base response for application resources."""
 
@@ -51,13 +79,16 @@ class ApplicationResponse(BaseModel):
     resume_document_id: Optional[str] = None
     cover_letter_document_id: Optional[str] = None
     status: ApplicationStatus
+    resolution: ApplicationResolution
+    resolved_at: Optional[datetime] = None
+    resolution_note: Optional[str] = None
     applied_at: Optional[datetime] = None
     offered_at: Optional[datetime] = None
     tailoring_level: TailoringLevel
     last_error: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    job: Optional[JobBase] = None
+    job: Optional[ApplicationJobInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 

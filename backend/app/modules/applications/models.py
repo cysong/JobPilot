@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
-from app.shared.enums import ApplicationStatus, TailoringLevel
+from app.shared.enums import ApplicationResolution, ApplicationStatus, TailoringLevel
 
 if TYPE_CHECKING:
     from app.modules.auth.models import User
@@ -82,6 +82,17 @@ class Application(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
+    resolution: Mapped[ApplicationResolution] = mapped_column(
+        SQLEnum(ApplicationResolution, native_enum=False),
+        default=ApplicationResolution.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     applied_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

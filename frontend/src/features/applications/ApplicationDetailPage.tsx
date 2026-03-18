@@ -17,13 +17,13 @@ import {
 } from 'lucide-react';
 
 import { useApplication, useApplicationMutations } from '@/features/applications/hooks/useApplications';
-import { useJobDetail, useJobExpirationMutations } from '@/features/jobs/hooks/useJobs';
+import { useJobDetail } from '@/features/jobs/hooks/useJobs';
 import { useResumes } from '@/features/resumes/hooks/useResumes';
 import { applicationApi } from '@/api/applications';
+import { ApplicationResolutionBadge } from '@/features/applications/components/ApplicationResolutionBadge';
 import { ApplicationStatusBadge } from '@/features/applications/components/ApplicationStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -39,13 +39,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/store/authStore';
-import type { ApplicationStatus, TailoringLevel } from '@/types/application';
+import type { ApplicationResolution, ApplicationStatus, TailoringLevel } from '@/types/application';
 import { buildApplicationPdfFilename } from '@/utils/pdfFilename';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { JobDescriptionHtml } from '@/components/job/JobDescriptionHtml';
 import { JobLanguageSelect } from '@/components/job/JobLanguageSelect';
@@ -118,8 +114,7 @@ export default function ApplicationDetailPage() {
     const [searchParams] = useSearchParams();
     const serializedSearchParams = searchParams.toString();
     const { data: application, isLoading, isError } = useApplication(applicationId || '');
-    const { retryCoverLetter, updateStatus } = useApplicationMutations();
-    const { setJobExpiration } = useJobExpirationMutations();
+    const { retryCoverLetter, updateStatus, updateResolution } = useApplicationMutations();
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes();
     const { user } = useAuthStore();
     const { toast } = useToast();
@@ -313,11 +308,8 @@ export default function ApplicationDetailPage() {
       updateStatus.mutate({ id: application.id, status });
     };
 
-    const handleToggleExpiration = () => {
-      setJobExpiration.mutate({
-        jobId: application.job_id,
-        manualExpired: !application.job?.manual_expired,
-      });
+    const handleResolutionUpdate = (resolution: ApplicationResolution) => {
+      updateResolution.mutate({ id: application.id, resolution });
     };
 
     const handleJdLanguageChange = (value: string) => {
@@ -328,10 +320,12 @@ export default function ApplicationDetailPage() {
     };
 
     const availableStatusActions = STATUS_ACTIONS[application.status] || [];
-    const statusActions = application.job?.is_expired
-      ? availableStatusActions.filter((action) => action.nextStatus !== 'Applied')
-      : availableStatusActions;
-    const canToggleExpired = !APPLIED_AND_AFTER_STATUSES.includes(application.status);
+    const isApplicationActive = application.resolution === 'ACTIVE';
+    const statusActions = isApplicationActive ? availableStatusActions : [];
+    const canResolveApplication =
+      isApplicationActive &&
+      !APPLIED_AND_AFTER_STATUSES.includes(application.status) &&
+      !['Failed'].includes(application.status);
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
         {/* Header */}
@@ -351,7 +345,7 @@ export default function ApplicationDetailPage() {
               </Button>
               <div ref={headerActionsRef} className="flex flex-wrap items-center justify-end gap-2">
                 {application.job?.share_link &&
-                  !application.job?.is_expired &&
+                  isApplicationActive &&
                   (
                   <Button variant="default" size="sm" asChild>
                     <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
@@ -374,22 +368,35 @@ export default function ApplicationDetailPage() {
                     {action.label}
                   </Button>
                 ))}
-                {canToggleExpired && (
+                {canResolveApplication && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleToggleExpiration}
-                    disabled={setJobExpiration.isPending}
-                    className={
-                      application.job?.manual_expired
-                        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'
-                        : 'border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800'
-                    }
+                    onClick={() => handleResolutionUpdate('JOB_CLOSED')}
+                    disabled={updateResolution.isPending}
+                    className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                   >
-                    {application.job?.manual_expired ? 'Mark as Active' : 'Mark as Expired'}
+                    {updateResolution.isPending && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
+                    Mark as Job Closed
                   </Button>
                 )}
-                <ApplicationStatusBadge status={application.status} />
+                {canResolveApplication && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleResolutionUpdate('USER_SKIPPED')}
+                    disabled={updateResolution.isPending}
+                    className="border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    {updateResolution.isPending && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
+                    Skip Application
+                  </Button>
+                )}
+	                <ApplicationStatusBadge status={application.status} />
               </div>
             </div>
           </div>
@@ -401,28 +408,19 @@ export default function ApplicationDetailPage() {
             <CardContent className="space-y-4 p-6">
               <div className="flex justify-between items-start gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-2xl font-bold text-slate-900">
-                      {application.job?.title || "Unknown Job"}
-                    </CardTitle>
-                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
-                      <Link to={`/jobs/${application.job_id}`} aria-label="View job details">
-                        <ExternalLink className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    {application.job?.is_expired && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Posting marked as closed on source site.
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
+		                  <div className="flex items-center gap-2">
+		                    <CardTitle className="text-2xl font-bold text-slate-900">
+		                      {application.job?.title || "Unknown Job"}
+		                    </CardTitle>
+		                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
+		                      <Link to={`/jobs/${application.job_id}`} aria-label="View job details">
+		                        <ExternalLink className="h-4 w-4" />
+		                      </Link>
+		                    </Button>
+		                    {application.resolution !== 'ACTIVE' && (
+		                      <ApplicationResolutionBadge resolution={application.resolution} />
+		                    )}
+		                  </div>
                   <JobSourceCompanyLine
                     source={application.job?.source}
                     companyName={application.job?.company_name}
@@ -616,10 +614,10 @@ export default function ApplicationDetailPage() {
                 )}
               </div>
 
-              {['Ready', 'Failed'].includes(application.status) && (
-                <div className="flex justify-end pt-2">
-                  <Button
-                    variant="outline"
+	              {['Ready', 'Failed'].includes(application.status) && application.resolution === 'ACTIVE' && (
+	                <div className="flex justify-end pt-2">
+	                  <Button
+	                    variant="outline"
                     onClick={openRetryDialog}
                     disabled={retryCoverLetter.isPending}
                   >

@@ -9,6 +9,12 @@ export type ApplicationStatus =
     | 'Rejected'
     | 'Failed';
 
+export type ApplicationResolution =
+    | 'ACTIVE'
+    | 'JOB_CLOSED'
+    | 'USER_SKIPPED'
+    | 'STALE_NO_RESPONSE';
+
 export type TailoringLevel = 'light' | 'moderate' | 'deep'
 
 export interface Application {
@@ -16,12 +22,15 @@ export interface Application {
     user_id: string;
     job_id: number;
     status: ApplicationStatus;
+    resolution: ApplicationResolution;
     source_resume_id: string;
     resume_document_id?: string;
     cover_letter_document_id?: string;
     tailoring_level: TailoringLevel;
     last_error?: string;
     created_at: string;
+    resolved_at?: string | null;
+    resolution_note?: string | null;
     applied_at?: string | null;
     offered_at?: string | null;
     updated_at: string;
@@ -39,8 +48,6 @@ export interface Application {
         classification?: string | null;
         sub_classification?: string | null;
         share_link?: string;
-        is_expired?: boolean;
-        manual_expired?: boolean;
     };
 }
 
@@ -60,9 +67,15 @@ export interface UpdateApplicationStatusRequest {
     note?: string;
 }
 
+export interface UpdateApplicationResolutionRequest {
+    resolution: ApplicationResolution;
+    note?: string;
+}
+
 export interface ApplicationListRequest {
     keyword?: string;
     status?: ApplicationStatus;
+    resolution?: ApplicationResolution;
     page: number;
     page_size: number;
 }
