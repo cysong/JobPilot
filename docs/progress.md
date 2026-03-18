@@ -1367,3 +1367,10 @@ None at this stage.
 - Added `backend/app/core/llm/providers.py` to build provider runtime wiring for OpenAI and MiniMax.
 - Updated `AgentGateway` to construct provider-aware `RunConfig` instances through the new provider runtime helper.
 - Kept default behavior backward-compatible by continuing to use OpenAI unless a different provider is explicitly selected later.
+
+### 2026-03-18 - Multi-Provider LLM Phase 2 Agent-Level Provider Selection
+
+**Completed Tasks:**
+- Extended `AgentLoader` to read an optional `provider` field from agent YAML and attach normalized provider metadata to loaded agents.
+- Kept backward compatibility so agents without `provider` continue to use the default provider.
+- Switched `backend/agent_configs/config/job_analyzer.yaml` to MiniMax for the pilot provider-routing path.

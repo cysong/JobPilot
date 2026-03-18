@@ -15,6 +15,7 @@ from agents.model_settings import ModelSettings
 from agent_configs.schemas import SCHEMA_REGISTRY
 from app.core.config import settings
 from app.core.llm.config import llm_gateway_settings
+from app.core.llm.providers import normalize_provider_name
 
 # Ensure OpenAI client finds credentials when using agents SDK
 if settings.OPENAI_API_KEY:
@@ -96,6 +97,7 @@ class AgentLoader:
 
         agent = Agent(**agent_kwargs)
         setattr(agent, "agent_id", agent_id)
+        setattr(agent, "provider", self._resolve_provider(config))
         setattr(agent, "config_version", config.get("version"))
         setattr(agent, "max_turns", self._resolve_max_turns(config, agent_id))
 
@@ -197,3 +199,7 @@ class AgentLoader:
                 f"Invalid max_turns for agent '{agent_id}': expected positive integer"
             )
         return max_turns
+
+    def _resolve_provider(self, config: dict[str, Any]) -> str:
+        """Resolve optional per-agent provider with backward-compatible default."""
+        return normalize_provider_name(config.get("provider"))

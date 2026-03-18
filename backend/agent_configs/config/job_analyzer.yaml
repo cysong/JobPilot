@@ -1,11 +1,18 @@
 version: 1
 name: job_analyzer
-model: gpt-5-mini
+provider: minimax
+model: MiniMax-M2.5
 model_settings:
-  max_tokens: 5000
+  temperature: 0.2
+  top_p: 0.9
+  tool_choice: none
   reasoning:
     effort: low
   verbosity: low
+  extra_body:
+    reasoning_split: true
+  extra_args:
+    max_completion_tokens: 5000
 
 instructions: |
   You are a professional recruiter AI analyzing job descriptions.
