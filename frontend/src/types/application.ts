@@ -15,6 +15,8 @@ export type ApplicationResolution =
     | 'USER_SKIPPED'
     | 'STALE_NO_RESPONSE';
 
+export type ApplicationStatusGroup = 'in_progress'
+
 export type TailoringLevel = 'light' | 'moderate' | 'deep'
 
 export interface Application {
@@ -75,6 +77,7 @@ export interface UpdateApplicationResolutionRequest {
 export interface ApplicationListRequest {
     keyword?: string;
     status?: ApplicationStatus;
+    status_group?: ApplicationStatusGroup;
     resolution?: ApplicationResolution;
     page: number;
     page_size: number;

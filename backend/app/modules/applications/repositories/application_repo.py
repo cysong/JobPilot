@@ -83,6 +83,7 @@ class ApplicationRepository:
         params: PaginationParams,
         keyword: str | None = None,
         status: ApplicationStatus | None = None,
+        status_group: str | None = None,
         resolution: ApplicationResolution | None = None,
     ) -> tuple[list[Application], int]:
         base_query = (
@@ -103,6 +104,20 @@ class ApplicationRepository:
 
         if status:
             base_query = base_query.where(Application.status == status)
+
+        if status_group == "in_progress":
+            base_query = base_query.where(
+                Application.status.in_(
+                    [
+                        ApplicationStatus.PENDING,
+                        ApplicationStatus.TAILORING,
+                        ApplicationStatus.READY,
+                        ApplicationStatus.APPLIED,
+                        ApplicationStatus.PHONE_SCREEN,
+                        ApplicationStatus.INTERVIEWING,
+                    ]
+                )
+            )
 
         if resolution:
             base_query = base_query.where(Application.resolution == resolution)

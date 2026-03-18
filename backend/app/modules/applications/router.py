@@ -33,6 +33,7 @@ async def list_applications(
     params: Annotated[PaginationParams, Depends()],
     keyword: str | None = Query(None, description="Search by job title or company"),
     status: ApplicationStatus | None = Query(None, description="Filter by application status"),
+    status_group: str | None = Query(None, description="Filter by status group, e.g. in_progress"),
     resolution: ApplicationResolution | None = Query(
         ApplicationResolution.ACTIVE,
         description="Filter by application resolution; defaults to ACTIVE",
@@ -45,6 +46,7 @@ async def list_applications(
         params,
         keyword=keyword,
         status=status,
+        status_group=status_group,
         resolution=resolution,
     )
 

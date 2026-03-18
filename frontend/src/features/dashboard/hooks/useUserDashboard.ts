@@ -256,10 +256,10 @@ const buildMetrics = ({
   finalizedResumeCount: number
 }): DashboardMetric[] => [
   {
-    label: 'Active Applications',
+    label: 'In-progress',
     value: applicationSnapshot.activeCount,
     helper: 'Applications in progress',
-    href: '/applications',
+    href: '/applications?resolution=ACTIVE&status_group=in_progress',
   },
   {
     label: 'Ready to Apply',

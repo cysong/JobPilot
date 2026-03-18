@@ -527,15 +527,19 @@ class ApplicationService:
         params: PaginationParams,
         keyword: str | None = None,
         status: ApplicationStatus | None = None,
+        status_group: str | None = None,
         resolution: ApplicationResolution | None = ApplicationResolution.ACTIVE,
     ) -> PaginatedResponse[Application]:
         """List applications for the current user with pagination helpers."""
+        if status_group and status_group != "in_progress":
+            raise BadRequestError("Unsupported status_group filter")
         items, total = await ApplicationRepository.list_for_user(
             db,
             user.id,
             params,
             keyword=keyword,
             status=status,
+            status_group=status_group,
             resolution=resolution,
         )
 

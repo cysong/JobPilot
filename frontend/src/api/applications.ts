@@ -37,6 +37,9 @@ export const applicationApi = {
         if (filters.status) {
             params.append('status', filters.status);
         }
+        if (filters.status_group) {
+            params.append('status_group', filters.status_group);
+        }
         if (filters.resolution && filters.resolution !== 'ACTIVE') {
             params.append('resolution', filters.resolution);
         }

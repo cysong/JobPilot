@@ -38,6 +38,7 @@ export default function ApplicationListingPage() {
         pageSize,
         keywordParam,
         statusParam,
+        statusGroupParam,
         resolutionParam,
         contextKey,
         keyword,
@@ -56,10 +57,11 @@ export default function ApplicationListingPage() {
         page_size: pageSize,
         keyword: keywordParam || undefined,
         status: statusParam || undefined,
+        status_group: statusGroupParam || undefined,
         resolution: resolutionParam || 'ACTIVE',
     }, isSearchParamsReady)
     const { retryCoverLetter } = useApplicationMutations()
-    const hasActiveFilters = Boolean(keywordParam || statusParam || resolutionParam)
+    const hasActiveFilters = Boolean(keywordParam || statusParam || statusGroupParam || resolutionParam)
     const isListLoading = !isSearchParamsReady || isLoading
     const visibleApplicationIds = useMemo(
         () => (data?.items || []).map((item) => item.id),
@@ -102,12 +104,13 @@ export default function ApplicationListingPage() {
                     )}
                 </form>
                 <div className="w-full sm:w-56">
-                    <Select value={statusParam || 'all'} onValueChange={handleStatusChange}>
+                    <Select value={statusGroupParam || statusParam || 'all'} onValueChange={handleStatusChange}>
                         <SelectTrigger>
                             <SelectValue placeholder="Filter by status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
                             <SelectItem value="Pending">Pending</SelectItem>
                             <SelectItem value="Tailoring">Tailoring</SelectItem>
                             <SelectItem value="Ready">Ready</SelectItem>
@@ -159,7 +162,7 @@ export default function ApplicationListingPage() {
                             <Button
                                 variant="link"
                                 className="mt-2 text-indigo-600"
-                                onClick={() => updateSearchParams({ keyword: '', status: null, resolution: null, page: 1 })}
+                                onClick={() => updateSearchParams({ keyword: '', status: null, statusGroup: null, resolution: null, page: 1 })}
                             >
                                 Clear filters
                             </Button>
