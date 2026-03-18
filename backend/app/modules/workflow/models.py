@@ -87,6 +87,8 @@ class AICall(Base, TimestampMixin):
     user_id: Mapped[int] = mapped_column(ForeignKey(
         "users.id", ondelete="SET NULL"), nullable=True, index=True)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_provider: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True)
     agent_id: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=False)
     agent_version: Mapped[Optional[str]] = mapped_column(
@@ -105,7 +107,7 @@ class AICall(Base, TimestampMixin):
         default=AICallStatus.PENDING,
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    meta: Mapped[Optional[dict]] = mapped_column(
+    metadata_: Mapped[Optional[dict]] = mapped_column(
         "metadata", JSON, nullable=True)
 
     task: Mapped[Optional["TaskExecution"]] = relationship("TaskExecution")

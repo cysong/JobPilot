@@ -135,6 +135,7 @@ class AICallRepository:
         agent_id: str,
         agent_version: str,
         model: str,
+        model_provider: str,
         status: AICallStatus,
         latency_ms: int,
         input_tokens: Optional[int] = None,
@@ -143,7 +144,7 @@ class AICallRepository:
         requests: Optional[int] = None,
         estimated_cost: Optional[float] = None,
         error_message: Optional[str] = None,
-        meta: Optional[dict] = None,
+        metadata: Optional[dict] = None,
     ) -> AICall:
         """
         Create a new AI call record.
@@ -156,6 +157,7 @@ class AICallRepository:
             agent_id: Agent identifier
             agent_version: Agent configuration version
             model: Model name (e.g., "gpt-4o")
+            model_provider: Provider name (e.g., "openai", "minimax")
             status: Call status (SUCCESS, ERROR, etc.)
             latency_ms: Call latency in milliseconds
             input_tokens: Number of input tokens
@@ -164,7 +166,7 @@ class AICallRepository:
             requests: Number of API requests made
             estimated_cost: Estimated cost in USD
             error_message: Error message if failed
-            meta: Additional metadata
+            metadata: Additional metadata
 
         Returns:
             Created AICall instance
@@ -173,6 +175,7 @@ class AICallRepository:
             task_id=task_id,
             user_id=user_id,
             model=model,
+            model_provider=model_provider,
             agent_id=agent_id,
             agent_version=agent_version,
             status=status,
@@ -183,7 +186,7 @@ class AICallRepository:
             requests=requests,
             estimated_cost=estimated_cost,
             error_message=error_message,
-            meta=meta or {},
+            metadata_=metadata or {},
         )
         db.add(ai_call)
         await db.flush()

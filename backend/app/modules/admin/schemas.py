@@ -107,6 +107,7 @@ class TaskListResponse(AdminBase):
 class AICallDetail(AdminBase):
     id: str
     model: str
+    model_provider: str = Field(..., alias="modelProvider")
     agent_id: Optional[str] = Field(None, alias="agentId")
     input_tokens: Optional[int] = Field(None, alias="inputTokens")
     output_tokens: Optional[int] = Field(None, alias="outputTokens")
@@ -115,6 +116,7 @@ class AICallDetail(AdminBase):
     latency_ms: Optional[int] = Field(None, alias="latencyMs")
     status: str
     error_message: Optional[str] = Field(None, alias="errorMessage")
+    metadata: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(..., alias="createdAt")
 
 

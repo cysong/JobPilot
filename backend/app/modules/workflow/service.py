@@ -506,6 +506,7 @@ class TaskService:
             {
                 "id": ac.id,
                 "model": ac.model,
+                "model_provider": ac.model_provider,
                 "agent_id": ac.agent_id,
                 "input_tokens": ac.input_tokens,
                 "output_tokens": ac.output_tokens,
@@ -514,6 +515,7 @@ class TaskService:
                 "latency_ms": ac.latency_ms,
                 "status": ac.status,
                 "error_message": ac.error_message,
+                "metadata": ac.metadata_,
                 "created_at": ac.created_at,
             }
             for ac in ai_calls.scalars().all()

@@ -100,6 +100,7 @@ class AgentLoader:
         setattr(agent, "provider", self._resolve_provider(config))
         setattr(agent, "config_version", config.get("version"))
         setattr(agent, "max_turns", self._resolve_max_turns(config, agent_id))
+        setattr(agent, "config_metadata", self._build_config_metadata(config, agent_id))
 
         # Store in cache if enabled
         if settings.CACHE_ENABLED:
@@ -203,3 +204,22 @@ class AgentLoader:
     def _resolve_provider(self, config: dict[str, Any]) -> str:
         """Resolve optional per-agent provider with backward-compatible default."""
         return normalize_provider_name(config.get("provider"))
+
+    def _build_config_metadata(
+        self,
+        config: dict[str, Any],
+        agent_id: str,
+    ) -> dict[str, Any]:
+        """Extract a stable subset of YAML config for observability metadata."""
+        return {
+            "agent_id": agent_id,
+            "name": config.get("name", agent_id),
+            "version": config.get("version"),
+            "provider": self._resolve_provider(config),
+            "model": config.get("model"),
+            "output_type": config.get("output_type"),
+            "max_turns": self._resolve_max_turns(config, agent_id),
+            "model_settings": config.get("model_settings") or {},
+            "tools": config.get("tools") or [],
+            "handoffs": config.get("handoffs") or [],
+        }

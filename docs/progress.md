@@ -1380,3 +1380,14 @@ None at this stage.
 **Completed Tasks:**
 - Added shared recursive storage sanitization helpers to strip NUL bytes and unsupported control characters from strings before DB persistence.
 - Applied the shared sanitization path to job analysis create/upsert persistence so both plain text and JSON-backed analysis fields are cleaned consistently.
+
+### 2026-03-18 - AI Call Provider Tracking and Agent Config Metadata
+
+**Completed Tasks:**
+- Added MiniMax model pricing entries to the LLM pricing table for cost estimation.
+- Added `model_provider` to `ai_calls` persistence and created an Alembic migration for the new column.
+- Extended AI call recording to persist provider name alongside model name.
+- Attached stable agent config metadata to loaded agents and stored key YAML config fields in `ai_calls.metadata.agent_config`.
+- Exposed `model_provider` and `metadata` in admin task detail AI call payloads for inspection.
+- Renamed AI call code-side metadata handling from `meta` to `metadata` for consistency with the database column name.
+- Made `ai_calls.model_provider` non-null with default `openai` and added migration backfill for historical rows using stored metadata and model-name heuristics.

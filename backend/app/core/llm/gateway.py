@@ -273,6 +273,7 @@ class AgentGateway:
             # Persist usage records in an independent transaction so task rollbacks
             # don't erase observability data on failures/retries.
             async with async_session_factory() as db:
+                agent_config_metadata = getattr(agent, "config_metadata", {}) or {}
                 await AICallRepository.create(
                     db,
                     task_id=task_id,
@@ -280,6 +281,7 @@ class AgentGateway:
                     agent_id=agent_id,
                     agent_version=agent_version_str,
                     model=getattr(agent, "model", ""),
+                    model_provider=model_provider,
                     status=ai_call_status,
                     latency_ms=latency_ms,
                     input_tokens=getattr(usage, "input_tokens",
@@ -291,10 +293,12 @@ class AgentGateway:
                     requests=getattr(usage, "requests", None) if usage else None,
                     estimated_cost=estimated_cost,
                     error_message=error_message,
-                    meta={
+                    metadata={
                         "operation": context.get("operation"),
                         "agent_id": agent_id,
-                        "provider": getattr(agent, "provider", None),
+                        "provider": model_provider,
+                        "agent_version": agent_version_str,
+                        "agent_config": agent_config_metadata,
                     },
                 )
                 await db.commit()
