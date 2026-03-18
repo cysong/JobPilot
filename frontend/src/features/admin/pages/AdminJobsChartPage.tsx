@@ -164,6 +164,14 @@ function renderScatterPoint(props: {
   )
 }
 
+function ChartStateBox({ message }: { message: string }) {
+  return (
+    <div className="flex h-[24rem] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
+      {message}
+    </div>
+  )
+}
+
 export default function AdminJobsChartPage() {
   const [trendDays, setTrendDays] = useState(30)
   const [scatterDays, setScatterDays] = useState(7)
@@ -284,9 +292,9 @@ export default function AdminJobsChartPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {trendQuery.isLoading && <div className="text-sm text-slate-600">Loading chart...</div>}
+          {trendQuery.isLoading && <ChartStateBox message="Loading chart..." />}
           {!trendQuery.isLoading && (!data || series.length === 0) && (
-            <div className="text-sm text-slate-600">No data.</div>
+            <ChartStateBox message="No data." />
           )}
           {!trendQuery.isLoading && data && series.length > 0 && (
             <div className="space-y-4">
@@ -398,9 +406,9 @@ export default function AdminJobsChartPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {scatterQuery.isLoading && <div className="text-sm text-slate-600">Loading scatter chart...</div>}
+          {scatterQuery.isLoading && <ChartStateBox message="Loading scatter chart..." />}
           {!scatterQuery.isLoading && (!scatterData || scatterPoints.length === 0) && (
-            <div className="text-sm text-slate-600">No scatter data.</div>
+            <ChartStateBox message="No scatter data." />
           )}
           {!scatterQuery.isLoading && scatterData && scatterPoints.length > 0 && (
             <div className="space-y-4">
