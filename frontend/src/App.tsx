@@ -21,6 +21,7 @@ import { SkillsPage } from '@/features/skills/SkillsPage'
 import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
 import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
 import AdminJobsChartPage from '@/features/admin/pages/AdminJobsChartPage'
+import AdminAIUsageChartPage from '@/features/admin/pages/AdminAIUsageChartPage'
 import { Role } from '@/types/auth'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -74,6 +75,7 @@ function App() {
           <Route element={<ProtectedRoute requiredRole={Role.ADMIN}><AdminLayout /></ProtectedRoute>}>
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/jobs/chart" element={<AdminJobsChartPage />} />
+            <Route path="/admin/ai/charts" element={<AdminAIUsageChartPage />} />
             <Route path="/admin/tasks" element={<TaskMonitorPage />} />
           </Route>
 

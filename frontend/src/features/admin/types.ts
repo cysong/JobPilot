@@ -56,6 +56,24 @@ export interface JobsTimeScatterResponse {
   points: JobsTimeScatterPoint[]
 }
 
+export interface AIUsageDailyTrendPoint {
+  date: string
+  value: number
+}
+
+export interface AIUsageDailyTrendSeries {
+  name: string
+  points: AIUsageDailyTrendPoint[]
+}
+
+export interface AIUsageDailyTrendResponse {
+  timezone: string
+  startDate: string
+  endDate: string
+  models: string[]
+  series: AIUsageDailyTrendSeries[]
+}
+
 export interface WorkerStatus {
   id: string
   hostname: string

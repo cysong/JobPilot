@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.modules.admin.schemas import (
+    AIUsageDailyTrendPoint,
+    AIUsageDailyTrendResponse,
+    AIUsageDailyTrendSeries,
     DashboardStats,
     FloatMetricCount,
     JobsDailyTrendPoint,
@@ -282,3 +285,102 @@ class AdminService:
             sources=sorted(all_sources),
             points=points,
         )
+
+    @staticmethod
+    async def _get_ai_usage_daily_trend(
+        db: AsyncSession,
+        days: int,
+        metric_expr,
+    ) -> AIUsageDailyTrendResponse:
+        """Return daily AI usage totals and per-model series."""
+        days = max(7, min(days, 90))
+        app_tz, tz_name = AdminService._app_timezone()
+
+        today_local = datetime.now(app_tz).date()
+        start_date = today_local - timedelta(days=days - 1)
+        end_date = today_local
+
+        start_local_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=app_tz)
+        end_exclusive_local_dt = datetime.combine(
+            end_date + timedelta(days=1), datetime.min.time(), tzinfo=app_tz
+        )
+
+        start_utc = start_local_dt.astimezone(timezone.utc)
+        end_exclusive_utc = end_exclusive_local_dt.astimezone(timezone.utc)
+
+        model_name = func.coalesce(func.nullif(func.trim(AICall.model), ""), "Unknown")
+        local_date = cast(func.timezone(tz_name, AICall.created_at), Date)
+
+        rows = (
+            await db.execute(
+                select(
+                    local_date.label("local_date"),
+                    model_name.label("model_name"),
+                    func.coalesce(func.sum(metric_expr), 0).label("metric_value"),
+                )
+                .where(
+                    AICall.created_at.isnot(None),
+                    AICall.created_at >= start_utc,
+                    AICall.created_at < end_exclusive_utc,
+                )
+                .group_by("local_date", "model_name")
+                .order_by("local_date", "model_name")
+            )
+        ).all()
+
+        by_model_and_date: dict[str, dict[date, float]] = {}
+        all_models: set[str] = set()
+
+        for local_day, model, value in rows:
+            if local_day is None:
+                continue
+            model_key = str(model)
+            all_models.add(model_key)
+            by_model_and_date.setdefault(model_key, {})[local_day] = float(value or 0)
+
+        sorted_models = sorted(all_models)
+        dates = [start_date + timedelta(days=i) for i in range(days)]
+
+        series: list[AIUsageDailyTrendSeries] = []
+
+        total_points: list[AIUsageDailyTrendPoint] = []
+        for day in dates:
+            total_value = sum(by_model_and_date.get(model, {}).get(day, 0) for model in sorted_models)
+            total_points.append(AIUsageDailyTrendPoint(date=day.isoformat(), value=total_value))
+        series.append(AIUsageDailyTrendSeries(name="Total", points=total_points))
+
+        for model in sorted_models:
+            points = [
+                AIUsageDailyTrendPoint(
+                    date=day.isoformat(),
+                    value=by_model_and_date.get(model, {}).get(day, 0),
+                )
+                for day in dates
+            ]
+            series.append(AIUsageDailyTrendSeries(name=model, points=points))
+
+        return AIUsageDailyTrendResponse(
+            timezone=tz_name,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            models=sorted_models,
+            series=series,
+        )
+
+    @staticmethod
+    @jcache("admin:ai:tokens-daily-trend:{days}", ttl=300)
+    async def get_ai_tokens_daily_trend(
+        db: AsyncSession,
+        days: int = 30,
+    ) -> AIUsageDailyTrendResponse:
+        """Return daily token consumption totals and per-model series."""
+        return await AdminService._get_ai_usage_daily_trend(db, days, AICall.total_tokens)
+
+    @staticmethod
+    @jcache("admin:ai:cost-daily-trend:{days}", ttl=300)
+    async def get_ai_cost_daily_trend(
+        db: AsyncSession,
+        days: int = 30,
+    ) -> AIUsageDailyTrendResponse:
+        """Return daily estimated USD cost totals and per-model series."""
+        return await AdminService._get_ai_usage_daily_trend(db, days, AICall.estimated_cost)

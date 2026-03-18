@@ -70,6 +70,24 @@ class JobsTimeScatterResponse(AdminBase):
     points: List[JobsTimeScatterPoint]
 
 
+class AIUsageDailyTrendPoint(AdminBase):
+    date: str
+    value: float
+
+
+class AIUsageDailyTrendSeries(AdminBase):
+    name: str
+    points: List[AIUsageDailyTrendPoint]
+
+
+class AIUsageDailyTrendResponse(AdminBase):
+    timezone: str
+    start_date: str = Field(..., alias="startDate")
+    end_date: str = Field(..., alias="endDate")
+    models: List[str]
+    series: List[AIUsageDailyTrendSeries]
+
+
 # ===== Worker Monitor =====
 class WorkerStatus(AdminBase):
     id: str

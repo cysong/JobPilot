@@ -11,6 +11,37 @@
 
 ## Work Log
 
+### 2026-03-18 - Admin AI Usage Charts Page and Dashboard Links
+
+- Added backend admin daily AI usage trend APIs:
+  - `GET /api/v1/admin/ai/tokens-daily-trend?days=30`
+  - `GET /api/v1/admin/ai/cost-daily-trend?days=30`
+- Both APIs:
+  - use app local timezone
+  - aggregate by local day
+  - include one `Total` series
+  - include per-model series
+  - fill missing dates with `0`
+- Added frontend admin AI usage charts page:
+  - new page: `AdminAIUsageChartPage`
+  - route: `/admin/ai/charts`
+  - chart sections:
+    - `#tokens`
+    - `#cost`
+- Added frontend API and hooks:
+  - `adminApi.getAITokensDailyTrend`
+  - `adminApi.getAICostDailyTrend`
+  - `useAITokensDailyTrend`
+  - `useAICostDailyTrend`
+- Updated admin dashboard cards:
+  - `Jobs` links to `/admin/jobs/chart`
+  - `Tokens` links to `/admin/ai/charts#tokens`
+  - `Est. Cost` links to `/admin/ai/charts#cost`
+- Validation:
+  - `python -m compileall backend/app/modules/admin` passed
+  - `pnpm exec tsc -b` passed
+  - `pnpm run build` passed
+
 ### 2026-03-18 - Admin Dashboard AI Usage Metrics
 
 - Extended admin dashboard stats with two new top-level metrics from `ai_calls`:

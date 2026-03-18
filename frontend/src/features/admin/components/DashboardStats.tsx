@@ -9,7 +9,21 @@ interface Props {
   onRefresh?: () => void
 }
 
-const cards = [
+interface DashboardCardTheme {
+  border: string
+  tint: string
+  accent: string
+  title: string
+}
+
+interface DashboardCardConfig {
+  key: keyof DashboardStats
+  label: string
+  href?: string
+  theme: DashboardCardTheme
+}
+
+const cards: DashboardCardConfig[] = [
   {
     key: 'users',
     label: 'Users',
@@ -23,6 +37,7 @@ const cards = [
   {
     key: 'jobs',
     label: 'Jobs',
+    href: '/admin/jobs/chart',
     theme: {
       border: 'border-blue-300',
       tint: 'from-blue-100 via-white to-slate-50',
@@ -63,6 +78,7 @@ const cards = [
   {
     key: 'aiTokens',
     label: 'Tokens',
+    href: '/admin/ai/charts#tokens',
     theme: {
       border: 'border-cyan-300',
       tint: 'from-cyan-100 via-white to-slate-50',
@@ -73,6 +89,7 @@ const cards = [
   {
     key: 'aiCost',
     label: 'Est. Cost',
+    href: '/admin/ai/charts#cost',
     theme: {
       border: 'border-rose-300',
       tint: 'from-rose-100 via-white to-stone-50',
@@ -132,7 +149,7 @@ export function DashboardStats({ data, isLoading }: Props) {
       {cards.map((card) => {
         const item = data?.[card.key]
         const taskItem = card.key === 'tasks' ? (item as TaskMetric | undefined) : undefined
-        const isJobsCard = card.key === 'jobs'
+        const isLinkedCard = !!card.href
         return (
           <Card
             key={card.key}
@@ -140,9 +157,9 @@ export function DashboardStats({ data, isLoading }: Props) {
               'relative overflow-hidden border shadow-sm transition-all',
               card.theme.border,
               `bg-gradient-to-br ${card.theme.tint}`,
-              isJobsCard && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:ring-2 hover:ring-blue-200 focus-within:ring-2 focus-within:ring-blue-200'
+              isLinkedCard && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:ring-2 hover:ring-blue-200 focus-within:ring-2 focus-within:ring-blue-200'
             )}
-            onClick={isJobsCard ? () => navigate('/admin/jobs/chart') : undefined}
+            onClick={card.href ? () => navigate(card.href as string) : undefined}
           >
             <CardHeader className="pb-2">
               <CardTitle className={cn('text-sm font-medium', card.theme.title)}>{card.label}</CardTitle>
