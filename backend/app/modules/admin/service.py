@@ -13,6 +13,8 @@ from app.modules.admin.schemas import (
     JobsDailyTrendPoint,
     JobsDailyTrendResponse,
     JobsDailyTrendSeries,
+    JobsTimeScatterPoint,
+    JobsTimeScatterResponse,
     MetricCount,
     TaskMetric,
 )
@@ -29,12 +31,17 @@ class AdminService:
     """Service methods for admin dashboard metrics."""
 
     @staticmethod
+    def _app_timezone() -> tuple[timezone | ZoneInfo, str]:
+        """Return configured app timezone and fallback-safe name."""
+        try:
+            return ZoneInfo(settings.APP_TIMEZONE), settings.APP_TIMEZONE
+        except ZoneInfoNotFoundError:
+            return timezone.utc, "UTC"
+
+    @staticmethod
     def _today_start_utc() -> datetime:
         """Return local-day start converted to UTC for consistent DB filtering."""
-        try:
-            app_tz = ZoneInfo(settings.APP_TIMEZONE)
-        except ZoneInfoNotFoundError:
-            app_tz = timezone.utc
+        app_tz, _ = AdminService._app_timezone()
 
         now_local = datetime.now(app_tz)
         today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -115,12 +122,7 @@ class AdminService:
         """Return daily new job counts for recent days by source and total."""
         days = max(7, min(days, 90))
 
-        try:
-            app_tz = ZoneInfo(settings.APP_TIMEZONE)
-            tz_name = settings.APP_TIMEZONE
-        except ZoneInfoNotFoundError:
-            app_tz = timezone.utc
-            tz_name = "UTC"
+        app_tz, tz_name = AdminService._app_timezone()
 
         today_local = datetime.now(app_tz).date()
         start_date = today_local - timedelta(days=days - 1)
@@ -191,4 +193,66 @@ class AdminService:
             end_date=end_date.isoformat(),
             sources=sorted_sources,
             series=series,
+        )
+
+    @staticmethod
+    @jcache("admin:jobs:time-scatter:{days}", ttl=300)
+    async def get_jobs_time_scatter(db: AsyncSession, days: int = 30) -> JobsTimeScatterResponse:
+        """Return hourly local-time job counts by source for scatter plotting."""
+        days = max(1, min(days, 90))
+        bucket_minutes = 60
+        app_tz, tz_name = AdminService._app_timezone()
+
+        end_local_dt = datetime.now(app_tz).replace(minute=0, second=0, microsecond=0)
+        start_local_dt = end_local_dt - timedelta(hours=(days * 24) - 1)
+        end_exclusive_local_dt = end_local_dt + timedelta(hours=1)
+
+        start_utc = start_local_dt.astimezone(timezone.utc)
+        end_exclusive_utc = end_exclusive_local_dt.astimezone(timezone.utc)
+
+        source_name = func.coalesce(func.nullif(func.trim(SeekJob.source), ""), "Unknown")
+        local_bucket = func.date_trunc("hour", func.timezone(tz_name, SeekJob.created_at))
+
+        rows = (
+            await db.execute(
+                select(
+                    local_bucket.label("local_bucket"),
+                    source_name.label("source_name"),
+                    func.count(SeekJob.id).label("job_count"),
+                )
+                .where(
+                    SeekJob.created_at.isnot(None),
+                    SeekJob.created_at >= start_utc,
+                    SeekJob.created_at < end_exclusive_utc,
+                )
+                .group_by("local_bucket", "source_name")
+                .order_by("local_bucket", "source_name")
+            )
+        ).all()
+
+        points: list[JobsTimeScatterPoint] = []
+        all_sources: set[str] = set()
+
+        for local_bucket_value, source, count in rows:
+            if local_bucket_value is None:
+                continue
+
+            source_key = str(source)
+            all_sources.add(source_key)
+            aware_local_bucket = local_bucket_value.replace(tzinfo=app_tz)
+            points.append(
+                JobsTimeScatterPoint(
+                    bucket_start=aware_local_bucket,
+                    source=source_key,
+                    count=int(count or 0),
+                )
+            )
+
+        return JobsTimeScatterResponse(
+            timezone=tz_name,
+            bucket_minutes=bucket_minutes,
+            start_date_time=start_local_dt,
+            end_date_time=end_local_dt,
+            sources=sorted(all_sources),
+            points=points,
         )

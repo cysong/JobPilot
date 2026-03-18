@@ -12,6 +12,7 @@ from app.modules.admin.schemas import (
     BatchRetryResponse,
     DashboardStats,
     JobsDailyTrendResponse,
+    JobsTimeScatterResponse,
     TaskDetailResponse,
     TaskListResponse,
     TaskRetryResponse,
@@ -41,6 +42,15 @@ async def get_jobs_daily_trend(
 ):
     """Daily new job counts for recent days (grouped by source and total)."""
     return await AdminService.get_jobs_daily_trend(db, days=days)
+
+
+@router.get("/jobs/time-scatter", response_model=JobsTimeScatterResponse)
+async def get_jobs_time_scatter(
+    days: int = Query(7, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hourly local-time job counts for recent days (grouped by source)."""
+    return await AdminService.get_jobs_time_scatter(db, days=days)
 
 
 @router.get("/workers", response_model=WorkerMonitorResponse)

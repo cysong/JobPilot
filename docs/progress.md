@@ -11,6 +11,30 @@
 
 ## Work Log
 
+### 2026-03-18 - Admin Hourly Jobs Scatter Chart
+
+- Added backend admin scatter API for hourly job-ingestion visualization:
+  - endpoint: `GET /api/v1/admin/jobs/time-scatter?days=30`
+  - groups `SeekJob.created_at` by local app timezone hour bucket and `source`
+  - fixed bucket size to `60` minutes
+  - returns bucket timestamps with timezone offsets for stable frontend formatting
+- Added backend response schemas:
+  - `JobsTimeScatterPoint`
+  - `JobsTimeScatterResponse`
+- Added frontend admin API and hook:
+  - `adminApi.getJobsTimeScatter`
+  - `useJobsTimeScatter`
+- Updated `AdminJobsChartPage` with a second Recharts scatter chart:
+  - X-axis uses local-time hourly buckets with `MM-DD HH` tick labels
+  - Y-axis shows per-bucket job count
+  - each source is rendered as its own scatter series
+  - custom tooltip shows source, local bucket time, and count
+  - source visibility stays controlled by the page-level toggle buttons
+- Validation:
+  - `python -m compileall app/modules/admin` passed
+  - `pnpm exec tsc -b` passed
+  - `pnpm run build` passed
+
 ### 2026-03-18 - Recharts Migration for Dashboard and Admin Trend Charts
 
 - Added `recharts` to the frontend dependencies and updated `pnpm-lock.yaml`.

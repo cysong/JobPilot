@@ -9,12 +9,15 @@ import type {
   BatchRetryResponse,
   TaskRetryResponse,
   JobsDailyTrendResponse,
+  JobsTimeScatterResponse,
 } from '@/features/admin/types'
 
 export const adminApi = {
   getDashboardStats: () => apiClient.get<DashboardStats>('/admin/dashboard/stats'),
   getJobsDailyTrend: (params?: { days?: number }) =>
     apiClient.get<JobsDailyTrendResponse>('/admin/jobs/daily-trend', { params }),
+  getJobsTimeScatter: (params?: { days?: number }) =>
+    apiClient.get<JobsTimeScatterResponse>('/admin/jobs/time-scatter', { params }),
   getWorkerStatus: () => apiClient.get<WorkerMonitorResponse>('/admin/workers'),
   getTasks: (params: {
     status?: string

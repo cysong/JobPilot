@@ -34,6 +34,21 @@ export interface JobsDailyTrendResponse {
   series: JobsDailyTrendSeries[]
 }
 
+export interface JobsTimeScatterPoint {
+  bucketStart: string
+  source: string
+  count: number
+}
+
+export interface JobsTimeScatterResponse {
+  timezone: string
+  bucketMinutes: number
+  startDateTime: string
+  endDateTime: string
+  sources: string[]
+  points: JobsTimeScatterPoint[]
+}
+
 export interface WorkerStatus {
   id: string
   hostname: string

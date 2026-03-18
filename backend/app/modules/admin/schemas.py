@@ -48,6 +48,21 @@ class JobsDailyTrendResponse(AdminBase):
     series: List[JobsDailyTrendSeries]
 
 
+class JobsTimeScatterPoint(AdminBase):
+    bucket_start: datetime = Field(..., alias="bucketStart")
+    source: str
+    count: int
+
+
+class JobsTimeScatterResponse(AdminBase):
+    timezone: str
+    bucket_minutes: int = Field(..., alias="bucketMinutes")
+    start_date_time: datetime = Field(..., alias="startDateTime")
+    end_date_time: datetime = Field(..., alias="endDateTime")
+    sources: List[str]
+    points: List[JobsTimeScatterPoint]
+
+
 # ===== Worker Monitor =====
 class WorkerStatus(AdminBase):
     id: str
