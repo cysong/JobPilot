@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import {
     Select,
     SelectContent,
+    SelectSeparator,
     SelectItem,
     SelectTrigger,
     SelectValue,
@@ -111,6 +112,7 @@ export default function ApplicationListingPage() {
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
                             <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectSeparator />
                             <SelectItem value="Pending">Pending</SelectItem>
                             <SelectItem value="Tailoring">Tailoring</SelectItem>
                             <SelectItem value="Ready">Ready</SelectItem>
