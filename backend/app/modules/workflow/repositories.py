@@ -80,7 +80,8 @@ class TaskRepository:
         task.completed_at = None
         task.execution_time_ms = None
         task.error_message = None
-        task.celery_task_id = celery_task_id
+        if celery_task_id:
+            task.celery_task_id = celery_task_id
         task.worker_id = worker_id or celery_task_id
         if retry_count is not None:
             task.retry_count = retry_count
@@ -110,11 +111,13 @@ class TaskRepository:
         task: TaskExecution,
         *,
         error_message: str,
+        execution_time_ms: Optional[int] = None,
         retry_count: Optional[int] = None,
     ) -> None:
         task.status = TaskStatus.FAILED
         task.error_message = error_message
         task.completed_at = datetime.now(timezone.utc)
+        task.execution_time_ms = execution_time_ms
         if retry_count is not None:
             task.retry_count = retry_count
         await db.flush()

@@ -204,93 +204,131 @@ class DBTrackingTask(AsyncBaseTask):
     def before_start(self, task_id, args, kwargs):
         """Called before the task starts. Mark as RUNNING."""
         db_task_id = kwargs.get("task_id")
-        if db_task_id:
-            try:
-                # Use current retry count from Celery request (0 for first attempt, increments on retry)
-                current_retry_count = getattr(self.request, "retries", 0)
-                self._run_db_coro(
-                    self._update_status(db_task_id, "RUNNING", retry_count=current_retry_count)
+        if not db_task_id:
+            logger.warning(
+                "Task missing workflow task_id in before_start",
+                extra={
+                    "celery_task_id": task_id,
+                    "task_name": self.name,
+                    "kwargs_keys": sorted(kwargs.keys()),
+                },
+            )
+            return super().before_start(task_id, args, kwargs)
+
+        try:
+            # Use current retry count from Celery request (0 for first attempt, increments on retry)
+            current_retry_count = getattr(self.request, "retries", 0)
+            self._run_db_coro(
+                self._update_status(
+                    db_task_id,
+                    "RUNNING",
+                    celery_task_id=task_id,
+                    worker_id=getattr(self.request, "hostname", None),
+                    retry_count=current_retry_count,
                 )
-                logger.info(
-                    f"Task started: {self.name}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "retry_count": current_retry_count,
-                    }
-                )
-            except Exception as exc:
-                # Critical: Don't let hook failures prevent task execution
-                logger.warning(
-                    f"Failed to update task status in before_start: {exc}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                    },
-                    exc_info=True
-                )
+            )
+            logger.info(
+                f"Task started: {self.name}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "worker_id": getattr(self.request, "hostname", None),
+                    "retry_count": current_retry_count,
+                }
+            )
+        except Exception as exc:
+            # Critical: Don't let hook failures prevent task execution
+            logger.warning(
+                f"Failed to update task status in before_start: {exc}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "worker_id": getattr(self.request, "hostname", None),
+                },
+                exc_info=True
+            )
         return super().before_start(task_id, args, kwargs)
 
     def on_success(self, retval, task_id, args, kwargs):
         """Called on success. Mark as SUCCESS."""
         db_task_id = kwargs.get("task_id")
-        if db_task_id:
-            elapsed_ms = int((time.perf_counter() - getattr(self, "_start_time", time.perf_counter())) * 1000)
-            output_data = retval.get("output_data", {}) if isinstance(retval, dict) else {}
+        if not db_task_id:
+            logger.warning(
+                "Task missing workflow task_id in on_success",
+                extra={
+                    "celery_task_id": task_id,
+                    "task_name": self.name,
+                    "kwargs_keys": sorted(kwargs.keys()),
+                },
+            )
+            return super().on_success(retval, task_id, args, kwargs)
 
-            try:
-                self._run_db_coro(
-                    self._mark_success(db_task_id, output_data, elapsed_ms)
-                )
-                logger.info(
-                    f"Task completed successfully: {self.name}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "execution_time_ms": elapsed_ms,
-                    }
-                )
-            except Exception as exc:
-                # Log error but don't fail the task that already succeeded
-                logger.error(
-                    f"Failed to mark task as success (task succeeded but status update failed): {exc}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                    },
-                    exc_info=True
-                )
+        elapsed_ms = int((time.perf_counter() - getattr(self, "_start_time", time.perf_counter())) * 1000)
+        output_data = retval.get("output_data", {}) if isinstance(retval, dict) else {}
+
+        try:
+            self._run_db_coro(
+                self._mark_success(db_task_id, output_data, elapsed_ms)
+            )
+            logger.info(
+                f"Task completed successfully: {self.name}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "execution_time_ms": elapsed_ms,
+                }
+            )
+        except Exception as exc:
+            # Log error but don't fail the task that already succeeded
+            logger.error(
+                f"Failed to mark task as success (task succeeded but status update failed): {exc}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                },
+                exc_info=True
+            )
         return super().on_success(retval, task_id, args, kwargs)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Called when the task fails (retries exhausted). Mark as FAILED."""
         db_task_id = kwargs.get("task_id")
-        if db_task_id:
-            try:
-                self._run_db_coro(
-                    self._mark_failed(db_task_id, str(exc))
-                )
-                logger.error(
-                    f"Task failed permanently: {self.name}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "error": str(exc),
-                        "retries": getattr(self.request, "retries", 0),
-                    },
-                    exc_info=True
-                )
-            except Exception as update_exc:
-                # Log error but don't suppress the original task failure
-                logger.error(
-                    f"Failed to mark task as failed (double error): {update_exc}",
-                    extra={
-                        "task_id": db_task_id,
-                        "celery_task_id": task_id,
-                        "original_error": str(exc),
-                    },
-                    exc_info=True
-                )
+        if not db_task_id:
+            logger.warning(
+                "Task missing workflow task_id in on_failure",
+                extra={
+                    "celery_task_id": task_id,
+                    "task_name": self.name,
+                    "kwargs_keys": sorted(kwargs.keys()),
+                },
+            )
+            return super().on_failure(exc, task_id, args, kwargs, einfo)
+
+        try:
+            self._run_db_coro(
+                self._mark_failed(db_task_id, str(exc))
+            )
+            logger.error(
+                f"Task failed permanently: {self.name}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "error": str(exc),
+                    "retries": getattr(self.request, "retries", 0),
+                },
+                exc_info=True
+            )
+        except Exception as update_exc:
+            # Log error but don't suppress the original task failure
+            logger.error(
+                f"Failed to mark task as failed (double error): {update_exc}",
+                extra={
+                    "task_id": db_task_id,
+                    "celery_task_id": task_id,
+                    "original_error": str(exc),
+                },
+                exc_info=True
+            )
         return super().on_failure(exc, task_id, args, kwargs, einfo)
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
@@ -316,18 +354,36 @@ class DBTrackingTask(AsyncBaseTask):
             )
         return super().on_retry(exc, task_id, args, kwargs, einfo)
 
-    async def _update_status(self, task_id: str, status: str, retry_count: int = None):
+    async def _update_status(
+        self,
+        task_id: str,
+        status: str,
+        *,
+        celery_task_id: str | None = None,
+        worker_id: str | None = None,
+        retry_count: int = None,
+    ):
         async with async_session_factory() as session:
             task = await TaskRepository.get_by_id(session, task_id)
-            if task:
-                await TaskRepository.mark_running(
-                    session, 
-                    task, 
-                    celery_task_id=self.request.id, 
-                    worker_id=self.request.hostname,
-                    retry_count=retry_count
+            if not task:
+                logger.warning(
+                    "Workflow task record not found in before_start status update",
+                    extra={
+                        "task_id": task_id,
+                        "celery_task_id": celery_task_id,
+                        "status": status,
+                    },
                 )
-                await session.commit()
+                return
+
+            await TaskRepository.mark_running(
+                session,
+                task,
+                celery_task_id=celery_task_id,
+                worker_id=worker_id,
+                retry_count=retry_count,
+            )
+            await session.commit()
 
     async def _mark_success(self, task_id: str, output_data: dict, elapsed_ms: int):
         async with async_session_factory() as session:
