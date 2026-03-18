@@ -356,23 +356,6 @@ export default function JobDetailPage() {
                 </TooltipProvider>
               )}
 
-              {job.share_link && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                  asChild
-                >
-                  <a
-                    href={job.share_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Original Posting
-                    <ExternalLink className="h-4 w-4 ml-2" />
-                  </a>
-                </Button>
-              )}
             </div>
 
             <ApplicationDialog
@@ -401,8 +384,28 @@ export default function JobDetailPage() {
               )}
 
               <div className="pr-28">
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
+                  {job.share_link && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={job.share_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Open Original Posting"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open Original Posting</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   {job.is_expired && (
                     <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
                   )}

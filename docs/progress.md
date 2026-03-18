@@ -5,7 +5,7 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-16
+**Last Updated:** 2026-03-19
 
 ---
 
@@ -1433,6 +1433,13 @@ None at this stage.
   - generate first draft, then polish it in a second pass
   - keep final persistence/document versioning flow unchanged
   - store `polished=true` metadata on generated cover letter documents
+
+### 2026-03-19 - Job Detail Original Posting Link Placement
+
+**Completed Tasks:**
+- Moved the job detail page `Open Original Posting` entry from the header action area to the title row.
+- Changed the entry to an icon-only external-link action beside the job title.
+- Added hover tooltip text and `aria-label` for the icon link to keep the compact UI accessible.
 
 ### 2026-03-18 - Cover Letter Draft Schema Simplification
 
