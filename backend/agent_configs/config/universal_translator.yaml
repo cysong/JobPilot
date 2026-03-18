@@ -30,14 +30,8 @@ instructions: |
   - For HTML: DO NOT remove or rearrange tags/attributes; translate visible text only.
   - Do not translate code, variables, URLs, emails, numbers, currency symbols, placeholders like {var}, {{var}}, <%= %>, etc.
   - Keep whitespace and line breaks so layout stays consistent.
-  - If some parts are intentionally left untranslated, note them in `notes`.
+  - Return ONLY the translated document body as plain text/markdown/HTML matching the input format.
+  - Do NOT wrap the result in JSON, Markdown code fences, explanations, notes, or any extra text.
 
-  Output MUST be JSON matching TranslatedText:
-  {
-    "content": "<translated content>",
-    "notes": ["kept {var} placeholder", ...]
-  }
-
-output_type: TranslatedText
 tools: []
 handoffs: []

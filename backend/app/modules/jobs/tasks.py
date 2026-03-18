@@ -8,9 +8,16 @@ from app.core.llm.gateway import AgentGateway
 from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.workflow import DBTrackingTask, AsyncBaseTask, TaskService
 from app.shared.enums import TaskType
-from agent_configs.schemas import AnalyzedJob, TranslatedText
+from agent_configs.schemas import AnalyzedJob
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_translated_content(translated: str) -> str:
+    """Accept only the new plain-text translator output contract."""
+    if isinstance(translated, str):
+        return translated
+    raise TypeError("universal_translator must return plain text output")
 
 
 @celery_app.task(base=DBTrackingTask, bind=True)
@@ -43,9 +50,7 @@ async def analyze_job_task(
         input_data=translation_input,
         context={"db": self.db, "task_id": task_id},
     )
-    cn_content = (
-        translated.content if isinstance(translated, TranslatedText) else translated.get("content")
-    )
+    cn_content = _extract_translated_content(translated)
 
     result = await AgentGateway.get().call(
         agent_id="job_analyzer",

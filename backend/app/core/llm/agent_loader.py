@@ -78,10 +78,11 @@ class AgentLoader:
             "name": config.get("name", agent_id),
             "model": config["model"],
             "instructions": config["instructions"],
-            "output_type": schema,
             "tools": config.get("tools") or [],
             "handoffs": config.get("handoffs") or [],
         }
+        if schema is not None:
+            agent_kwargs["output_type"] = schema
 
         # Read model settings from unified nested config.
         # No backward compatibility: top-level temperature/max_tokens/top_p is not supported.
@@ -182,8 +183,7 @@ class AgentLoader:
 
     def _resolve_schema(self, output_type_name: str | None):
         if not output_type_name:
-            raise ValueError(
-                "Agent config missing required field 'output_type'")
+            return None
         schema = SCHEMA_REGISTRY.get(output_type_name)
         if not schema:
             raise ValueError(
