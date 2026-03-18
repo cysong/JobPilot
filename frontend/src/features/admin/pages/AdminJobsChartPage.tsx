@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useJobsDailyTrend } from '../hooks/useJobsDailyTrend'
 import type { JobsDailyTrendResponse, JobsDailyTrendSeries } from '../types'
 
-const CHART_WIDTH = 980
-const CHART_HEIGHT = 360
-const PAD = { top: 20, right: 24, bottom: 42, left: 46 }
 const COLORS = [
   '#0f766e',
   '#1d4ed8',
@@ -23,6 +29,45 @@ function pickColor(index: number) {
   return COLORS[index % COLORS.length]
 }
 
+interface TrendTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    value?: number
+    name?: string
+    color?: string
+    dataKey?: string
+  }>
+  label?: string
+}
+
+function TrendTooltip({ active, payload, label }: TrendTooltipProps) {
+  if (!active || !payload?.length) return null
+
+  const rows = [...payload].sort((left, right) => {
+    const leftIsTotal = left.name === 'Total' ? -1 : 0
+    const rightIsTotal = right.name === 'Total' ? -1 : 0
+    if (leftIsTotal !== rightIsTotal) return leftIsTotal - rightIsTotal
+    return Number(right.value ?? 0) - Number(left.value ?? 0)
+  })
+
+  return (
+    <div className="min-w-44 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl">
+      <div className="text-sm font-semibold text-slate-950">{label}</div>
+      <div className="mt-2 space-y-1 text-xs text-slate-600">
+        {rows.map((entry) => (
+          <div key={entry.name} className="flex items-center justify-between gap-6">
+            <span className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+              {entry.name}
+            </span>
+            <span className="font-medium text-slate-900">{entry.value ?? 0}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminJobsChartPage() {
   const [days, setDays] = useState(30)
   const query = useJobsDailyTrend(days)
@@ -30,27 +75,23 @@ export default function AdminJobsChartPage() {
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({})
 
   const series: JobsDailyTrendSeries[] = data?.series ?? []
-  const dates = series[0]?.points.map((p: { date: string }) => p.date) ?? []
+  const chartData = useMemo(() => {
+    const totalSeries = series.find((item) => item.name === 'Total')
+    const dates = totalSeries?.points.map((point) => point.date) ?? []
 
-  const maxCount = useMemo(() => {
-    const visible = series.filter((s: JobsDailyTrendSeries) => !hiddenSeries[s.name])
-    const values = visible.flatMap((s: JobsDailyTrendSeries) => s.points.map((p: { count: number }) => p.count))
-    return Math.max(1, ...values, 0)
-  }, [series, hiddenSeries])
+    return dates.map((date, index) => {
+      const row: Record<string, string | number> = {
+        date,
+        shortDate: date.slice(5),
+      }
 
-  const plotWidth = CHART_WIDTH - PAD.left - PAD.right
-  const plotHeight = CHART_HEIGHT - PAD.top - PAD.bottom
+      for (const item of series) {
+        row[item.name] = item.points[index]?.count ?? 0
+      }
 
-  const x = (idx: number) => {
-    if (dates.length <= 1) return PAD.left
-    return PAD.left + (idx / (dates.length - 1)) * plotWidth
-  }
-  const y = (count: number) => PAD.top + plotHeight - (count / maxCount) * plotHeight
-
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round(maxCount * r))
-  const xTickIndexes = dates.length <= 8
-    ? dates.map((_: string, i: number) => i)
-    : [0, Math.floor(dates.length * 0.25), Math.floor(dates.length * 0.5), Math.floor(dates.length * 0.75), dates.length - 1]
+      return row
+    })
+  }, [series])
 
   const toggleSeries = (name: string) => {
     setHiddenSeries((prev) => ({ ...prev, [name]: !prev[name] }))
@@ -88,68 +129,48 @@ export default function AdminJobsChartPage() {
           )}
           {!query.isLoading && data && series.length > 0 && (
             <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <svg width={CHART_WIDTH} height={CHART_HEIGHT} role="img" aria-label="Jobs daily trend chart">
-                  <rect x={PAD.left} y={PAD.top} width={plotWidth} height={plotHeight} fill="transparent" />
+              <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 12, right: 20, bottom: 6, left: 0 }}
+                  >
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="shortDate"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748b', fontSize: 11 }}
+                      minTickGap={24}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    />
+                    <Tooltip content={<TrendTooltip />} />
 
-                  {yTicks.map((tick) => (
-                    <g key={`y-${tick}`}>
-                      <line
-                        x1={PAD.left}
-                        y1={y(tick)}
-                        x2={PAD.left + plotWidth}
-                        y2={y(tick)}
-                        stroke="#e2e8f0"
-                        strokeWidth="1"
-                      />
-                      <text x={PAD.left - 8} y={y(tick) + 4} textAnchor="end" fontSize="11" fill="#64748b">
-                        {tick}
-                      </text>
-                    </g>
-                  ))}
+                    {series.map((s: JobsDailyTrendSeries, idx: number) => {
+                      if (hiddenSeries[s.name]) return null
+                      const isTotal = s.name === 'Total'
+                      const stroke = isTotal ? '#111827' : pickColor(idx)
 
-                  {xTickIndexes.map((idx: number) => (
-                    <g key={`x-${idx}`}>
-                      <line
-                        x1={x(idx)}
-                        y1={PAD.top}
-                        x2={x(idx)}
-                        y2={PAD.top + plotHeight}
-                        stroke="#f1f5f9"
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={x(idx)}
-                        y={PAD.top + plotHeight + 18}
-                        textAnchor="middle"
-                        fontSize="11"
-                        fill="#64748b"
-                      >
-                        {dates[idx]?.slice(5) ?? ''}
-                      </text>
-                    </g>
-                  ))}
-
-                  {series.map((s: JobsDailyTrendSeries, idx: number) => {
-                    if (hiddenSeries[s.name]) return null
-                    const points = s.points.map((p: { count: number }, i: number) => `${x(i)},${y(p.count)}`).join(' ')
-                    const isTotal = s.name === 'Total'
-                    const stroke = isTotal ? '#111827' : pickColor(idx)
-
-                    return (
-                      <g key={s.name}>
-                        <polyline
-                          fill="none"
+                      return (
+                        <Line
+                          key={s.name}
+                          type="monotone"
+                          dataKey={s.name}
+                          name={s.name}
                           stroke={stroke}
                           strokeWidth={isTotal ? 3 : 2}
-                          points={points}
+                          dot={false}
+                          activeDot={{ r: isTotal ? 5 : 4 }}
                         />
-                      </g>
-                    )
-                  })}
-
-                  <text x={PAD.left} y={PAD.top - 6} fontSize="11" fill="#64748b">Jobs</text>
-                </svg>
+                      )
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
 
               <div className="flex flex-wrap gap-2">

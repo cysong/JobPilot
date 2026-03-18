@@ -11,6 +11,23 @@
 
 ## Work Log
 
+### 2026-03-18 - Recharts Migration for Dashboard and Admin Trend Charts
+
+- Added `recharts` to the frontend dependencies and updated `pnpm-lock.yaml`.
+- Replaced the user dashboard `Added vs Applied over the last 14 days` custom div-based chart with a responsive Recharts bar chart:
+  - proper X/Y axes
+  - hover tooltip
+  - built-in legend
+  - improved mobile/desktop responsiveness
+- Replaced the admin `Jobs Daily Trend` custom SVG chart with a responsive Recharts multi-series line chart:
+  - built-in axes and grid
+  - hover tooltip with per-series values
+  - preserved per-series visibility toggles below the chart
+  - kept `Total` visually emphasized
+- Validation:
+  - `pnpm exec tsc -b` passed
+  - `pnpm run build` passed
+
 ### 2026-03-17 - Shared Search Params Helpers for List State Hooks
 
 - Added shared query-param helpers at `frontend/src/utils/searchParams.ts`.
