@@ -28,7 +28,7 @@ import {
 } from "@/features/jobs/hooks/useJobs";
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
-import { ApplicationStatusBadge } from "@/features/applications/components/ApplicationStatusBadge";
+import { getApplicationStatusPresentation } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +49,7 @@ import {
   getCompanyDisplayName,
   JobSourceCompanyLine,
 } from "@/components/job/jobDisplay";
+import { cn } from "@/utils/cn";
 import {
   getListContextKey,
   readSessionRecord,
@@ -166,6 +167,9 @@ export default function JobDetailPage() {
     data: application,
     isLoading: isApplicationLoading,
   } = useApplicationByJob(jobIdNum);
+  const applicationStatusPresentation = application
+    ? getApplicationStatusPresentation(application.status)
+    : null;
 
   // Restore search params when going back to listing page
   const backUrl = `/jobs?${searchParams.toString()}`;
@@ -296,19 +300,41 @@ export default function JobDetailPage() {
                 </Button>
               )}
 
-              {!isApplicationLoading && application && (
-                <TooltipProvider>
-                  <div className="flex gap-2 items-center">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div>
-                          <ApplicationStatusBadge status={application.status} />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {application.status === "Failed" &&
-                          application.last_error && (
-                            <div className="max-w-xs">
+	              {!isApplicationLoading && application && (
+	                <TooltipProvider>
+	                  <div className="flex gap-2 items-center">
+	                    <Tooltip>
+	                      <TooltipTrigger asChild>
+	                        <Link
+	                          to={`/applications/${application.id}`}
+	                          aria-label={`Open application (${applicationStatusPresentation?.label})`}
+	                          className={cn(
+	                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+	                            "hover:brightness-95",
+	                            applicationStatusPresentation?.className,
+	                            applicationStatusPresentation?.variant === "secondary" &&
+	                              "border-transparent bg-secondary text-secondary-foreground",
+	                            applicationStatusPresentation?.variant === "outline" &&
+	                              "text-foreground",
+	                            applicationStatusPresentation?.variant == null &&
+	                              "border-transparent bg-primary text-primary-foreground",
+	                          )}
+	                        >
+	                          <span>{applicationStatusPresentation?.label}</span>
+	                          <span
+	                            aria-hidden="true"
+	                            className="h-3.5 w-px bg-current/20"
+	                          />
+	                          <Eye className="h-3.5 w-3.5" />
+	                        </Link>
+	                      </TooltipTrigger>
+	                      <TooltipContent>
+	                        <div className="max-w-xs">
+	                          <p className="text-sm font-medium">Open application</p>
+	                        </div>
+	                        {application.status === "Failed" &&
+	                          application.last_error && (
+	                            <div className="max-w-xs">
                               <p className="font-semibold text-red-500">
                                 Error:
                               </p>
@@ -341,17 +367,6 @@ export default function JobDetailPage() {
                         )}
                       </TooltipContent>
                     </Tooltip>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                      asChild
-                    >
-                      <Link to={`/applications/${application.id}`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Application
-                      </Link>
-                    </Button>
                   </div>
                 </TooltipProvider>
               )}
