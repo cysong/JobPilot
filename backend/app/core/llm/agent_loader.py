@@ -15,6 +15,7 @@ from agents.model_settings import ModelSettings
 from agent_configs.schemas import SCHEMA_REGISTRY
 from app.core.config import settings
 from app.core.llm.config import llm_gateway_settings
+from app.core.llm.output_schemas import CleaningOutputSchema, should_use_cleaning_schema
 from app.core.llm.providers import normalize_provider_name
 
 # Ensure OpenAI client finds credentials when using agents SDK
@@ -73,6 +74,7 @@ class AgentLoader:
         config = self._load_yaml(config_path)
         output_type_name = config.get("output_type")
         schema = self._resolve_schema(output_type_name)
+        provider = self._resolve_provider(config)
 
         agent_kwargs: dict[str, Any] = {
             "name": config.get("name", agent_id),
@@ -82,7 +84,10 @@ class AgentLoader:
             "handoffs": config.get("handoffs") or [],
         }
         if schema is not None:
-            agent_kwargs["output_type"] = schema
+            if should_use_cleaning_schema(provider, schema):
+                agent_kwargs["output_type"] = CleaningOutputSchema(schema)
+            else:
+                agent_kwargs["output_type"] = schema
 
         # Read model settings from unified nested config.
         # No backward compatibility: top-level temperature/max_tokens/top_p is not supported.
@@ -98,7 +103,7 @@ class AgentLoader:
 
         agent = Agent(**agent_kwargs)
         setattr(agent, "agent_id", agent_id)
-        setattr(agent, "provider", self._resolve_provider(config))
+        setattr(agent, "provider", provider)
         setattr(agent, "config_version", config.get("version"))
         setattr(agent, "max_turns", self._resolve_max_turns(config, agent_id))
         setattr(agent, "config_metadata", self._build_config_metadata(config, agent_id))

@@ -466,6 +466,12 @@ Resume (简历元数据：title, isDraft, 软删除标记)
 5. 记录 token 使用量 (AiUsage 表)
 ```
 
+**结构化输出容错策略**：
+- `openai` provider 和纯文本输出保持 SDK 原生 `output_type` 行为，不增加额外清洗。
+- 非 `openai` provider 的结构化输出使用 `CleaningOutputSchema`，在 `validate_json()` 前做轻量格式清洗后再交给 SDK 原始 schema 校验。
+- 轻量清洗仅包含：原文直验、去掉整段 fenced JSON、提取 fenced block 内 JSON、提取首个平衡 JSON 对象/数组；不做字段修复、自动补全或重试调用。
+- 记录结构化输出校验日志，区分原始直接通过、清洗后恢复通过、清洗后仍失败，用于统计第三方模型结构化输出稳定性。
+
 **核心任务类型**：
 1. **job_analysis**: 分析职位描述，提取技能要求、经验要求等
 2. **tailor_resume**: 根据职位要求定制简历（Deep/Light两种深度）
