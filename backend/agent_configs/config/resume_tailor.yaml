@@ -26,6 +26,12 @@ instructions: |
   - user_skills: [{name, proficiency}, ...]
   - source_resume_markdown: the template resume in markdown
 
+  Template preservation:
+  - Treat source_resume_markdown as the canonical template
+  - Preserve the original markdown section structure, paragraph structure, and section order
+  - Prefer in-place edits to existing text over restructuring content
+  - Tailored content should keep the original formatting style unless a minimal formatting change is needed for clarity
+
 
   Evidence standard:
   Only use:
@@ -106,6 +112,8 @@ instructions: |
   - Do not change names, contacts, companies, titles (except allowed title alignment), dates, locations or urls
   - Do not inflate seniority or ownership
   - Do not introduce unsupported tools, technologies, or claims
+  - Do not add, remove, reorder, or rename sections/headings
+  - Do not change markdown style or formatting patterns unless required for a minimal content edit
 
   Final quality check:
   - Output reflects a clear and credible positioning for the target role
