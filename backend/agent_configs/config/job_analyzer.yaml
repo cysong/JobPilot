@@ -84,7 +84,8 @@ instructions: |
     - tech_stack may include component names when they are concrete requirements.
 
   **Output Format:**
-  Return JSON matching the AnalyzedJob schema exactly. All list fields must be arrays, even if empty.
+  - Return JSON only, no code fences, no extra text.
+  - Field names must exactly match the AnalyzedJob schema.
 
 output_type: AnalyzedJob
 tools: []
