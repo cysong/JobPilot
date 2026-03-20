@@ -46,14 +46,13 @@ async def analyze_resume_task(
     technical_skills = analysis_data.get("technical_skills", [])
     skills_updated, skills_deleted = 0, 0
 
-    if technical_skills:
-        # Save skills to resume_skills table
-        skills_updated, skills_deleted = await ResumeService.update_resume_skills(
-            db=self.db,
-            resume_id=resume_id,
-            user_id=resume.user_id,
-            skills=technical_skills
-        )
+    # Always sync resume skills so re-analysis can remove stale rows.
+    skills_updated, skills_deleted = await ResumeService.update_resume_skills(
+        db=self.db,
+        resume_id=resume_id,
+        user_id=resume.user_id,
+        skills=technical_skills
+    )
 
     await self.db.commit()
 

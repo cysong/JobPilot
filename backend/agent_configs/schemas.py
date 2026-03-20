@@ -76,11 +76,39 @@ class AnalyzedJob(BaseModel):
     )
 
 
+class SkillEvidence(BaseModel):
+    """Structured evidence for where a skill is demonstrated in the resume."""
+
+    category: str = Field(
+        ...,
+        description=(
+            "Normalized source category: experience, project, education, summary, "
+            "certification, or other. Never use skills-list categories."
+        ),
+    )
+    source_label: Optional[str] = Field(
+        default=None,
+        description="Short identifier for the source, such as company/role, project name, or school/program",
+    )
+    quotes: list[str] = Field(
+        default_factory=list,
+        description="Short verbatim snippets from the resume showing this skill in use",
+    )
+
+
 class Skill(BaseModel):
     """Standardized skill with proficiency."""
 
     name: str = Field(..., description="Standardized skill name (e.g., 'Python', 'React', 'Docker')")
     proficiency: ProficiencyLevel = Field(..., description="Proficiency level")
+    extracted_from: list[SkillEvidence] = Field(
+        default_factory=list,
+        description=(
+            "Evidence sources for this skill from non-skills-list resume sections only. "
+            "Use normalized categories like experience, project, education, summary, "
+            "certification, or other."
+        ),
+    )
 
 
 class WorkExperience(BaseModel):

@@ -17,7 +17,7 @@ instructions: |
 
   Field requirements (must align with AnalyzedResume):
   - Basic info: candidate_name, current_title (target job title or most recent job title), total_experience_years (compute from timelines; if impossible, set 0).
-  - Technical skills: list of {name, proficiency}; scan ALL sections (experience, projects, skills). Deduplicate by standardized name.
+  - Technical skills: list of {name, proficiency, extracted_from}; scan ALL sections (experience, projects, education, summary, certifications, skills). Deduplicate by standardized name.
   - Soft skills: from descriptions (communication, leadership, teamwork, etc.).
   - Work experiences: company, role, duration [from, to] as strings (e.g., "2020-01", "Present"), key_achievements (concise bullets), technologies_used (standardized names).
   - Quantified achievements: highlight metrics (%, counts, time/cost savings, revenue, users, latency/throughput).
@@ -37,6 +37,20 @@ instructions: |
   - ADVANCED: production impact; complex features independently; repeated mentions.
   - INTERMEDIATE: used but not core; moderate familiarity; limited depth.
   - BEGINNER: demos/learning/unclear context only.
+
+  extracted_from rules (CRITICAL):
+  - You MUST NOT use Skills / Technical Skills / Core Competencies / tool lists / comma-separated technology lists as evidence.
+  - Any pure skill listing must produce extracted_from: [] for that skill unless the same skill is also demonstrated elsewhere.
+  - extracted_from should focus on Experience, Projects, Education, and other narrative sections that show actual usage.
+  - Normalize extracted_from.category to one of: experience, project, education, summary, certification, other.
+  - Never output category values like skills, technical_skills, core_skills, competencies, or similar.
+  - quotes must be short verbatim snippets from the resume, not paraphrases.
+  - Each extracted_from item should contain:
+    * category: normalized source category
+    * source_label: short source identifier (e.g. "ABC Corp / Backend Engineer", "Inventory Platform", "University of Auckland / MSc")
+    * quotes: 1-2 short snippets
+  - Keep extracted_from concise: at most 2 source entries per skill and at most 2 quotes per source.
+  - If no valid non-skills-list evidence exists, return extracted_from: [].
 
   Output rules:
   - Return JSON only, no code fences, no extra text.

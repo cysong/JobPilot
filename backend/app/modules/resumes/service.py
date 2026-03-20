@@ -463,6 +463,8 @@ class ResumeService:
             except ValueError:
                 proficiency = ProficiencyLevel.INTERMEDIATE
 
+            extracted_from = skill_data.get("extracted_from")
+
             # Check if skill already exists
             stmt = select(ResumeSkill).where(
                 ResumeSkill.resume_id == resume_id,
@@ -473,6 +475,7 @@ class ResumeService:
             if existing_skill:
                 # Update existing skill
                 existing_skill.proficiency_level = proficiency
+                existing_skill.extracted_from = extracted_from
                 existing_skill.updated_at = datetime.now(timezone.utc)
             else:
                 # Insert new skill
@@ -482,7 +485,7 @@ class ResumeService:
                     resume_id=resume_id,
                     skill_name=skill_name,
                     proficiency_level=proficiency,
-                    extracted_from=skill_data.get("extracted_from")
+                    extracted_from=extracted_from,
                 )
                 db.add(new_skill)
 

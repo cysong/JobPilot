@@ -1441,6 +1441,18 @@ None at this stage.
   - keep final persistence/document versioning flow unchanged
   - store `polished=true` metadata on generated cover letter documents
 
+### 2026-03-20 - Resume Skill Evidence Persistence
+
+**Completed Tasks:**
+- Extended `resume_analyzer` structured output so each technical skill can include `extracted_from` evidence with normalized non-skills-list source categories.
+- Tightened `resume_analyzer` instructions to allow skill detection from Skills sections while explicitly forbidding Skills or pure technology lists from being emitted as evidence.
+- Updated `ResumeService.update_resume_skills()` to write `extracted_from` directly from parsed analysis results and overwrite `resume_skills.extracted_from` on re-analysis instead of only setting it on insert.
+- Updated resume analysis task syncing so `resume_skills` are always refreshed, including the case where re-analysis returns zero technical skills and stale rows must be removed.
+- Added focused backend tests covering:
+  - direct overwrite behavior for existing `resume_skills.extracted_from`
+  - direct persistence of `None` extracted-from payloads
+  - deletion behavior when analyzed technical skills become empty
+
 ### 2026-03-19 - Job Detail Original Posting Link Placement
 
 **Completed Tasks:**
