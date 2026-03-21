@@ -17,9 +17,16 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.response_codes import ResponseCode
+from app.modules.jobs.models import JobAnalysis
+from app.modules.resumes.config import resume_module_settings
 from app.modules.resumes.models import Document, Resume, ResumeSkill
 from app.modules.resumes.repository import ResumeRepository, DocumentRepository
-from app.modules.resumes.schemas import ResumeCreate, ResumeUpdate
+from app.modules.resumes.schemas import (
+    ResumeCreate,
+    ResumeTargetJobTitlesUpdate,
+    ResumeUpdate,
+    TargetJobTitleOption,
+)
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType, ProficiencyLevel
 from app.core.config import settings
@@ -231,6 +238,70 @@ class ResumeService:
         await db.refresh(resume)
 
         return resume
+
+    @staticmethod
+    async def update_target_job_titles(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        payload: ResumeTargetJobTitlesUpdate,
+    ) -> Resume:
+        """Update user-selected target job titles for a resume."""
+        resume = await ResumeService.get_resume_by_id(db, resume_id, user_id)
+        if not resume:
+            raise NotFoundError("Resume not found")
+
+        normalized_titles = ResumeService._normalize_target_job_titles(
+            payload.target_job_titles,
+            max_titles=resume_module_settings.TARGET_JOB_TITLES_LIMIT,
+        )
+        canonical_titles = await ResumeService._validate_target_job_titles(
+            db, normalized_titles
+        )
+
+        resume.target_job_titles = canonical_titles
+        resume.updated_at = datetime.now(timezone.utc)
+        db.add(resume)
+        await db.commit()
+        await db.refresh(resume)
+
+        return resume
+
+    @staticmethod
+    async def get_target_job_title_options(
+        db: AsyncSession,
+        *,
+        keyword: str | None = None,
+        limit: int = 10,
+    ) -> list[TargetJobTitleOption]:
+        """Get aggregated target job title options from analyzed jobs."""
+        trimmed_title = func.trim(JobAnalysis.normalized_job_title)
+        stmt = (
+            select(
+                trimmed_title.label("title"),
+                func.count(JobAnalysis.id).label("count"),
+            )
+            .where(JobAnalysis.normalized_job_title.is_not(None))
+            .where(trimmed_title != "")
+        )
+
+        search_keyword = (keyword or "").strip()
+        if search_keyword:
+            stmt = stmt.where(trimmed_title.ilike(f"%{search_keyword}%"))
+
+        stmt = (
+            stmt.group_by(trimmed_title)
+            .order_by(func.count(JobAnalysis.id).desc(), trimmed_title.asc())
+        )
+
+        if not search_keyword:
+            stmt = stmt.limit(limit)
+
+        result = await db.execute(stmt)
+        return [
+            TargetJobTitleOption(title=row.title, count=row.count)
+            for row in result.all()
+        ]
 
     @staticmethod
     async def finalize_resume(db: AsyncSession, resume_id: str, user_id: int) -> Resume:
@@ -504,6 +575,65 @@ class ResumeService:
             deleted_skills = (await db.execute(stmt)).rowcount
 
         return len(skill_names_in_list), deleted_skills
+
+    @staticmethod
+    def _normalize_target_job_titles(
+        titles: list[str],
+        *,
+        max_titles: int,
+    ) -> list[str]:
+        """Normalize, deduplicate, and limit target job titles."""
+        normalized: list[str] = []
+        seen: set[str] = set()
+
+        for title in titles:
+            trimmed = title.strip()
+            if not trimmed:
+                continue
+
+            key = trimmed.lower()
+            if key in seen:
+                continue
+
+            seen.add(key)
+            normalized.append(trimmed)
+
+        if len(normalized) > max_titles:
+            raise BadRequestError(
+                f"At most {max_titles} target job titles are allowed."
+            )
+
+        return normalized
+
+    @staticmethod
+    async def _validate_target_job_titles(
+        db: AsyncSession,
+        titles: list[str],
+    ) -> list[str]:
+        """Validate titles against aggregated analyzed job titles."""
+        if not titles:
+            return []
+
+        title_keys = [title.lower() for title in titles]
+        trimmed_title = func.trim(JobAnalysis.normalized_job_title)
+        lowered_trimmed_title = func.lower(trimmed_title)
+        stmt = (
+            select(trimmed_title.label("title"))
+            .where(JobAnalysis.normalized_job_title.is_not(None))
+            .where(trimmed_title != "")
+            .where(lowered_trimmed_title.in_(title_keys))
+            .group_by(trimmed_title)
+        )
+        result = await db.execute(stmt)
+        canonical_map = {row.title.lower(): row.title for row in result.all()}
+
+        missing_titles = [title for title in titles if title.lower() not in canonical_map]
+        if missing_titles:
+            raise BadRequestError(
+                "Invalid target job titles: " + ", ".join(missing_titles)
+            )
+
+        return [canonical_map[title.lower()] for title in titles]
 
     @staticmethod
     async def _submit_resume_analysis_tasks(db: AsyncSession, resume_id: str, user_id: int) -> list[TaskExecution]:

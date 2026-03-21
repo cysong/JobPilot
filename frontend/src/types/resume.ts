@@ -5,6 +5,7 @@ export interface ResumeListItem {
     created_at: string
     updated_at: string
     document_id?: string
+    target_job_titles: string[]
 }
 
 export interface Document {
@@ -23,6 +24,7 @@ export interface Resume {
     created_at: string
     updated_at: string
     document: Document
+    target_job_titles?: string[]
 }
 
 export interface CreateResumeRequest {
@@ -43,9 +45,22 @@ export interface ResumeTitleUpdate {
 export interface ResumeListResponse {
     items: ResumeListItem[]
     total: number
-    page: number
-    size: number
-    pages: number
+    draft_count: number
+    formal_count: number
+}
+
+export interface TargetJobTitleOption {
+    title: string
+    count: number
+}
+
+export interface TargetJobTitleOptionsResponse {
+    items: TargetJobTitleOption[]
+    selection_limit: number
+}
+
+export interface UpdateTargetJobTitlesRequest {
+    target_job_titles: string[]
 }
 
 export interface ResumeExportRequest {

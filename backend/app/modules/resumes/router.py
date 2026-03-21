@@ -12,6 +12,7 @@ from app.core.exceptions import NotFoundError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.resumes import service
+from app.modules.resumes.config import resume_module_settings
 from app.modules.resumes.schemas import (
     DocumentVersion,
     FormalResumeLimit,
@@ -21,8 +22,10 @@ from app.modules.resumes.schemas import (
     ResumeListItem,
     ResumeListResponse,
     ResumeResponse,
+    ResumeTargetJobTitlesUpdate,
     ResumeTitleUpdate,
     ResumeUpdate,
+    TargetJobTitleOptionsResponse,
     WorkflowResponse,
 )
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
@@ -79,6 +82,7 @@ async def list_resumes(
             is_deleted=resume.is_deleted,
             created_at=resume.created_at,
             updated_at=resume.updated_at,
+            target_job_titles=resume.target_job_titles or [],
             content_preview=content_preview,
         )
         items.append(item)
@@ -88,6 +92,24 @@ async def list_resumes(
         total=len(resumes),
         draft_count=draft_count,
         formal_count=formal_count,
+    )
+
+
+@router.get("/target-job-titles/options", response_model=TargetJobTitleOptionsResponse)
+async def get_target_job_title_options(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    keyword: str | None = None,
+):
+    """Get aggregated target job title options from analyzed jobs."""
+    _ = current_user
+    items = await service.ResumeService.get_target_job_title_options(
+        db,
+        keyword=keyword,
+    )
+    return TargetJobTitleOptionsResponse(
+        items=items,
+        selection_limit=resume_module_settings.TARGET_JOB_TITLES_LIMIT,
     )
 
 
@@ -159,6 +181,23 @@ async def update_resume_title(
     """Update resume title (metadata only, does not create new version)."""
     resume = await service.ResumeService.update_resume_title(
         db, resume_id, current_user.id, title_data.title
+    )
+    return ResumeResponse.model_validate(resume)
+
+
+@router.patch("/{resume_id}/target-job-titles", response_model=ResumeResponse)
+async def update_resume_target_job_titles(
+    resume_id: str,
+    payload: ResumeTargetJobTitlesUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Update selected target job titles for a resume."""
+    resume = await service.ResumeService.update_target_job_titles(
+        db=db,
+        resume_id=resume_id,
+        user_id=current_user.id,
+        payload=payload,
     )
     return ResumeResponse.model_validate(resume)
 

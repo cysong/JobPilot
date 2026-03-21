@@ -11,6 +11,39 @@
 
 ## Work Log
 
+### 2026-03-22 - Resume List Target Role Display and Editor
+
+- Added resume list target role display so each resume card now shows its current `target_job_titles`.
+- Added backend resume target role option API:
+  - `GET /api/v1/resumes/target-job-titles/options`
+  - source: `job_analyses.normalized_job_title`
+  - excludes `NULL` and blank values
+  - aggregates duplicate titles with counts
+  - default response returns top 10 by count
+  - keyword search returns all matching results ordered by count desc
+- Added backend resume target role update API:
+  - `PATCH /api/v1/resumes/{resume_id}/target-job-titles`
+  - trims input values
+  - removes case-insensitive duplicates
+  - validates against analyzed job title options
+  - limits selection to 5 titles
+- Extended resume list response schema to include `target_job_titles`.
+- Added frontend resume target role editor:
+  - debounced search input
+  - selected roles rendered as removable badges
+  - flat candidate list with `title (count)`
+  - selected candidates remain visible but appear disabled/greyed out
+  - save action persists the full selected list and refreshes resume queries
+- Added focused backend unit tests for target role normalization rules.
+- Validation:
+  - `python -m compileall app/modules/resumes` passed
+  - `uv run pytest tests/modules/resumes/test_resume_target_job_titles.py` passed
+  - `pnpm exec tsc -b` passed
+- Follow-up:
+  - moved target job title selection limit into `backend/app/modules/resumes/config.py`
+  - increased the limit from `5` to `10`
+  - removed the frontend hardcoded limit and now return `selection_limit` from the options API so the dialog reads the configured value from backend
+
 ### 2026-03-19 - Universal Translator Simplified Chinese Locale Fix
 
 - Tightened `universal_translator` language parameter semantics from generic language codes to explicit locale-aware tags.

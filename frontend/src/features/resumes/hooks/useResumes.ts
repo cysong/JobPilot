@@ -11,6 +11,14 @@ export const useResumes = () => {
     })
 }
 
+export const useTargetJobTitleOptions = (keyword: string, enabled = true) => {
+    return useQuery({
+        queryKey: ['resume-target-job-title-options', keyword],
+        queryFn: () => resumeApi.getTargetJobTitleOptions(keyword || undefined),
+        enabled,
+    })
+}
+
 export const useResumeForEdit = (resumeId: string) => {
     return useQuery<DocumentEditData>({
         queryKey: ['resume-edit', resumeId],
@@ -39,6 +47,29 @@ export const useUpdateResumeTitle = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['resumes'] })
       queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
+    },
+  })
+}
+
+export const useUpdateTargetJobTitles = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: ({ id, targetJobTitles }: { id: string; targetJobTitles: string[] }) =>
+      resumeApi.updateTargetJobTitles(id, { target_job_titles: targetJobTitles }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] })
+      queryClient.invalidateQueries({ queryKey: ['resumes', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
+      toast({ title: 'Success', description: 'Target roles updated successfully' })
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update target roles',
+        variant: 'destructive',
+      })
     },
   })
 }

@@ -94,6 +94,10 @@ class ResumeListItem(ResumeBase):
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
+    target_job_titles: list[str] = Field(
+        default_factory=list,
+        description="Selected target job titles for this resume",
+    )
 
     # Only include metadata, not full content
     content_preview: Optional[str] = Field(None, description="First 200 characters of content")
@@ -107,6 +111,29 @@ class ResumeListResponse(BaseModel):
     total: int
     draft_count: int
     formal_count: int
+
+
+class TargetJobTitleOption(BaseModel):
+    """Job title option aggregated from analyzed jobs."""
+
+    title: str
+    count: int = Field(..., ge=1)
+
+
+class TargetJobTitleOptionsResponse(BaseModel):
+    """Target job title options list."""
+
+    items: list[TargetJobTitleOption]
+    selection_limit: int = Field(..., ge=1)
+
+
+class ResumeTargetJobTitlesUpdate(BaseModel):
+    """Update selected target job titles for a resume."""
+
+    target_job_titles: list[str] = Field(
+        default_factory=list,
+        description="Selected target job titles for the resume",
+    )
 
 
 # ============================================

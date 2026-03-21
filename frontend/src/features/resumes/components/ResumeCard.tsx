@@ -16,6 +16,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { resumeApi } from '@/api/resumes'
+import { TargetJobTitlesEditor } from './TargetJobTitlesEditor'
 
 interface ResumeCardProps {
     resume: ResumeListItem
@@ -48,10 +49,7 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
     }
 
     return (
-        <Link
-            to={`/resumes/${resume.id}`}
-            className="block bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative"
-        >
+        <article className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative">
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                 <Button
                     variant="ghost"
@@ -104,23 +102,59 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                 </AlertDialog>
             </div>
 
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${resume.is_draft ? 'bg-yellow-50 text-yellow-600' : 'bg-indigo-50 text-indigo-600'
-                }`}>
-                <FileText className="w-6 h-6" />
-            </div>
-
-            <h3 className="font-bold text-slate-900 truncate pr-16">{resume.title}</h3>
-            <p className="text-sm text-slate-500 mt-1">
-                Updated {formatDistanceToNow(new Date(resume.updated_at), { addSuffix: true })}
-            </p>
-
-            {resume.is_draft && (
-                <div className="mt-4">
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
-                        Draft
-                    </Badge>
+            <Link
+                to={`/resumes/${resume.id}`}
+                className="block"
+            >
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${resume.is_draft ? 'bg-yellow-50 text-yellow-600' : 'bg-indigo-50 text-indigo-600'
+                    }`}>
+                    <FileText className="w-6 h-6" />
                 </div>
-            )}
-        </Link>
+
+                <h3 className="font-bold text-slate-900 truncate pr-16">{resume.title}</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                    Updated {formatDistanceToNow(new Date(resume.updated_at), { addSuffix: true })}
+                </p>
+
+                <div className="mt-4 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                        {resume.target_job_titles.length > 0 ? (
+                            resume.target_job_titles.map((title) => (
+                                <Badge
+                                    key={title}
+                                    variant="outline"
+                                    className="border-slate-200 bg-slate-50 font-normal text-slate-700"
+                                >
+                                    {title}
+                                </Badge>
+                            ))
+                        ) : (
+                            <Badge
+                                variant="outline"
+                                className="border-dashed border-slate-200 bg-slate-50 font-normal text-slate-400"
+                            >
+                                No target roles
+                            </Badge>
+                        )}
+                    </div>
+
+                    {resume.is_draft && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
+                                Draft
+                            </Badge>
+                        </div>
+                    )}
+                </div>
+            </Link>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+                <TargetJobTitlesEditor
+                    resumeId={resume.id}
+                    resumeTitle={resume.title}
+                    currentTitles={resume.target_job_titles}
+                />
+            </div>
+        </article>
     )
 }

@@ -5,7 +5,9 @@ import type {
     ResumeTitleUpdate,
     UpdateResumeRequest,
     ResumeListResponse,
-    ResumeExportRequest
+    ResumeExportRequest,
+    TargetJobTitleOptionsResponse,
+    UpdateTargetJobTitlesRequest,
 } from '@/types/resume'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
 
@@ -14,6 +16,16 @@ export const resumeApi = {
         const result = await client.get<ResumeListResponse, ResumeListResponse>('/resumes', {
             params: { page, size }
         })
+        return result
+    },
+
+    getTargetJobTitleOptions: async (keyword?: string) => {
+        const result = await client.get<TargetJobTitleOptionsResponse, TargetJobTitleOptionsResponse>(
+            '/resumes/target-job-titles/options',
+            {
+                params: keyword ? { keyword } : undefined,
+            },
+        )
         return result
     },
 
@@ -44,6 +56,11 @@ export const resumeApi = {
 
     updateResumeTitle: async (id: string, data: ResumeTitleUpdate) => {
         const result = await client.patch<Resume, Resume>(`/resumes/${id}/title`, data)
+        return result
+    },
+
+    updateTargetJobTitles: async (id: string, data: UpdateTargetJobTitlesRequest) => {
+        const result = await client.patch<Resume, Resume>(`/resumes/${id}/target-job-titles`, data)
         return result
     },
 
