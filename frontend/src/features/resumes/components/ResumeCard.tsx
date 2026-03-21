@@ -15,6 +15,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { resumeApi } from '@/api/resumes'
 import { TargetJobTitlesEditor } from './TargetJobTitlesEditor'
 
@@ -50,57 +56,74 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
 
     return (
         <article className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative">
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-slate-400 hover:text-slate-600"
-                    onClick={handleDownload}
-                    disabled={isDownloading}
-                >
-                    {isDownloading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <Download className="w-4 h-4" />
-                    )}
-                </Button>
-                <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:text-red-600"
-                        onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setIsDeleteOpen(true)
-                        }}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </Button>
-                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete your resume.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    onDelete(resume.id)
-                                    setIsDeleteOpen(false)
-                                }}
-                                className="bg-red-600 hover:bg-red-700"
+            <TooltipProvider>
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                                onClick={handleDownload}
+                                disabled={isDownloading}
                             >
-                                Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </div>
+                                {isDownloading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Download className="w-4 h-4" />
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            Download PDF
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-red-600"
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setIsDeleteOpen(true)
+                                    }}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                Delete Resume
+                            </TooltipContent>
+                        </Tooltip>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete your resume.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        onDelete(resume.id)
+                                        setIsDeleteOpen(false)
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700"
+                                >
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </TooltipProvider>
 
             <Link
                 to={`/resumes/${resume.id}`}
