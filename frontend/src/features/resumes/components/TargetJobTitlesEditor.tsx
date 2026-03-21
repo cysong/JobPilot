@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Pencil, Search, X } from 'lucide-react'
+import { Check, Loader2, Lock, Pencil, Search, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { useTargetJobTitleOptions, useUpdateTargetJobTitles } from '@/features/resumes/hooks/useResumes'
 import { cn } from '@/utils/cn'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface TargetJobTitlesEditorProps {
   resumeId: string
@@ -173,32 +179,55 @@ export function TargetJobTitlesEditor({
               )}
             </div>
 
+            {reachedLimit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                You can select up to {selectionLimit} target roles. Remove one to add another.
+              </div>
+            )}
+
             <div className="min-h-[224px] rounded-lg border border-slate-200 bg-white px-3 py-3">
               {options.length > 0 ? (
-                <div className="flex max-h-[200px] flex-wrap gap-2 overflow-y-auto pr-1">
+                <TooltipProvider>
+                  <div className="flex max-h-[200px] flex-wrap gap-2 overflow-y-auto pr-1">
                 {options.map((option) => {
                   const isSelected = hasTitle(selectedTitles, option.title)
-                  const disabled = isSelected || reachedLimit
+                  const isDisabledByLimit = !isSelected && reachedLimit
+                  const disabled = isSelected || isDisabledByLimit
+                  const tooltipText = isSelected
+                    ? 'Already selected'
+                    : isDisabledByLimit
+                      ? 'Limit reached'
+                      : null
 
                   return (
-                    <button
-                      key={option.title}
-                      type="button"
-                      onClick={() => handleAdd(option.title)}
-                      disabled={disabled}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-sm transition-colors',
-                        isSelected
-                          ? 'border-slate-200 bg-slate-100 text-slate-400'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100',
-                        !isSelected && reachedLimit && 'cursor-not-allowed text-slate-400',
+                    <Tooltip key={option.title}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(option.title)}
+                          disabled={disabled}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors',
+                            isSelected && 'border-slate-200 bg-slate-100 text-slate-500',
+                            isDisabledByLimit && 'border-amber-200 bg-amber-50 text-amber-700',
+                            !disabled && 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100',
+                          )}
+                        >
+                          {isSelected && <Check className="h-3.5 w-3.5" />}
+                          {isDisabledByLimit && <Lock className="h-3.5 w-3.5" />}
+                          <span>{option.title} ({option.count})</span>
+                        </button>
+                      </TooltipTrigger>
+                      {tooltipText && (
+                        <TooltipContent>
+                          {tooltipText}
+                        </TooltipContent>
                       )}
-                    >
-                      {option.title} ({option.count})
-                    </button>
+                    </Tooltip>
                   )
                 })}
-                </div>
+                  </div>
+                </TooltipProvider>
               ) : (
                 <div className="flex min-h-[200px] items-center justify-center text-sm text-slate-500">
                   No matching roles found.
