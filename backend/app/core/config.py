@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     # Matching
     MATCH_SCORE_THRESHOLD: float = 0.6  # Minimum match score to recommend resume
     HIGH_MATCH_THRESHOLD: float = 0.9  # Threshold for "high match" badge
+    MAX_JOB_MATCHES_PER_PULL: int = 100  # Maximum matching tasks to enqueue per poll cycle
     MAX_CANDIDATES_PER_JOB: int = 100  # Title-prefilter cap per job
     SKILL_MATCH_THRESHOLD: float = 40  # Minimum skill match percentage to keep a match
     MATCHING_ALGORITHM_VERSION: str = "v1.0.0"

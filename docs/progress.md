@@ -11,6 +11,13 @@
 
 ## Work Log
 
+### 2026-03-22 - Matching Pull Batch Limit
+
+- Added backend matching pull batch limit setting:
+  - `MAX_JOB_MATCHES_PER_PULL = 100`
+- Updated periodic `pull_unmatched_jobs` to explicitly cap each polling cycle by the configured limit instead of relying on the repository default.
+- This change limits how many `JOB_USER_MATCHING` tasks can be enqueued in one 5-minute pull cycle and reduces queue burst risk.
+
 ### 2026-03-22 - Resume List Target Role Display and Editor
 
 - Added resume list target role display so each resume card now shows its current `target_job_titles`.

@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.celery_app import celery_app
+from app.core.config import settings
 from app.modules.jobs.repository import JobAnalysisRepository
 from app.modules.workflow.models import TaskExecution
 from app.modules.workflow.service import TaskService
@@ -26,7 +27,11 @@ async def pull_unmatched_jobs(self) -> dict:
     last_exec = await _get_last_execution_time(self.db)
     since = last_exec or datetime.now(timezone.utc) - timedelta(days=30)
 
-    new_analyses = await JobAnalysisRepository.get_updated_since(self.db, since=since)
+    new_analyses = await JobAnalysisRepository.get_updated_since(
+        self.db,
+        since=since,
+        limit=settings.MAX_JOB_MATCHES_PER_PULL,
+    )
     if not new_analyses:
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(f"pull_unmatched_jobs completed: new_jobs=0, time={elapsed_ms}ms")
