@@ -55,12 +55,12 @@ celery_app.conf.beat_schedule = {
     'poll-unanalyzed-jobs': {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
-    }
+    },
     # Temporarily disabled: do not enqueue new JOB_USER_MATCHING tasks.
-    # 'pull-unmatched-jobs': {
-    #     'task': 'app.modules.matching.pull.pull_unmatched_jobs',
-    #     'schedule': crontab(minute='*/5'),
-    # },
+    'pull-unmatched-jobs': {
+        'task': 'app.modules.matching.pull.pull_unmatched_jobs',
+        'schedule': crontab(minute='*/5'),
+    }
 }
 
 
