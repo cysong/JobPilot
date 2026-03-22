@@ -1,4 +1,5 @@
 """Celery tasks for resume analysis."""
+import json
 
 from app.core.celery_app import celery_app
 from app.core.llm.gateway import AgentGateway
@@ -23,9 +24,16 @@ async def analyze_resume_task(
     if not content or len(content.strip()) < 50:
         raise ValueError(f"Resume {resume_id} has insufficient content to analyze")
 
+    allowed_target_job_titles = await ResumeService.get_controlled_target_job_titles(self.db)
     result = await AgentGateway.get().call(
         agent_id="resume_analyzer",
-        input_data=content,
+        input_data=json.dumps(
+            {
+                "resume_content": content,
+                "allowed_target_job_titles": allowed_target_job_titles,
+            },
+            ensure_ascii=False,
+        ),
         context={
             "db": self.db,
             "task_id": task_id,
@@ -34,6 +42,11 @@ async def analyze_resume_task(
     )
 
     analysis_data = result.model_dump() if isinstance(result, AnalyzedResume) else result
+    filtered_target_job_titles = await ResumeService.filter_analysis_target_job_titles(
+        self.db,
+        analysis_data.get("target_job_titles") or [],
+    )
+    analysis_data["target_job_titles"] = filtered_target_job_titles
 
     await ResumeRepository.update_analysis(
         db=self.db,

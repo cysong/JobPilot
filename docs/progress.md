@@ -43,6 +43,16 @@
   - moved target job title selection limit into `backend/app/modules/resumes/config.py`
   - increased the limit from `5` to `10`
   - removed the frontend hardcoded limit and now return `selection_limit` from the options API so the dialog reads the configured value from backend
+  - tightened controlled target job title vocabulary for resume analysis:
+    - source is `job_analyses.normalized_job_title`
+    - excludes blank values
+    - only keeps titles with `count >= 3`
+  - updated `resume_analyzer` input contract so the agent receives `allowed_target_job_titles` and must select `target_job_titles` only from that controlled list
+  - updated resume analysis task persistence to silently filter invalid analyzed titles instead of raising:
+    - invalid titles are dropped before saving
+    - filtered titles are written back to both `resume.target_job_titles` and `analysis_result.target_job_titles`
+  - aligned manual target-role editing validation to the same controlled vocabulary
+  - added focused tests for strict-vs-filtered controlled title coercion
 
 ### 2026-03-19 - Universal Translator Simplified Chinese Locale Fix
 

@@ -135,7 +135,7 @@ class AnalyzedResume(BaseModel):
     # Target job titles (for downstream matching)
     target_job_titles: list[str] = Field(
         default_factory=list,
-        description="3-5 suitable job titles for the candidate, ordered by relevance"
+        description="Candidate target job titles selected from the controlled allowed list, ordered by relevance"
     )
 
     # Basic information
