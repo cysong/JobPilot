@@ -332,6 +332,30 @@ class ResumeService:
         )
 
     @staticmethod
+    def merge_target_job_titles(
+        existing_titles: list[str] | None,
+        analyzed_titles: list[str] | None,
+    ) -> list[str]:
+        """Merge analyzed titles into user-maintained titles with case-insensitive deduplication."""
+        merged: list[str] = []
+        seen: set[str] = set()
+
+        for title_group in (existing_titles or [], analyzed_titles or []):
+            for source in title_group:
+                trimmed = source.strip()
+                if not trimmed:
+                    continue
+
+                key = trimmed.lower()
+                if key in seen:
+                    continue
+
+                seen.add(key)
+                merged.append(trimmed)
+
+        return merged
+
+    @staticmethod
     async def finalize_resume(db: AsyncSession, resume_id: str, user_id: int) -> Resume:
         """Mark resume as formal version (finalize from draft)."""
         resume = await ResumeService.get_resume_by_id(db, resume_id, user_id)

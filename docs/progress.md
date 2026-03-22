@@ -50,9 +50,15 @@
   - updated `resume_analyzer` input contract so the agent receives `allowed_target_job_titles` and must select `target_job_titles` only from that controlled list
   - updated resume analysis task persistence to silently filter invalid analyzed titles instead of raising:
     - invalid titles are dropped before saving
-    - filtered titles are written back to both `resume.target_job_titles` and `analysis_result.target_job_titles`
+    - filtered titles are written to `analysis_result.target_job_titles`
   - aligned manual target-role editing validation to the same controlled vocabulary
   - added focused tests for strict-vs-filtered controlled title coercion
+  - follow-up split of target role responsibilities:
+    - `resume.analysis_result["target_job_titles"]` now represents AI-analyzed target roles
+    - `resumes.target_job_titles` now represents user-maintained target roles and matching source
+    - resume analysis persistence merges filtered AI titles into `resumes.target_job_titles` with case-insensitive deduplication instead of overwriting user-maintained values
+    - frontend manual editing still updates only `resumes.target_job_titles`
+    - matching title prefilter now reads from `resumes.target_job_titles` instead of `analysis_result->target_job_titles`
 
 ### 2026-03-19 - Universal Translator Simplified Chinese Locale Fix
 

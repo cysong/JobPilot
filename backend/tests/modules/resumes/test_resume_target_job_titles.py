@@ -74,3 +74,26 @@ def test_coerce_controlled_target_job_titles_raises_in_strict_mode():
             controlled_title_map,
             strict=True,
         )
+
+
+def test_merge_target_job_titles_keeps_existing_and_appends_new_unique_titles():
+    merged = ResumeService.merge_target_job_titles(
+        ["Backend Developer", "Software Engineer"],
+        ["software engineer", "Data Engineer", "Backend Developer", "Platform Engineer"],
+    )
+
+    assert merged == [
+        "Backend Developer",
+        "Software Engineer",
+        "Data Engineer",
+        "Platform Engineer",
+    ]
+
+
+def test_merge_target_job_titles_ignores_blank_values():
+    merged = ResumeService.merge_target_job_titles(
+        ["Backend Developer", " "],
+        ["", "Data Engineer"],
+    )
+
+    assert merged == ["Backend Developer", "Data Engineer"]

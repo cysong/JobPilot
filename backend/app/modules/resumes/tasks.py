@@ -47,12 +47,17 @@ async def analyze_resume_task(
         analysis_data.get("target_job_titles") or [],
     )
     analysis_data["target_job_titles"] = filtered_target_job_titles
+    merged_target_job_titles = ResumeService.merge_target_job_titles(
+        resume.target_job_titles,
+        filtered_target_job_titles,
+    )
 
     await ResumeRepository.update_analysis(
         db=self.db,
         resume_id=resume_id,
         analysis_data=analysis_data,
         analysis_version=AnalyzedResume.__version__,
+        merged_target_job_titles=merged_target_job_titles,
     )
 
     # Extract and save skills

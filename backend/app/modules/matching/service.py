@@ -114,10 +114,10 @@ async def prefilter_candidates_by_title(
         FROM resumes r
         WHERE r.is_draft = FALSE
           AND r.is_deleted = FALSE
-          AND r.analysis_result IS NOT NULL
+          AND r.target_job_titles IS NOT NULL
           AND LOWER(:title) = ANY (
               SELECT LOWER(elem::text)::text
-              FROM jsonb_array_elements_text((r.analysis_result)::jsonb->'target_job_titles') AS elem
+              FROM jsonb_array_elements_text((r.target_job_titles)::jsonb) AS elem
           )
         LIMIT :max_candidates
         """
@@ -135,7 +135,7 @@ async def find_best_resume_for_user(
     """Pick best formal resume with analysis for this user."""
     q = text(
         """
-        SELECT id, title, analysis_result
+        SELECT id, title, analysis_result, target_job_titles
         FROM resumes
         WHERE user_id = :user_id
           AND is_draft = FALSE
@@ -150,7 +150,7 @@ async def find_best_resume_for_user(
     best_details: dict = {}
 
     for row in rows:
-        resume_id, title, analysis_json = row
+        resume_id, title, analysis_json, target_job_titles = row
         score, details = calculate_resume_match_score(resume_analysis=analysis_json, job_analysis=job_analysis)
         if score > best_score:
             best_score = score
@@ -159,7 +159,7 @@ async def find_best_resume_for_user(
                 "resume_title": title,
                 "score_breakdown": details,
                 "total_experience_years": analysis_json.get("total_experience_years"),
-                "target_job_titles": analysis_json.get("target_job_titles", []),
+                "target_job_titles": target_job_titles or [],
             }
     return best_id, best_score, best_details
 
@@ -191,10 +191,10 @@ async def user_has_title_target(db: AsyncSession, *, user_id: int, normalized_jo
         WHERE r.user_id = :user_id
           AND r.is_draft = FALSE
           AND r.is_deleted = FALSE
-          AND r.analysis_result IS NOT NULL
+          AND r.target_job_titles IS NOT NULL
           AND LOWER(:title) = ANY (
               SELECT LOWER(elem::text)::text
-              FROM jsonb_array_elements_text((r.analysis_result)::jsonb->'target_job_titles') AS elem
+              FROM jsonb_array_elements_text((r.target_job_titles)::jsonb) AS elem
           )
         LIMIT 1
         """
