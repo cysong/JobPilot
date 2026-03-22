@@ -59,6 +59,10 @@
     - resume analysis persistence merges filtered AI titles into `resumes.target_job_titles` with case-insensitive deduplication instead of overwriting user-maintained values
     - frontend manual editing still updates only `resumes.target_job_titles`
     - matching title prefilter now reads from `resumes.target_job_titles` instead of `analysis_result->target_job_titles`
+  - refined target title validation scope:
+    - frontend candidate list and `allowed_target_job_titles` for AI still use `count >= 3`
+    - AI result filtering and manual-save validation no longer require `count >= 3`
+    - if a normalized job title exists in `job_analyses` even once, it can still be preserved/saved during filtering or manual updates
 
 ### 2026-03-19 - Universal Translator Simplified Chinese Locale Fix
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { resumeApi } from '@/api/resumes'
 import type { CreateResumeRequest } from '@/types/resume'
 import type { DocumentEditData, DocumentUpdatePayload } from '@/types/document'
+import { ApiError } from '@/types/api'
 import { useToast } from '@/components/ui/use-toast'
 
 export const useResumes = () => {
@@ -64,10 +65,13 @@ export const useUpdateTargetJobTitles = () => {
       queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
       toast({ title: 'Success', description: 'Target roles updated successfully' })
     },
-    onError: () => {
+    onError: (error) => {
+      const description = error instanceof ApiError
+        ? error.message
+        : 'Failed to update target roles'
       toast({
         title: 'Error',
-        description: 'Failed to update target roles',
+        description,
         variant: 'destructive',
       })
     },

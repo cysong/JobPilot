@@ -319,12 +319,15 @@ class ResumeService:
         db: AsyncSession,
         titles: list[str],
     ) -> list[str]:
-        """Silently filter analyzed target job titles to the controlled vocabulary."""
+        """Silently filter analyzed target job titles to existing normalized job titles."""
         normalized_titles = ResumeService._normalize_target_job_titles(
             titles,
             max_titles=resume_module_settings.TARGET_JOB_TITLES_LIMIT,
         )
-        controlled_title_map = await ResumeService._get_controlled_target_job_title_map(db)
+        controlled_title_map = await ResumeService._get_existing_target_job_title_map_for_titles(
+            db,
+            normalized_titles,
+        )
         return ResumeService._coerce_controlled_target_job_titles(
             normalized_titles,
             controlled_title_map,
@@ -663,7 +666,10 @@ class ResumeService:
         titles: list[str],
     ) -> list[str]:
         """Validate titles against aggregated analyzed job titles."""
-        controlled_title_map = await ResumeService._get_controlled_target_job_title_map(db)
+        controlled_title_map = await ResumeService._get_existing_target_job_title_map_for_titles(
+            db,
+            titles,
+        )
         return ResumeService._coerce_controlled_target_job_titles(
             titles,
             controlled_title_map,
@@ -671,17 +677,23 @@ class ResumeService:
         )
 
     @staticmethod
-    async def _get_controlled_target_job_title_map(
+    async def _get_existing_target_job_title_map_for_titles(
         db: AsyncSession,
+        titles: list[str],
     ) -> dict[str, str]:
-        """Get canonical controlled target job titles keyed by lowercase title."""
+        """Get canonical existing target job titles keyed by lowercase title."""
+        normalized_titles = [title.strip().lower() for title in titles if title.strip()]
+        if not normalized_titles:
+            return {}
+
         trimmed_title = func.trim(JobAnalysis.normalized_job_title)
+        lowered_trimmed_title = func.lower(trimmed_title)
         stmt = (
             select(trimmed_title.label("title"))
             .where(JobAnalysis.normalized_job_title.is_not(None))
             .where(trimmed_title != "")
+            .where(lowered_trimmed_title.in_(normalized_titles))
             .group_by(trimmed_title)
-            .having(func.count(JobAnalysis.id) >= resume_module_settings.TARGET_JOB_TITLE_MIN_JOB_COUNT)
         )
         result = await db.execute(stmt)
         return {row.title.lower(): row.title for row in result.all()}
