@@ -258,36 +258,6 @@ export default function JobDetailPage() {
               </Link>
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleSaved}
-                disabled={saveJob.isPending || unsaveJob.isPending}
-                className={isSaved ? "text-amber-500 border-amber-200 hover:bg-amber-50" : ""}
-              >
-                <Star
-                  className={`h-4 w-4 mr-2 ${isSaved ? "fill-amber-500 text-amber-500" : ""}`}
-                />
-                {isSaved ? "Saved" : "Save"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleExpiration}
-                disabled={setJobExpiration.isPending}
-                className={
-                  job.manual_expired
-                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                    : "border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-                }
-              >
-                {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
-              </Button>
-
               {/* Application Button Logic */}
               {!isApplicationLoading && !application && (
                 <Button
@@ -300,41 +270,41 @@ export default function JobDetailPage() {
                 </Button>
               )}
 
-	              {!isApplicationLoading && application && (
-	                <TooltipProvider>
-	                  <div className="flex gap-2 items-center">
-	                    <Tooltip>
-	                      <TooltipTrigger asChild>
-	                        <Link
-	                          to={`/applications/${application.id}`}
-	                          aria-label={`Open application (${applicationStatusPresentation?.label})`}
-	                          className={cn(
-	                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-	                            "hover:brightness-95",
-	                            applicationStatusPresentation?.className,
-	                            applicationStatusPresentation?.variant === "secondary" &&
-	                              "border-transparent bg-secondary text-secondary-foreground",
-	                            applicationStatusPresentation?.variant === "outline" &&
-	                              "text-foreground",
-	                            applicationStatusPresentation?.variant == null &&
-	                              "border-transparent bg-primary text-primary-foreground",
-	                          )}
-	                        >
-	                          <span>{applicationStatusPresentation?.label}</span>
-	                          <span
-	                            aria-hidden="true"
-	                            className="h-3.5 w-px bg-current/20"
-	                          />
-	                          <Eye className="h-3.5 w-3.5" />
-	                        </Link>
-	                      </TooltipTrigger>
-	                      <TooltipContent>
-	                        <div className="max-w-xs">
-	                          <p className="text-sm font-medium">Open application</p>
-	                        </div>
-	                        {application.status === "Failed" &&
-	                          application.last_error && (
-	                            <div className="max-w-xs">
+              {!isApplicationLoading && application && (
+                <TooltipProvider>
+                  <div className="flex gap-2 items-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to={`/applications/${application.id}`}
+                          aria-label={`Open application (${applicationStatusPresentation?.label})`}
+                          className={cn(
+                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                            "hover:brightness-95",
+                            applicationStatusPresentation?.className,
+                            applicationStatusPresentation?.variant === "secondary" &&
+                              "border-transparent bg-secondary text-secondary-foreground",
+                            applicationStatusPresentation?.variant === "outline" &&
+                              "text-foreground",
+                            applicationStatusPresentation?.variant == null &&
+                              "border-transparent bg-primary text-primary-foreground",
+                          )}
+                        >
+                          <span>{applicationStatusPresentation?.label}</span>
+                          <span
+                            aria-hidden="true"
+                            className="h-3.5 w-px bg-current/20"
+                          />
+                          <Eye className="h-3.5 w-3.5" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="max-w-xs">
+                          <p className="text-sm font-medium">Open application</p>
+                        </div>
+                        {application.status === "Failed" &&
+                          application.last_error && (
+                            <div className="max-w-xs">
                               <p className="font-semibold text-red-500">
                                 Error:
                               </p>
@@ -370,6 +340,36 @@ export default function JobDetailPage() {
                   </div>
                 </TooltipProvider>
               )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleExpiration}
+                disabled={setJobExpiration.isPending}
+                className={
+                  job.manual_expired
+                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                    : "border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                }
+              >
+                {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleSaved}
+                disabled={saveJob.isPending || unsaveJob.isPending}
+                className={isSaved ? "text-amber-500 border-amber-200 hover:bg-amber-50" : ""}
+              >
+                <Star
+                  className={`h-4 w-4 mr-2 ${isSaved ? "fill-amber-500 text-amber-500" : ""}`}
+                />
+                {isSaved ? "Saved" : "Save"}
+              </Button>
+              <Button variant="outline" size="sm">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
 
             </div>
 
