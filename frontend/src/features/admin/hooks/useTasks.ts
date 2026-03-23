@@ -18,5 +18,6 @@ export function useTasks(params: TaskQueryParams) {
     queryKey: ['admin', 'tasks', params],
     queryFn: () => adminApi.getTasks(params),
     placeholderData: keepPreviousData,
+    refetchInterval: 10 * 1000,
   })
 }

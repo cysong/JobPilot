@@ -111,9 +111,9 @@ export function TaskFilters({
             ))}
           </SelectContent>
         </Select>
-        <Select value={workerId ?? '__any__'} onValueChange={handleWorkerSelect}>
+        <Select value={workerId ?? ''} onValueChange={handleWorkerSelect}>
           <SelectTrigger>
-            <SelectValue placeholder="Worker id" />
+            <SelectValue placeholder="Worker" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__any__">(Any)</SelectItem>

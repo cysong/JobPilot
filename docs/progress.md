@@ -11,6 +11,17 @@
 
 ## Work Log
 
+### 2026-03-23 - Admin Task Monitor Worker Placeholder
+
+- Updated the admin task monitor worker filter placeholder from `Worker id` to `Worker` so it matches the title-style labeling used by the other filter controls.
+- Fixed the worker filter default select value so the control now shows the `Worker` placeholder when no worker is selected, instead of rendering `(Any)` as the current selected value.
+- Verified the current admin task monitor `keyword` filter scope in backend task search logic:
+  - exact match: `task_executions.id`
+  - exact match: `task_executions.workflow_id`
+  - exact match: `task_executions.entity_id`
+  - fuzzy match (`ILIKE %keyword%`): `task_executions.task_name`
+- Added automatic polling for the admin task list query every 10 seconds so the task monitor list stays fresh without manual refresh.
+
 ### 2026-03-22 - Matching Pull Batch Limit
 
 - Added backend matching pull batch limit setting:
