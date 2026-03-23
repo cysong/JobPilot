@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSkills, useSkillMutations } from '../hooks/useSkills'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
@@ -55,8 +55,9 @@ export const SkillsManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-32 w-full" />
+      <div className="space-y-6">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-28 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -81,56 +82,56 @@ export const SkillsManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with stats */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                My Skills
-              </CardTitle>
-              <CardDescription>
-                Manage your professional skills and proficiency levels
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSync}
-                disabled={syncSkills.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncSkills.isPending ? 'animate-spin' : ''}`} />
-                Sync from Resumes
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setAddDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Skill
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold">{data?.total || 0}</p>
-              <p className="text-sm text-muted-foreground">Total Skills</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{data?.manual_count || 0}</p>
-              <p className="text-sm text-muted-foreground">Manually Added</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{data?.auto_count || 0}</p>
-              <p className="text-sm text-muted-foreground">From Resumes</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <Tag className="h-6 w-6" />
+            My Skills
+          </h1>
+          <p className="mt-1 text-slate-500">
+            Manage your professional skills and proficiency levels
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncSkills.isPending}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncSkills.isPending ? 'animate-spin' : ''}`} />
+            Sync from Resumes
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setAddDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Skill
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="py-6 text-center">
+            <p className="text-2xl font-bold">{data?.total || 0}</p>
+            <p className="text-sm text-muted-foreground">Total Skills</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-6 text-center">
+            <p className="text-2xl font-bold text-blue-600">{data?.manual_count || 0}</p>
+            <p className="text-sm text-muted-foreground">Manually Added</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-6 text-center">
+            <p className="text-2xl font-bold text-green-600">{data?.auto_count || 0}</p>
+            <p className="text-sm text-muted-foreground">From Resumes</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Skills List */}
       <div className="space-y-4">
