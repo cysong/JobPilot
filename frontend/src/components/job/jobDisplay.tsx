@@ -1,4 +1,5 @@
-import { Clock, Globe, MapPin, Tag, type LucideIcon } from "lucide-react";
+import { Banknote, Clock, Globe, MapPin, Tag, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import linkedinIcon from "@/assets/source-icons/linkedin.svg";
 import seekIcon from "@/assets/source-icons/seek.ico";
@@ -13,6 +14,7 @@ type JobDisplayFields = {
   source?: string | null;
   location_label?: string | null;
   work_types_label?: string | null;
+  salary_label?: string | null;
   classification?: string | null;
   sub_classification?: string | null;
 };
@@ -57,6 +59,7 @@ type JobAttributeListProps = {
   className?: string;
   showSource?: boolean;
   showCategory?: boolean;
+  showSalary?: boolean;
 };
 
 type JobSourceCompanyLineProps = {
@@ -96,11 +99,33 @@ export function JobSourceCompanyLine({
   );
 }
 
+type JobSalaryDisplayProps = {
+  salaryLabel?: string | null;
+  className?: string;
+  iconClassName?: string;
+};
+
+export function JobSalaryDisplay({
+  salaryLabel,
+  className,
+  iconClassName,
+}: JobSalaryDisplayProps) {
+  if (!salaryLabel) return null;
+
+  return (
+      <div className={`flex items-center gap-1.5 ${className ?? ""}`.trim()}>
+      <Banknote className={iconClassName ?? "h-3.5 w-3.5"} />
+      <span>{salaryLabel}</span>
+    </div>
+  );
+}
+
 export function JobAttributeList({
   job,
   className,
   showSource = false,
   showCategory = true,
+  showSalary = false,
 }: JobAttributeListProps) {
   const sourceMeta = getSourceMeta(job.source);
   const SourceIcon = sourceMeta.icon;
@@ -121,6 +146,12 @@ export function JobAttributeList({
     job.work_types_label
       ? { key: "type", icon: Clock, label: job.work_types_label }
       : null,
+    showSalary && job.salary_label
+      ? {
+          key: "salary",
+          content: <JobSalaryDisplay salaryLabel={job.salary_label} />,
+        }
+      : null,
     showCategory && category
       ? { key: "category", icon: Tag, label: category }
       : null,
@@ -128,7 +159,8 @@ export function JobAttributeList({
     key: string;
     icon?: LucideIcon | null;
     iconSrc?: string;
-    label: string;
+    label?: string;
+    content?: ReactNode;
   }>;
 
   if (items.length === 0) return null;
@@ -137,16 +169,22 @@ export function JobAttributeList({
     <div className={`flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500 ${className ?? ""}`.trim()}>
       {items.map((item) => (
         <div key={item.key} className="flex items-center gap-1.5">
-          {item.iconSrc ? (
-            <img
-              src={item.iconSrc}
-              alt={`${item.label} icon`}
-              className="h-3.5 w-3.5 rounded-sm object-contain"
-            />
-          ) : item.icon ? (
-            <item.icon className="h-3.5 w-3.5" />
-          ) : null}
-          <span>{item.label}</span>
+          {item.content ? (
+            item.content
+          ) : (
+            <>
+              {item.iconSrc ? (
+                <img
+                  src={item.iconSrc}
+                  alt={`${item.label} icon`}
+                  className="h-3.5 w-3.5 rounded-sm object-contain"
+                />
+              ) : item.icon ? (
+                <item.icon className="h-3.5 w-3.5" />
+              ) : null}
+              <span>{item.label}</span>
+            </>
+          )}
         </div>
       ))}
     </div>

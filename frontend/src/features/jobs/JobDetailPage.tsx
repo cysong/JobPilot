@@ -437,12 +437,10 @@ export default function JobDetailPage() {
                 job={job}
                 className="mt-2 text-sm text-slate-600"
                 showCategory={false}
+                showSalary
               />
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {job.salary_label && (
-                  <Badge variant="secondary">{job.salary_label}</Badge>
-                )}
                 {categoryText && (
                   <span className="text-xs text-slate-500">{categoryText}</span>
                 )}

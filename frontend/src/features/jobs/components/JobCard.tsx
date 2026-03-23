@@ -17,6 +17,7 @@ import {
 import {
   formatJobCategory,
   getSourceMeta,
+  JobSalaryDisplay,
 } from '@/components/job/jobDisplay'
 
 interface JobCardProps {
@@ -117,9 +118,7 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
               <span>{job.work_types_label}</span>
             </div>
             {job.salary_label && (
-              <div className="flex items-center gap-1">
-                <span>{job.salary_label}</span>
-              </div>
+              <JobSalaryDisplay salaryLabel={job.salary_label} />
             )}
           </div>
 
