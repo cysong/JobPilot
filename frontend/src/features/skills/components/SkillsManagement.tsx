@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSkills, useSkillMutations } from '../hooks/useSkills'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RefreshCw, Plus, Edit, Trash2, Tag } from 'lucide-react'
+import { RefreshCw, Plus, Edit, Trash2, Tag, Search } from 'lucide-react'
 import type { UserSkill } from '@/types/skill'
 import { AddSkillDialog } from './AddSkillDialog'
 import { EditSkillDialog } from './EditSkillDialog'
@@ -33,13 +34,48 @@ const proficiencyLabels = {
   expert: 'Expert',
 }
 
+const normalizeSkillName = (value: string) => value.trim().toLowerCase()
+
+const isFuzzyMatch = (skillName: string, keyword: string) => {
+  const normalizedSkill = normalizeSkillName(skillName)
+  const normalizedKeyword = normalizeSkillName(keyword)
+
+  if (!normalizedKeyword) return true
+  if (normalizedSkill.includes(normalizedKeyword)) return true
+
+  let keywordIndex = 0
+  for (const char of normalizedSkill) {
+    if (char === normalizedKeyword[keywordIndex]) {
+      keywordIndex += 1
+    }
+
+    if (keywordIndex === normalizedKeyword.length) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export const SkillsManagement = () => {
   const { data, isLoading, error } = useSkills()
   const { deleteSkill, syncSkills } = useSkillMutations()
 
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [addDialogInstanceKey, setAddDialogInstanceKey] = useState(0)
+  const [addDialogInitialSkillName, setAddDialogInitialSkillName] = useState('')
   const [editingSkill, setEditingSkill] = useState<UserSkill | null>(null)
   const [deletingSkill, setDeletingSkill] = useState<UserSkill | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [searchInput])
 
   const handleDelete = () => {
     if (deletingSkill) {
@@ -53,11 +89,25 @@ export const SkillsManagement = () => {
     syncSkills.mutate()
   }
 
+  const handleOpenAddDialog = (initialSkillName = '') => {
+    setAddDialogInitialSkillName(initialSkillName.trim())
+    setAddDialogInstanceKey((current) => current + 1)
+    setAddDialogOpen(true)
+  }
+
+  const handleAddDialogOpenChange = (open: boolean) => {
+    setAddDialogOpen(open)
+
+    if (!open) {
+      setAddDialogInitialSkillName('')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-16 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -77,17 +127,22 @@ export const SkillsManagement = () => {
   }
 
   const skills = data?.items || []
-  const manualSkills = skills.filter(s => s.is_manual)
-  const autoSkills = skills.filter(s => !s.is_manual)
+  const filteredSkills = debouncedSearch
+    ? skills.filter((skill) => isFuzzyMatch(skill.skill_name, debouncedSearch))
+    : skills
+  const manualSkills = filteredSkills.filter((s) => s.is_manual)
+  const autoSkills = filteredSkills.filter((s) => !s.is_manual)
+  const normalizedDebouncedSearch = normalizeSkillName(debouncedSearch)
+  const hasExactSkillMatch = normalizedDebouncedSearch
+    ? skills.some((skill) => normalizeSkillName(skill.skill_name) === normalizedDebouncedSearch)
+    : false
+  const showAddFromSearch = Boolean(normalizedDebouncedSearch) && !hasExactSkillMatch
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-            <Tag className="h-6 w-6" />
-            My Skills
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900">My Skills</h1>
           <p className="mt-1 text-slate-500">
             Manage your professional skills and proficiency levels
           </p>
@@ -104,7 +159,7 @@ export const SkillsManagement = () => {
           </Button>
           <Button
             size="sm"
-            onClick={() => setAddDialogOpen(true)}
+            onClick={() => handleOpenAddDialog()}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Skill
@@ -112,25 +167,28 @@ export const SkillsManagement = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="py-6 text-center">
-            <p className="text-2xl font-bold">{data?.total || 0}</p>
-            <p className="text-sm text-muted-foreground">Total Skills</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-6 text-center">
-            <p className="text-2xl font-bold text-blue-600">{data?.manual_count || 0}</p>
-            <p className="text-sm text-muted-foreground">Manually Added</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-6 text-center">
-            <p className="text-2xl font-bold text-green-600">{data?.auto_count || 0}</p>
-            <p className="text-sm text-muted-foreground">From Resumes</p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search skills by name or keyword"
+            className="pl-10"
+            aria-label="Search skills"
+          />
+        </div>
+        {showAddFromSearch && (
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            onClick={() => handleOpenAddDialog(debouncedSearch)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add "{debouncedSearch}" as a new skill
+          </Button>
+        )}
       </div>
 
       {/* Skills List */}
@@ -143,6 +201,18 @@ export const SkillsManagement = () => {
                 <p className="text-lg font-medium">No skills yet</p>
                 <p className="text-sm mt-2">
                   Add skills manually or upload a resume to extract them automatically
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : filteredSkills.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center text-muted-foreground">
+                <Search className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                <p className="text-lg font-medium text-slate-900">No matching skills found</p>
+                <p className="mt-2 text-sm">
+                  Try another keyword or add "{debouncedSearch}" as a new skill.
                 </p>
               </div>
             </CardContent>
@@ -254,8 +324,10 @@ export const SkillsManagement = () => {
 
       {/* Dialogs */}
       <AddSkillDialog
+        key={addDialogInstanceKey}
         open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
+        onOpenChange={handleAddDialogOpenChange}
+        initialSkillName={addDialogInitialSkillName}
       />
 
       {editingSkill && (

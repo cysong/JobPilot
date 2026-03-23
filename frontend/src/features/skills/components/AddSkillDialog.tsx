@@ -23,6 +23,7 @@ import { PROFICIENCY_LEVELS, type ProficiencyLevel } from '@/types/skill'
 interface AddSkillDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSkillName?: string
 }
 
 const proficiencyOptions = [
@@ -32,9 +33,9 @@ const proficiencyOptions = [
   { value: PROFICIENCY_LEVELS.EXPERT, label: 'Expert' },
 ]
 
-export const AddSkillDialog = ({ open, onOpenChange }: AddSkillDialogProps) => {
+export const AddSkillDialog = ({ open, onOpenChange, initialSkillName = '' }: AddSkillDialogProps) => {
   const { createSkill } = useSkillMutations()
-  const [skillName, setSkillName] = useState('')
+  const [skillName, setSkillName] = useState(initialSkillName.trim())
   const [proficiency, setProficiency] = useState<ProficiencyLevel>(PROFICIENCY_LEVELS.INTERMEDIATE)
 
   const handleSubmit = (e: React.FormEvent) => {
