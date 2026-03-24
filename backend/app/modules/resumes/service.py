@@ -8,6 +8,7 @@ from uuid import uuid4
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.core.exceptions import (
     BadRequestError,
@@ -531,7 +532,8 @@ class ResumeService:
             raise NotFoundError("Resume not found")
 
         try:
-            pdf_bytes, filename, template_used = DocumentExportService.export_to_pdf(
+            pdf_bytes, filename, template_used = await run_in_threadpool(
+                DocumentExportService.export_to_pdf,
                 document_type="resume",
                 content=resume.document.content,
                 title=resume.title,

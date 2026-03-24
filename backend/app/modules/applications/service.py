@@ -7,6 +7,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.exceptions import BadRequestError, NotFoundError, JobPilotException
 from app.modules.applications.models import Application
@@ -406,10 +407,11 @@ class ApplicationService:
         job_title = application.job.title if application.job else None
 
         try:
-            pdf_bytes, _, template_used = DocumentExportService.export_to_pdf(
+            pdf_bytes, _, template_used = await run_in_threadpool(
+                DocumentExportService.export_to_pdf,
                 document_type="resume",
                 content=resume_doc.content,
-                title="Tailored Resume",
+                title="Resume",
                 template=template,
                 font_size=font_size,
                 include_metadata=include_metadata,
@@ -451,7 +453,8 @@ class ApplicationService:
         job_title = application.job.title if application.job else None
 
         try:
-            pdf_bytes, _, template_used = DocumentExportService.export_to_pdf(
+            pdf_bytes, _, template_used = await run_in_threadpool(
+                DocumentExportService.export_to_pdf,
                 document_type="cover_letter",
                 content=cover_letter_doc.content,
                 title="Cover Letter",

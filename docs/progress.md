@@ -11,6 +11,15 @@
 
 ## Work Log
 
+### 2026-03-24 - PDF Export Threadpool Offload
+
+- Moved synchronous PDF generation for resume and application material exports onto a threadpool using `run_in_threadpool`.
+- Updated these export paths:
+  - `ResumeService.export_resume_to_pdf`
+  - `ApplicationService.export_tailored_resume_to_pdf`
+  - `ApplicationService.export_cover_letter_to_pdf`
+- This keeps FastAPI's main event loop responsive while WeasyPrint renders PDFs, reducing the "site feels blocked until download finishes" behavior during exports.
+
 ### 2026-03-23 - Admin Task Monitor Worker Placeholder
 
 - Updated the admin task monitor worker filter placeholder from `Worker id` to `Worker` so it matches the title-style labeling used by the other filter controls.
