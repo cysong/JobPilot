@@ -7,4 +7,4 @@ echo - Redis running
 echo - Updated .env file with correct credentials
 echo.
 call .venv\Scripts\activate.bat
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --workers 2 --reload --host 0.0.0.0 --port 8000
