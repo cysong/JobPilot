@@ -1,21 +1,18 @@
 ﻿
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Building2,
   Calendar,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Download,
   ExternalLink,
   FileText,
   Loader2,
   MapPin,
-  RefreshCw,
 } from 'lucide-react'
 
 import {
@@ -26,9 +23,12 @@ import {
   useTailoredResumeForEdit,
 } from '@/features/applications/hooks/useApplications'
 import {
+  ApplicationOperationsCard,
+  type ApplicationStatusAction,
+} from '@/features/applications/components/ApplicationOperationsCard'
+import {
   getApplicationMaterialEmptyMessage,
   getApplicationMaterialState,
-  getApplicationMaterialStateClassName,
 } from '@/features/applications/presentation'
 import { downloadApplicationPdf } from '@/features/applications/pdf'
 import { useJobDetail } from '@/features/jobs/hooks/useJobs'
@@ -57,15 +57,8 @@ import {
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
@@ -84,15 +77,8 @@ import {
   type ListReturnIntent,
   writeSessionRecord,
 } from '@/utils/listState'
-import { cn } from '@/utils/cn'
 
-type StatusAction = {
-  label: string
-  nextStatus: ApplicationStatus
-  variant?: 'default' | 'outline'
-}
-
-const STATUS_ACTIONS: Record<ApplicationStatus, StatusAction[]> = {
+const STATUS_ACTIONS: Record<ApplicationStatus, ApplicationStatusAction[]> = {
   Pending: [],
   Tailoring: [],
   Ready: [{ label: 'Mark as Applied', nextStatus: 'Applied', variant: 'default' }],
@@ -741,168 +727,28 @@ export default function ApplicationDetailPage() {
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Operations</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ApplicationStatusBadge status={application.status} />
-                  {application.resolution !== 'ACTIVE' && (
-                    <ApplicationResolutionBadge resolution={application.resolution} />
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {isInactiveResolution ? (
-                    <Button
-                      className="col-span-2"
-                      onClick={() => handleResolutionUpdate('ACTIVE')}
-                      disabled={updateResolution.isPending}
-                    >
-                      {updateResolution.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Mark as Active
-                    </Button>
-                  ) : primaryAction ? (
-                    <Button
-                      className="col-span-2"
-                      variant={primaryAction.variant || 'default'}
-                      onClick={() => handleStatusUpdate(primaryAction.nextStatus)}
-                      disabled={updateStatus.isPending}
-                    >
-                      {updateStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {primaryAction.label}
-                    </Button>
-                  ) : (
-                    <Button className="col-span-2" disabled>
-                      {isTailoring ? 'Generating Materials' : 'No Primary Action'}
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="col-span-1">
-                        More
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      {!isInactiveResolution && secondaryStatusActions.map((action) => (
-                        <DropdownMenuItem
-                          key={action.nextStatus}
-                          onClick={() => handleStatusUpdate(action.nextStatus)}
-                          disabled={updateStatus.isPending}
-                        >
-                          {action.label}
-                        </DropdownMenuItem>
-                      ))}
-                      {canResolveApplication && !isInactiveResolution && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() => handleResolutionUpdate('USER_SKIPPED')}
-                            disabled={updateResolution.isPending}
-                          >
-                            Skip Application
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleResolutionUpdate('JOB_CLOSED')}
-                            disabled={updateResolution.isPending}
-                            className="text-red-700 focus:text-red-700"
-                          >
-                            Mark as Job Closed
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {!secondaryStatusActions.length && !canResolveApplication && (
-                        <DropdownMenuItem disabled>No additional actions</DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <p className="text-sm text-slate-600">{statusDescription}</p>
-                <Separator />
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-slate-900">Resume</div>
-                    </div>
-                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getApplicationMaterialStateClassName(resumeMaterialState)}`}>
-                        {resumeMaterialState}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={handleDownloadResumePdf}
-                      disabled={!application.resume_document_id || isDownloadingResume}
-                    >
-                      {isDownloadingResume ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="mr-2 h-4 w-4" />
-                      )}
-                      PDF
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-slate-900">Cover Letter</div>
-                    </div>
-                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getApplicationMaterialStateClassName(coverLetterMaterialState)}`}>
-                        {coverLetterMaterialState}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={handleDownloadCoverLetterPdf}
-                      disabled={!application.cover_letter_document_id || isDownloadingCoverLetter}
-                    >
-                      {isDownloadingCoverLetter ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="mr-2 h-4 w-4" />
-                      )}
-                      PDF
-                    </Button>
-                  </div>
-                </div>
-                {retryVisible && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={openRetryDialog}
-                    disabled={retryCoverLetter.isPending}
-                  >
-                    <RefreshCw className={cn('mr-2 h-4 w-4', retryCoverLetter.isPending && 'animate-spin')} />
-                    Retry Generation
-                  </Button>
-                )}
-                {isTailoring && (
-                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">
-                    Materials are generating. Retry is unavailable until processing completes.
-                  </div>
-                )}
-                <Separator />
-                <div className="space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Added</span>
-                    <span>{formatDistanceToNow(new Date(application.created_at), { addSuffix: true })}</span>
-                  </div>
-                  {application.applied_at && (
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Applied</span>
-                      <span>{formatDistanceToNow(new Date(application.applied_at), { addSuffix: true })}</span>
-                    </div>
-                  )}
-                  {application.resolved_at && (
-                    <div className="flex items-center justify-between gap-3">
-                      <span>Resolved</span>
-                      <span>{formatDistanceToNow(new Date(application.resolved_at), { addSuffix: true })}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
+            <ApplicationOperationsCard
+              application={application}
+              statusDescription={statusDescription}
+              isInactiveResolution={isInactiveResolution}
+              isTailoring={isTailoring}
+              primaryAction={primaryAction}
+              secondaryStatusActions={secondaryStatusActions}
+              canResolveApplication={canResolveApplication}
+              resumeMaterialState={resumeMaterialState}
+              coverLetterMaterialState={coverLetterMaterialState}
+              isDownloadingResume={isDownloadingResume}
+              isDownloadingCoverLetter={isDownloadingCoverLetter}
+              retryVisible={retryVisible}
+              isUpdateStatusPending={updateStatus.isPending}
+              isUpdateResolutionPending={updateResolution.isPending}
+              isRetryPending={retryCoverLetter.isPending}
+              onStatusUpdate={handleStatusUpdate}
+              onResolutionUpdate={handleResolutionUpdate}
+              onDownloadResumePdf={handleDownloadResumePdf}
+              onDownloadCoverLetterPdf={handleDownloadCoverLetterPdf}
+              onOpenRetryDialog={openRetryDialog}
+            />
             <OtherRolesCard items={companyRoles} isLoading={isCompanyRolesLoading} searchParams={searchParams} />
           </aside>
         </div>
