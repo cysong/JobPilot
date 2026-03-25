@@ -142,8 +142,14 @@ export default function ApplicationListingPage() {
                 </Button>
             </div>
 
-            <div className="text-sm font-medium text-slate-700">
-                {data?.total ?? 0} Applications Found
+            <div className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                <span>{data?.total ?? 0} Applications Found</span>
+                {isSearchParamsReady && isFetching && !!data && (
+                    <span className="inline-flex items-center gap-1.5 text-slate-500" aria-live="polite">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Updating results...</span>
+                    </span>
+                )}
             </div>
 
             {isError && !data ? (
@@ -179,15 +185,7 @@ export default function ApplicationListingPage() {
                     )}
                 </div>
             ) : (
-                <div className="relative">
-                    {isSearchParamsReady && isFetching && (
-                        <div className="absolute inset-0 z-10 bg-white/65 backdrop-blur-[1px] rounded-lg border border-slate-100 p-4 space-y-3">
-                            {[1, 2, 3].map((i) => (
-                                <Skeleton key={i} className="h-20 w-full" />
-                            ))}
-                        </div>
-                    )}
-                    <div className="grid gap-4">
+                <div className={`grid gap-4 transition-opacity ${isSearchParamsReady && isFetching ? 'opacity-60' : 'opacity-100'}`}>
                     {data?.items.map((app) => {
                         const query = searchParams.toString()
                         const detailUrl = query ? `/applications/${app.id}?${query}` : `/applications/${app.id}`
@@ -264,7 +262,6 @@ export default function ApplicationListingPage() {
                             </Card>
                         )
                     })}
-                    </div>
                 </div>
             )}
 
