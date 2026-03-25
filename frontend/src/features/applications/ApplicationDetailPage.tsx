@@ -471,15 +471,35 @@ export default function ApplicationDetailPage() {
   const retryVisible = ['Ready', 'Failed'].includes(application.status) && application.resolution === 'ACTIVE'
   const isTailoring = application.status === 'Tailoring'
   const statusDescription = (() => {
+    if (application.resolution === 'JOB_CLOSED') {
+      return 'This application was stopped because the job was marked closed.'
+    }
+    if (application.resolution === 'USER_SKIPPED') {
+      return 'This application was stopped because you chose to skip it.'
+    }
+    if (application.resolution === 'STALE_NO_RESPONSE') {
+      return 'This application was stopped due to no response.'
+    }
+
     switch (application.status) {
+      case 'Pending':
+        return 'Application created. Materials have not started generating yet.'
       case 'Ready':
-        return 'Review materials, then mark as applied.'
+        return 'Materials are ready. Review them, apply externally, then mark as applied.'
       case 'Tailoring':
-        return 'Materials are generating.'
+        return 'Resume and cover letter are being generated.'
+      case 'PhoneScreen':
+        return 'Phone screen in progress. Move forward when the next stage is confirmed.'
+      case 'Interviewing':
+        return 'Interview process in progress. Update the status after each outcome.'
+      case 'Offer':
+        return 'Offer received. Keep this application updated with your final decision.'
+      case 'Rejected':
+        return 'Application closed as rejected.'
       case 'Failed':
-        return 'Generation failed. Retry if needed.'
+        return 'Generation failed. Retry to regenerate the materials.'
       case 'Applied':
-        return 'Update the pipeline here.'
+        return 'Application submitted. Update the pipeline as responses come in.'
       default:
         return 'Review materials and continue here.'
     }
