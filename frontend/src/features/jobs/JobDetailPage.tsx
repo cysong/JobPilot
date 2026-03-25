@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Share2,
-  ExternalLink,
   Plus,
   Eye,
   Star,
@@ -47,6 +46,7 @@ import {
   JobAttributeList,
   formatJobCategory,
   getCompanyDisplayName,
+  getSourceMeta,
   JobSourceCompanyLine,
 } from "@/components/job/jobDisplay";
 import { cn } from "@/utils/cn";
@@ -224,6 +224,8 @@ export default function JobDetailPage() {
       : job.content;
   const isSaved = Boolean(savedStatus?.is_saved);
   const categoryText = formatJobCategory(job);
+  const sourceMeta = getSourceMeta(job.source);
+  const SourceIcon = sourceMeta.icon;
 
   const handleToggleSaved = () => {
     if (isSaved) {
@@ -257,120 +259,41 @@ export default function JobDetailPage() {
                 Back to Search
               </Link>
             </Button>
-            <div className="flex gap-2">
-              {/* Application Button Logic */}
-              {!isApplicationLoading && !application && (
-                <Button
-                  size="sm"
-                  onClick={() => setIsApplicationDialogOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add to Applications
+            <div className="flex gap-2 items-center">
+              {detailNavigation.previousJobId ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    to={`/jobs/${detailNavigation.previousJobId}?${searchParams.toString()}`}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
                 </Button>
               )}
-
-              {!isApplicationLoading && application && (
-                <TooltipProvider>
-                  <div className="flex gap-2 items-center">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Link
-                          to={`/applications/${application.id}`}
-                          aria-label={`Open application (${applicationStatusPresentation?.label})`}
-                          className={cn(
-                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                            "hover:brightness-95",
-                            applicationStatusPresentation?.className,
-                            applicationStatusPresentation?.variant === "secondary" &&
-                              "border-transparent bg-secondary text-secondary-foreground",
-                            applicationStatusPresentation?.variant === "outline" &&
-                              "text-foreground",
-                            applicationStatusPresentation?.variant == null &&
-                              "border-transparent bg-primary text-primary-foreground",
-                          )}
-                        >
-                          <span>{applicationStatusPresentation?.label}</span>
-                          <span
-                            aria-hidden="true"
-                            className="h-3.5 w-px bg-current/20"
-                          />
-                          <Eye className="h-3.5 w-3.5" />
-                        </Link>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="max-w-xs">
-                          <p className="text-sm font-medium">Open application</p>
-                        </div>
-                        {application.status === "Failed" &&
-                          application.last_error && (
-                            <div className="max-w-xs">
-                              <p className="font-semibold text-red-500">
-                                Error:
-                              </p>
-                              <p className="text-sm">
-                                {application.last_error}
-                              </p>
-                            </div>
-                          )}
-                        {application.status === "Tailoring" && (
-                          <div className="max-w-xs">
-                            <p className="text-sm">
-                              Customizing your resume and generating cover
-                              letter...
-                            </p>
-                          </div>
-                        )}
-                        {application.status === "Pending" && (
-                          <div className="max-w-xs">
-                            <p className="text-sm">
-                              Waiting to start processing...
-                            </p>
-                          </div>
-                        )}
-                        {application.status === "Ready" && (
-                          <div className="max-w-xs">
-                            <p className="text-sm">
-                              Application materials are ready!
-                            </p>
-                          </div>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </TooltipProvider>
+              {detailNavigation.nextJobId ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    to={`/jobs/${detailNavigation.nextJobId}?${searchParams.toString()}`}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleExpiration}
-                disabled={setJobExpiration.isPending}
-                className={
-                  job.manual_expired
-                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                    : "border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-                }
-              >
-                {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleSaved}
-                disabled={saveJob.isPending || unsaveJob.isPending}
-                className={isSaved ? "text-amber-500 border-amber-200 hover:bg-amber-50" : ""}
-              >
-                <Star
-                  className={`h-4 w-4 mr-2 ${isSaved ? "fill-amber-500 text-amber-500" : ""}`}
-                />
-                {isSaved ? "Saved" : "Save"}
-              </Button>
               <Button variant="outline" size="sm">
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
-
             </div>
 
             <ApplicationDialog
@@ -401,26 +324,33 @@ export default function JobDetailPage() {
               <div className="pr-28">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
-                  {job.share_link && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={job.share_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Open Original Posting"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Open Original Posting</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleToggleSaved}
+                          disabled={saveJob.isPending || unsaveJob.isPending}
+                          aria-label={isSaved ? "Unsave job" : "Save job"}
+                          className={cn(
+                            "h-8 w-8 text-slate-500 hover:text-amber-600",
+                            isSaved && "text-amber-500 hover:text-amber-600",
+                          )}
+                        >
+                          <Star
+                            className={cn(
+                              "h-4 w-4",
+                              isSaved && "fill-amber-500 text-amber-500",
+                            )}
+                          />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isSaved ? "Saved" : "Save job"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {job.is_expired && (
                     <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
                   )}
@@ -472,43 +402,127 @@ export default function JobDetailPage() {
 
               <JobDescriptionHtml html={descriptionHtml} />
             </div>
-
-            <div className="flex items-center justify-center gap-3">
-              {detailNavigation.previousJobId ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link
-                    to={`/jobs/${detailNavigation.previousJobId}?${searchParams.toString()}`}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-              )}
-              {detailNavigation.nextJobId ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link
-                    to={`/jobs/${detailNavigation.nextJobId}?${searchParams.toString()}`}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              )}
-            </div>
           </div>
 
           {/* Sidebar */}
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <h3 className="font-semibold text-slate-900">Operations</h3>
+
+                {!isApplicationLoading && !application && (
+                  <Button
+                    size="sm"
+                    onClick={() => setIsApplicationDialogOpen(true)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Applications
+                  </Button>
+                )}
+
+                {!isApplicationLoading && application && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to={`/applications/${application.id}`}
+                          aria-label={`Open application (${applicationStatusPresentation?.label})`}
+                          className={cn(
+                            "inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                            "hover:brightness-95",
+                            applicationStatusPresentation?.className,
+                            applicationStatusPresentation?.variant === "secondary" &&
+                              "border-transparent bg-secondary text-secondary-foreground",
+                            applicationStatusPresentation?.variant === "outline" &&
+                              "text-foreground",
+                            applicationStatusPresentation?.variant == null &&
+                              "border-transparent bg-primary text-primary-foreground",
+                          )}
+                        >
+                          <span>{applicationStatusPresentation?.label}</span>
+                          <span aria-hidden="true" className="h-4 w-px bg-current/20" />
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="max-w-xs">
+                          <p className="text-sm font-medium">Open application</p>
+                        </div>
+                        {application.status === "Failed" &&
+                          application.last_error && (
+                            <div className="max-w-xs">
+                              <p className="font-semibold text-red-500">Error:</p>
+                              <p className="text-sm">{application.last_error}</p>
+                            </div>
+                          )}
+                        {application.status === "Tailoring" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">
+                              Customizing your resume and generating cover
+                              letter...
+                            </p>
+                          </div>
+                        )}
+                        {application.status === "Pending" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">
+                              Waiting to start processing...
+                            </p>
+                          </div>
+                        )}
+                        {application.status === "Ready" && (
+                          <div className="max-w-xs">
+                            <p className="text-sm">
+                              Application materials are ready!
+                            </p>
+                          </div>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {job.share_link && (
+                  <Button variant="outline" size="sm" asChild className="w-full">
+                    <a
+                      href={job.share_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open Original Posting"
+                      className="relative flex w-full items-center justify-center"
+                    >
+                      <span>Open Original Posting</span>
+                      {sourceMeta.iconSrc ? (
+                        <img
+                          src={sourceMeta.iconSrc}
+                          alt={`${sourceMeta.label} icon`}
+                          className="absolute right-1 h-4 w-4 rounded-sm object-contain"
+                        />
+                      ) : SourceIcon ? (
+                        <SourceIcon className="absolute right-1 h-4 w-4" />
+                      ) : null}
+                    </a>
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleExpiration}
+                  disabled={setJobExpiration.isPending}
+                  className={cn(
+                    "w-full",
+                    job.manual_expired
+                      ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                      : "border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800",
+                  )}
+                >
+                  {job.manual_expired ? "Mark as Active" : "Mark as Expired"}
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Company Info Card (Placeholder) */}
             <Card>
               <CardContent className="p-6">

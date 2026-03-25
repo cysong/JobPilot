@@ -1555,6 +1555,15 @@ None at this stage.
 - Updated the job detail page sidebar container to use the same desktop sticky positioning pattern as the application detail page.
 - Kept mobile behavior unchanged so the sidebar remains in normal document flow on smaller screens.
 
+### 2026-03-26 - Job Detail Action Hierarchy Refresh
+
+**Completed Tasks:**
+- Reorganized the job detail page actions to reduce scanning and keep navigation, record actions, and save behavior in separate UI zones.
+- Moved `Previous`, `Next`, and `Share` into the top action bar in that order and removed the duplicate bottom pager.
+- Moved application actions, original posting access, and manual expired/active toggles into a new sidebar `Operations` card.
+- Moved `Save` next to the job title and converted it to an icon-only action with tooltip feedback.
+- Removed the extra helper copy from the `Operations` card and changed the original posting action to use the same source-site icon mapping as the job source display.
+
 ### 2026-03-20 - Resume Skill Evidence Persistence
 
 **Completed Tasks:**
