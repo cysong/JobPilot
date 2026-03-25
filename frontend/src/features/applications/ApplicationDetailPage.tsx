@@ -25,6 +25,11 @@ import {
   useCoverLetterForEdit,
   useTailoredResumeForEdit,
 } from '@/features/applications/hooks/useApplications'
+import {
+  getApplicationMaterialEmptyMessage,
+  getApplicationMaterialState,
+  getApplicationMaterialStateClassName,
+} from '@/features/applications/presentation'
 import { useJobDetail } from '@/features/jobs/hooks/useJobs'
 import { useResumes } from '@/features/resumes/hooks/useResumes'
 import { applicationApi } from '@/api/applications'
@@ -504,62 +509,12 @@ export default function ApplicationDetailPage() {
         return 'Review materials and continue here.'
     }
   })()
-  const resumeTabState =
-    application.status === 'Tailoring'
-      ? 'Generating'
-      : application.status === 'Failed'
-        ? 'Failed'
-        : application.resume_document_id
-          ? 'Ready'
-          : 'Pending'
-  const coverLetterTabState =
-    application.status === 'Tailoring'
-      ? 'Generating'
-      : application.status === 'Failed'
-        ? 'Failed'
-        : application.cover_letter_document_id
-          ? 'Ready'
-          : 'Pending'
-  const resumeEmptyMessage =
-    application.status === 'Failed'
-      ? 'Resume generation failed. Use Retry Generation in Operations to try again.'
-      : application.status === 'Tailoring'
-        ? 'Resume is currently being tailored for this application.'
-        : 'Resume is still being prepared for this application.'
-  const coverLetterEmptyMessage =
-    application.status === 'Failed'
-      ? 'Cover letter generation failed. Use Retry Generation in Operations to try again.'
-      : application.status === 'Tailoring'
-        ? 'Cover letter is currently being generated for this application.'
-        : 'Cover letter is still being prepared for this application.'
+  const resumeMaterialState = getApplicationMaterialState(application, 'resume')
+  const coverLetterMaterialState = getApplicationMaterialState(application, 'coverLetter')
+  const resumeEmptyMessage = getApplicationMaterialEmptyMessage(application.status, 'resume')
+  const coverLetterEmptyMessage = getApplicationMaterialEmptyMessage(application.status, 'coverLetter')
   const isInactiveResolution =
     application.resolution === 'JOB_CLOSED' || application.resolution === 'USER_SKIPPED'
-  const resumeStatusLabel = application.status === 'Tailoring'
-    ? 'Generating'
-    : application.status === 'Failed'
-      ? 'Failed'
-      : application.resume_document_id
-        ? 'Ready'
-        : 'Pending'
-  const coverLetterStatusLabel = application.status === 'Tailoring'
-    ? 'Generating'
-    : application.status === 'Failed'
-      ? 'Failed'
-      : application.cover_letter_document_id
-        ? 'Ready'
-        : 'Pending'
-  const getTabStateClassName = (state: string) => {
-    switch (state) {
-      case 'Ready':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      case 'Generating':
-        return 'border-sky-200 bg-sky-50 text-sky-700'
-      case 'Failed':
-        return 'border-red-200 bg-red-50 text-red-700'
-      default:
-        return 'border-slate-200 bg-slate-100 text-slate-500'
-    }
-  }
 
   const openRetryDialog = () => {
     setRetryResumeId(application.source_resume_id)
@@ -882,8 +837,8 @@ export default function ApplicationDetailPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-slate-900">Resume</div>
                     </div>
-                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getTabStateClassName(resumeStatusLabel)}`}>
-                        {resumeStatusLabel}
+                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getApplicationMaterialStateClassName(resumeMaterialState)}`}>
+                        {resumeMaterialState}
                     </div>
                     <Button
                       variant="outline"
@@ -904,8 +859,8 @@ export default function ApplicationDetailPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-slate-900">Cover Letter</div>
                     </div>
-                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getTabStateClassName(coverLetterStatusLabel)}`}>
-                        {coverLetterStatusLabel}
+                    <div className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getApplicationMaterialStateClassName(coverLetterMaterialState)}`}>
+                        {coverLetterMaterialState}
                     </div>
                     <Button
                       variant="outline"
