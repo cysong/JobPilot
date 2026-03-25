@@ -11,6 +11,13 @@
 
 ## Work Log
 
+### 2026-03-25 - Resume Modern PDF Stylesheet Migration
+
+- Reworked the resume `modern` PDF stylesheet to use typography and spacing patterns adapted from the legacy `resume-css-stylesheet.css` reference.
+- Kept the existing export flow and `modern.html` template structure unchanged; the migration is CSS-only.
+- Scoped the active overrides to `.modern-template` so shared resume PDF page setup in `base.css` remains intact.
+- Avoided importing legacy global reset, browser normalize, screen-only interactions, and external/local machine font references into the production PDF template.
+
 ### 2026-03-25 - Application Detail Review Workspace and Same-Company Roles
 
 - Reworked the application detail page into a two-column review workspace:

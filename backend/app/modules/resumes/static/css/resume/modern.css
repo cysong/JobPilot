@@ -4,84 +4,181 @@
  */
 
 .modern-template {
-    /* Override base styles for modern look */
+    color: #111827;
 }
 
-.modern-template .accent-bar {
-    height: 6px;
-    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-    margin-bottom: 1.5em;
+.modern-template .resume-content {
+    font-size: 1em;
+    line-height: 1.5;
 }
 
-.modern-template .resume-title {
-    font-size: 2.2em;
-    color: #1e293b;
-    font-weight: 800;
+.modern-template .resume-content > :first-child {
+    margin-top: 0;
+}
+
+.modern-template .resume-content > :last-child {
+    margin-bottom: 0;
+}
+
+.modern-template .resume-title,
+.modern-template .resume-content > h1:first-child {
+    margin-top: 0;
+    margin-bottom: 0.45em;
+    font-size: 2.1em;
+    line-height: 1.1;
+    text-align: center;
+    color: #000000;
+    font-weight: 700;
     letter-spacing: -0.02em;
 }
 
 .modern-template h2 {
+    margin-top: 1.15em;
+    margin-bottom: 0.45em;
+    padding-bottom: 0.22em;
+    font-size: 1.35em;
+    line-height: 1.2;
     color: #6366f1;
-    border-bottom: 2px solid #6366f1;
-    padding-bottom: 0.4em;
-    margin-top: 1.5em;
-    font-weight: 700;
+    border-bottom: 1px solid #cfcfcf;
 }
 
 .modern-template h3 {
-    color: #334155;
-    font-weight: 600;
+    margin-top: 0.8em;
+    margin-bottom: 0.2em;
+    font-size: 1.05em;
+    line-height: 1.25;
+    color: #2f2f2f;
+    font-weight: 700;
+}
+
+.modern-template h4 {
+    margin-top: 0.3em;
+    margin-bottom: 0.15em;
+    font-size: 0.98em;
+    line-height: 1.2;
+    color: #2f2f2f;
+    font-weight: 700;
+}
+
+.modern-template h5,
+.modern-template h6 {
+    margin-top: 0.25em;
+    margin-bottom: 0.1em;
+    color: #4b5563;
+    font-weight: 700;
+}
+
+.modern-template p {
+    margin: 0.5em 0 0.8em;
+}
+
+.modern-template ul,
+.modern-template ol {
+    margin: 0.45em 0 0.8em 1.55em;
+    padding-left: 0.4em;
+}
+
+.modern-template li {
+    margin-bottom: 0.25em;
+}
+
+.modern-template ul li > :first-child,
+.modern-template ol li > :first-child,
+.modern-template h1 + p,
+.modern-template h2 + p,
+.modern-template h3 + p,
+.modern-template h4 + p,
+.modern-template h5 + p,
+.modern-template h6 + p {
+    margin-top: 0;
 }
 
 .modern-template a {
-    color: #6366f1;
-    font-weight: 500;
+    color: #2b6cb0;
+    text-decoration: none;
 }
 
 .modern-template strong {
-    color: #1e293b;
+    color: #111827;
+    font-weight: 700;
 }
 
-.modern-template .resume-footer {
-    border-top: 2px solid #e2e8f0;
-    color: #64748b;
+.modern-template em {
+    color: #374151;
 }
 
-/* Lists with custom bullets */
-.modern-template ul {
-    list-style: none;
-    margin-left: 1.2em;
+.modern-template hr {
+    margin: 1.1em 0;
+    border: none;
+    border-top: 1px solid #d4d4d4;
 }
 
-.modern-template ul li::before {
-    content: "▸";
-    color: #6366f1;
-    font-weight: bold;
-    display: inline-block;
-    width: 1em;
-    margin-left: -1em;
+.modern-template blockquote {
+    margin: 0.9em 0;
+    padding: 0 0 0 0.9em;
+    color: #6b7280;
+    border-left: 4px solid #d1d5db;
+    font-style: italic;
 }
 
-/* Code blocks */
+.modern-template table {
+    margin-bottom: 0.9em;
+    font-size: 0.95em;
+}
+
+.modern-template th,
+.modern-template td {
+    padding: 0.42em 0.65em;
+    border: 1px solid #d1d5db;
+}
+
+.modern-template th {
+    background: #f5f5f5;
+    color: #111827;
+    font-weight: 700;
+}
+
+.modern-template tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.modern-template img {
+    max-width: 100%;
+    height: auto;
+}
+
 .modern-template code {
-    background: #f1f5f9;
-    color: #6366f1;
-    border: 1px solid #e2e8f0;
+    margin: 0 0.12em;
+    padding: 0.08em 0.4em;
+    white-space: nowrap;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    border-radius: 3px;
+    color: #374151;
+    font-size: 0.9em;
 }
 
 .modern-template pre {
+    margin: 0.8em 0 1em;
+    padding: 0.7em 0.9em;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
     background: #f8fafc;
-    border-left: 4px solid #6366f1;
+    line-height: 1.45;
 }
 
-/* Tables */
-.modern-template th {
-    background: #f8fafc;
-    color: #1e293b;
-    font-weight: 600;
-    border-bottom: 2px solid #6366f1;
+.modern-template pre code {
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    border: 0;
+    background: transparent;
+    color: inherit;
 }
 
-.modern-template td {
-    border-color: #e2e8f0;
+.modern-template .resume-footer {
+    margin-top: 1.6em;
+    padding-top: 0.8em;
+    border-top: 1px solid #d1d5db;
+    color: #6b7280;
 }
