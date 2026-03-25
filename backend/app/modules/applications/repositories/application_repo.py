@@ -198,3 +198,41 @@ class ApplicationRepository:
     async def mark_tailoring(db: AsyncSession, application: Application) -> None:
         application.status = ApplicationStatus.TAILORING
         await db.flush()
+
+    @staticmethod
+    async def list_same_company_for_user(
+        db: AsyncSession,
+        *,
+        user_id: int,
+        application_id: str,
+        job_id: int,
+        company_name: str | None,
+        advertiser_name: str | None,
+    ) -> list[Application]:
+        """List other applications for the same company ordered by job listed time."""
+        company_filters = []
+        if company_name:
+            company_filters.append(SeekJob.company_name == company_name)
+        if advertiser_name:
+            company_filters.append(SeekJob.advertiser_name == advertiser_name)
+
+        if not company_filters:
+            return []
+
+        query = (
+            select(Application)
+            .join(SeekJob, SeekJob.id == Application.job_id)
+            .where(
+                and_(
+                    Application.user_id == user_id,
+                    Application.id != application_id,
+                    Application.job_id != job_id,
+                    Application.is_deleted.is_(False),
+                    or_(*company_filters),
+                )
+            )
+            .options(selectinload(Application.job))
+            .order_by(SeekJob.listed_at.desc().nullslast(), Application.created_at.desc())
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())

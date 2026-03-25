@@ -50,7 +50,34 @@ export interface Application {
         classification?: string | null;
         sub_classification?: string | null;
         share_link?: string;
+        listed_at?: string | null;
     };
+}
+
+export interface ApplicationCompanyRole {
+    id: string;
+    job_id: number;
+    status: ApplicationStatus;
+    resolution: ApplicationResolution;
+    updated_at: string;
+    job: {
+        id: number;
+        title: string;
+        source?: string | null;
+        advertiser_name?: string | null;
+        company_name?: string | null;
+        company_logo?: string | null;
+        location_label?: string | null;
+        work_types_label?: string | null;
+        classification?: string | null;
+        sub_classification?: string | null;
+        share_link?: string | null;
+        listed_at?: string | null;
+    };
+}
+
+export interface ApplicationCompanyRoleListResponse {
+    items: ApplicationCompanyRole[];
 }
 
 export interface CreateApplicationRequest {

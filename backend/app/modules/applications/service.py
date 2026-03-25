@@ -38,8 +38,12 @@ class ApplicationService:
             ApplicationResolution.JOB_CLOSED,
             ApplicationResolution.USER_SKIPPED,
         },
-        ApplicationResolution.JOB_CLOSED: set(),
-        ApplicationResolution.USER_SKIPPED: set(),
+        ApplicationResolution.JOB_CLOSED: {
+            ApplicationResolution.ACTIVE,
+        },
+        ApplicationResolution.USER_SKIPPED: {
+            ApplicationResolution.ACTIVE,
+        },
         ApplicationResolution.STALE_NO_RESPONSE: set(),
     }
     RESOLUTION_ALLOWED_STATUSES: set[ApplicationStatus] = {
@@ -206,8 +210,8 @@ class ApplicationService:
             note=note,
         )
         application.resolution = target_resolution
-        application.resolved_at = now
-        application.resolution_note = note
+        application.resolved_at = now if target_resolution != ApplicationResolution.ACTIVE else None
+        application.resolution_note = note if target_resolution != ApplicationResolution.ACTIVE else None
         application.updated_at = now
 
         if target_resolution == ApplicationResolution.JOB_CLOSED:
@@ -218,6 +222,13 @@ class ApplicationService:
             job.manual_expired_by = user.id
             job.manual_expired_at = now
             job.manual_expired_note = note
+        elif target_resolution == ApplicationResolution.ACTIVE and current_resolution == ApplicationResolution.JOB_CLOSED:
+            job = application.job
+            if job:
+                job.manual_expired = False
+                job.manual_expired_by = None
+                job.manual_expired_at = None
+                job.manual_expired_note = None
 
         await db.commit()
         await db.refresh(application)
@@ -563,6 +574,28 @@ class ApplicationService:
     ) -> Optional[Application]:
         """Fetch application by job_id for current user."""
         return await ApplicationRepository.get_by_user_and_job(db, user.id, job_id)
+
+    @staticmethod
+    async def list_same_company_applications(
+        db: AsyncSession,
+        application_id: str,
+        user: User,
+    ) -> list[Application]:
+        """List other applications belonging to the same company as the current one."""
+        application = await ApplicationRepository.get_by_id_for_user(db, application_id, user.id)
+        if not application:
+            raise NotFoundError("Application not found")
+        if not application.job:
+            return []
+
+        return await ApplicationRepository.list_same_company_for_user(
+            db,
+            user_id=user.id,
+            application_id=application.id,
+            job_id=application.job_id,
+            company_name=getattr(application.job, "company_name", None),
+            advertiser_name=getattr(application.job, "advertiser_name", None),
+        )
 
     @staticmethod
     async def retry_application_tailor(

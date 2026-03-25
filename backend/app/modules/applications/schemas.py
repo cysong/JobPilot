@@ -66,6 +66,20 @@ class ApplicationJobInfo(BaseModel):
     classification: Optional[str] = None
     sub_classification: Optional[str] = None
     share_link: Optional[str] = None
+    listed_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationCompanyRoleItem(BaseModel):
+    """Same-company application item shown on application detail page."""
+
+    id: str
+    job_id: int
+    status: ApplicationStatus
+    resolution: ApplicationResolution
+    updated_at: datetime
+    job: ApplicationJobInfo
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -100,3 +114,9 @@ class ApplicationDetail(ApplicationResponse):
 
 class ApplicationListResponse(PaginatedResponse[ApplicationDetail]):
     """Paginated list response for applications."""
+
+
+class ApplicationCompanyRoleListResponse(BaseModel):
+    """Response for same-company related applications."""
+
+    items: list[ApplicationCompanyRoleItem]

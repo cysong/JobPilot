@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
 from app.modules.applications.schemas import (
+    ApplicationCompanyRoleListResponse,
     ApplicationCreateRequest,
     ApplicationDetail,
     ApplicationListResponse,
@@ -171,6 +172,17 @@ async def get_application(
     if not application:
         raise NotFoundError("Application not found")
     return application
+
+
+@router.get("/{application_id}/company-roles", response_model=ApplicationCompanyRoleListResponse)
+async def list_same_company_application_roles(
+    application_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """List other applications for the same company ordered by job listed time."""
+    items = await ApplicationService.list_same_company_applications(db, application_id, current_user)
+    return ApplicationCompanyRoleListResponse(items=items)
 
 
 @router.post("/{application_id}/retry", response_model=ApplicationDetail)

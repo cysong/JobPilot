@@ -5,11 +5,32 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-03-25
 
 ---
 
 ## Work Log
+
+### 2026-03-25 - Application Detail Review Workspace and Same-Company Roles
+
+- Reworked the application detail page into a two-column review workspace:
+  - left-side tabbed content for `JD`, `Resume`, and `Cover Letter`
+  - right-side sticky sidebar for current status, apply actions, status actions, and same-company roles
+- Added lazy/asynchronous loading behavior for application detail review content:
+  - JD only loads detail data when the JD tab is active
+  - resume and cover letter review content load only when their tabs are opened
+- Added lightweight read-only markdown review component:
+  - new `frontend/src/components/MarkdownViewer/index.tsx`
+  - intentionally separate from the heavier document editor container
+- Added same-company related applications API and UI:
+  - new backend endpoint `GET /api/v1/applications/{application_id}/company-roles`
+  - excludes the current application
+  - orders results by `seek_jobs.listed_at DESC`
+  - frontend card shows title, location, application status, resolution, and listed time
+- Validation:
+  - `pnpm exec tsc --noEmit` passed in `frontend/`
+  - `pnpm build` could not complete in the sandbox because Vite/esbuild failed with `spawn EPERM`
+  - `python -m compileall backend/app/modules/applications` could not complete because writing `__pycache__` was denied by the sandbox
 
 ### 2026-03-24 - PDF Export Threadpool Offload
 

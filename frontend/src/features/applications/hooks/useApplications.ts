@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
 import type {
+    ApplicationCompanyRole,
     ApplicationListRequest,
     CreateApplicationRequest,
     RetryApplicationRequest,
@@ -45,11 +46,11 @@ export const useApplication = (id: string) => {
     })
 }
 
-export const useTailoredResumeForEdit = (applicationId: string) => {
+export const useTailoredResumeForEdit = (applicationId: string, enabled = true) => {
     return useQuery<DocumentEditData>({
         queryKey: ['tailored-resume-edit', applicationId],
         queryFn: () => applicationApi.getTailoredResumeForEdit(applicationId),
-        enabled: !!applicationId,
+        enabled: enabled && !!applicationId,
     })
 }
 
@@ -65,11 +66,11 @@ export const useUpdateTailoredResumeContent = () => {
     })
 }
 
-export const useCoverLetterForEdit = (applicationId: string) => {
+export const useCoverLetterForEdit = (applicationId: string, enabled = true) => {
     return useQuery<DocumentEditData>({
         queryKey: ['cover-letter-edit', applicationId],
         queryFn: () => applicationApi.getCoverLetterForEdit(applicationId),
-        enabled: !!applicationId,
+        enabled: enabled && !!applicationId,
     })
 }
 
@@ -165,4 +166,15 @@ export const useApplicationMutations = () => {
         updateStatus,
         updateResolution,
     }
+}
+
+export const useApplicationCompanyRoles = (applicationId: string, enabled = true) => {
+    return useQuery<ApplicationCompanyRole[]>({
+        queryKey: ['applications', applicationId, 'company-roles'],
+        queryFn: async () => {
+            const result = await applicationApi.getCompanyRoles(applicationId)
+            return result.items
+        },
+        enabled: enabled && !!applicationId,
+    })
 }

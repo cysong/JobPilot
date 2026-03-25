@@ -1,6 +1,7 @@
 import client from './client';
 import type {
     Application,
+    ApplicationCompanyRoleListResponse,
     ApplicationListRequest,
     ApplicationListResponse,
     CreateApplicationRequest,
@@ -19,6 +20,13 @@ export const applicationApi = {
 
     get: async (id: string) => {
         const result = await client.get<Application, Application>(`/applications/${id}`);
+        return result;
+    },
+
+    getCompanyRoles: async (id: string) => {
+        const result = await client.get<ApplicationCompanyRoleListResponse, ApplicationCompanyRoleListResponse>(
+            `/applications/${id}/company-roles`
+        );
         return result;
     },
 
