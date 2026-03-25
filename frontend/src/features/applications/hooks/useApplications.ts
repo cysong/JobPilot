@@ -54,6 +54,10 @@ export const useTailoredResumeForEdit = (applicationId: string, enabled = true) 
     })
 }
 
+export const useTailoredResumeForReview = (applicationId: string, enabled = true) => {
+    return useTailoredResumeForEdit(applicationId, enabled)
+}
+
 export const useUpdateTailoredResumeContent = () => {
     const queryClient = useQueryClient()
     return useMutation({
@@ -72,6 +76,10 @@ export const useCoverLetterForEdit = (applicationId: string, enabled = true) => 
         queryFn: () => applicationApi.getCoverLetterForEdit(applicationId),
         enabled: enabled && !!applicationId,
     })
+}
+
+export const useCoverLetterForReview = (applicationId: string, enabled = true) => {
+    return useCoverLetterForEdit(applicationId, enabled)
 }
 
 export const useUpdateCoverLetterContent = () => {

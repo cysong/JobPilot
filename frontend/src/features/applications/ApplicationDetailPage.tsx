@@ -19,8 +19,8 @@ import {
   useApplication,
   useApplicationCompanyRoles,
   useApplicationMutations,
-  useCoverLetterForEdit,
-  useTailoredResumeForEdit,
+  useCoverLetterForReview,
+  useTailoredResumeForReview,
 } from '@/features/applications/hooks/useApplications'
 import {
   ApplicationOperationsCard,
@@ -302,9 +302,9 @@ export default function ApplicationDetailPage() {
     !!applicationId,
   )
   const { data: resumeDocument, isLoading: isResumeLoading, isError: isResumeError } =
-    useTailoredResumeForEdit(applicationId || '', activeTab === 'resume' && !!application?.resume_document_id)
+    useTailoredResumeForReview(applicationId || '', activeTab === 'resume' && !!application?.resume_document_id)
   const { data: coverLetterDocument, isLoading: isCoverLetterLoading, isError: isCoverLetterError } =
-    useCoverLetterForEdit(
+    useCoverLetterForReview(
       applicationId || '',
       activeTab === 'cover-letter' && !!application?.cover_letter_document_id,
     )
