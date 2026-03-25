@@ -30,9 +30,9 @@ import {
   getApplicationMaterialState,
   getApplicationMaterialStateClassName,
 } from '@/features/applications/presentation'
+import { downloadApplicationPdf } from '@/features/applications/pdf'
 import { useJobDetail } from '@/features/jobs/hooks/useJobs'
 import { useResumes } from '@/features/resumes/hooks/useResumes'
-import { applicationApi } from '@/api/applications'
 import { ApplicationResolutionBadge } from '@/features/applications/components/ApplicationResolutionBadge'
 import {
   ApplicationStatusBadge,
@@ -77,7 +77,6 @@ import type {
   TailoringLevel,
 } from '@/types/application'
 import type { DocumentEditData } from '@/types/document'
-import { buildApplicationPdfFilename } from '@/utils/pdfFilename'
 import {
   getListContextKey,
   readSessionRecord,
@@ -370,25 +369,16 @@ export default function ApplicationDetailPage() {
     })
   }, [applicationId, searchParams, serializedSearchParams])
 
-  const buildFilename = (label: string) => {
-    const jobTitle = application?.job?.title || 'Job'
-    const userName = user?.full_name || 'User'
-    return buildApplicationPdfFilename({ userName, label, jobTitle })
-  }
-
   const handleDownloadResumePdf = async () => {
     if (!application) return
     setIsDownloadingResume(true)
     try {
-      const blob = await applicationApi.exportTailoredResumePdf(application.id)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = buildFilename('Resume')
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      await downloadApplicationPdf({
+        applicationId: application.id,
+        kind: 'Resume',
+        userName: user?.full_name || 'User',
+        jobTitle: application.job?.title || 'Job',
+      })
     } catch {
       toast({
         title: 'Error',
@@ -404,15 +394,12 @@ export default function ApplicationDetailPage() {
     if (!application) return
     setIsDownloadingCoverLetter(true)
     try {
-      const blob = await applicationApi.exportCoverLetterPdf(application.id)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = buildFilename('CoverLetter')
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      await downloadApplicationPdf({
+        applicationId: application.id,
+        kind: 'CoverLetter',
+        userName: user?.full_name || 'User',
+        jobTitle: application.job?.title || 'Job',
+      })
     } catch {
       toast({
         title: 'Error',
