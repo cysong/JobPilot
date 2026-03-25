@@ -508,7 +508,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             {/* Company Info Card (Placeholder) */}
             <Card>
               <CardContent className="p-6">
@@ -700,7 +700,7 @@ export default function JobDetailPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </aside>
         </div>
       </main>
     </div>

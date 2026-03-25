@@ -5,7 +5,7 @@
 **Version:** v0.3.0 (Resume Management Module)
 **Next Task:** Stage 3 - Application Module
 
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-03-26
 
 ---
 
@@ -1548,6 +1548,12 @@ None at this stage.
   - generate first draft, then polish it in a second pass
   - keep final persistence/document versioning flow unchanged
   - store `polished=true` metadata on generated cover letter documents
+
+### 2026-03-26 - Job Detail Sticky Sidebar
+
+**Completed Tasks:**
+- Updated the job detail page sidebar container to use the same desktop sticky positioning pattern as the application detail page.
+- Kept mobile behavior unchanged so the sidebar remains in normal document flow on smaller screens.
 
 ### 2026-03-20 - Resume Skill Evidence Persistence
 
