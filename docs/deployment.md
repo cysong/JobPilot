@@ -16,9 +16,9 @@
 
 ## 1.1 已确认参数
 
-- 根域名：`jobpilot.me`
-- 前端域名：`app.jobpilot.me`
-- API 域名：`api.jobpilot.me`
+- 根域名：`freeclaw.cloud`
+- 前端域名：`app.freeclaw.cloud`
+- API 域名：`api.freeclaw.cloud`
 - 前端部署方式：Nginx 静态托管
 - 定时任务：启用 `Celery Beat`
 - 发布策略：合并到 `main` 后自动发布
@@ -30,7 +30,7 @@
 - 入口层
   - VPS 上已有 Nginx 统一接入，负责 TLS 终止与反向代理。
 - 前端
-  - CI 构建静态文件，部署到 Nginx 静态目录（如 `/var/www/jobpilot`），由 `app.jobpilot.me` 访问。
+  - CI 构建静态文件，部署到 Nginx 静态目录（如 `/var/www/jobpilot`），由 `app.freeclaw.cloud` 访问。
 - 后端
   - `jobpilot-api`：FastAPI 服务容器。
   - `jobpilot-worker`：Celery worker 容器。
@@ -49,8 +49,8 @@
 ## 3. 域名与路由
 
 推荐使用子域名：
-- `app.jobpilot.me` -> 前端
-- `api.jobpilot.me` -> FastAPI
+- `app.freeclaw.cloud` -> 前端
+- `api.freeclaw.cloud` -> FastAPI
 
 说明：
 - 该方式对 CORS、Cookie、WebSocket 管理最清晰。
@@ -68,7 +68,7 @@
 - `CELERY_BROKER_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_RESULT_BACKEND=redis://jobpilot-redis:6379/1`
 - `OPENAI_API_KEY=<secret>`
-- `CORS_ORIGINS=["https://app.jobpilot.me"]`
+- `CORS_ORIGINS=["https://app.freeclaw.cloud"]`
 - `CORS_ALLOW_CREDENTIALS=true`
 
 建议增加：
@@ -189,7 +189,7 @@ cAdvisor           ┘                              │
 ```
 
 监控服务全部运行在 `jobpilot-internal` Docker 网络内，不直接暴露公网端口。
-Grafana 通过 Nginx 反代对外开放：`https://api.jobpilot.me/grafana`
+Grafana 通过 Nginx 反代对外开放：`https://api.freeclaw.cloud/grafana`
 
 ### 11.2 容器清单（新增 4 个）
 
@@ -240,7 +240,7 @@ deploy/
    curl http://127.0.0.1:9090/api/v1/targets  # 从容器内访问，或临时端口映射
    ```
 
-4. 访问 Grafana：`https://api.jobpilot.me/grafana`，用 `monitoring.env` 中的 admin 密码登录。
+4. 访问 Grafana：`https://api.freeclaw.cloud/grafana`，用 `monitoring.env` 中的 admin 密码登录。
 
 ### 11.5 Grafana Dashboard 面板
 
@@ -336,7 +336,7 @@ deploy/
 ## 16. GitHub Variables 清单
 
 当前 workflow 需要的 Variables：
-- `VITE_API_BASE_URL`：前端构建时使用，例如 `https://api.jobpilot.me`
+- `VITE_API_BASE_URL`：前端构建时使用，例如 `https://api.freeclaw.cloud`
 
 说明：
 - 此变量非敏感信息，建议放 Variables，不放 Secrets。
