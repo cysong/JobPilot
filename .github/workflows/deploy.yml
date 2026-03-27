@@ -110,11 +110,25 @@ jobs:
 
       - name: Sync deployment files to VPS
         run: |
-          ssh -p "${VPS_PORT:-22}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "mkdir -p /opt/jobpilot/deploy/env /opt/jobpilot/deploy/nginx /var/www/jobpilot/current"
+          ssh -p "${VPS_PORT:-22}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "mkdir -p \
+              /opt/jobpilot/deploy/env \
+              /opt/jobpilot/deploy/nginx \
+              /opt/jobpilot/deploy/prometheus \
+              /opt/jobpilot/deploy/grafana/provisioning/datasources \
+              /opt/jobpilot/deploy/grafana/provisioning/dashboards \
+              /opt/jobpilot/deploy/grafana/dashboards \
+              /var/www/jobpilot/current"
           scp -P "${VPS_PORT:-22}" docker-compose.prod.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/docker-compose.prod.yml"
           scp -P "${VPS_PORT:-22}" deploy/deploy-prod.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/deploy-prod.sh"
           scp -P "${VPS_PORT:-22}" deploy/nginx/jobpilot.conf "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/nginx/jobpilot.conf"
           scp -P "${VPS_PORT:-22}" deploy/env/backend.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/backend.env.example"
+          scp -P "${VPS_PORT:-22}" deploy/env/monitoring.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/monitoring.env.example"
+          scp -P "${VPS_PORT:-22}" deploy/prometheus/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/prometheus.yml"
+          scp -P "${VPS_PORT:-22}" deploy/prometheus/alert_rules.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/alert_rules.yml"
+          scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/datasources/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/datasources/prometheus.yml"
+          scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/dashboards/dashboard.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/dashboards/dashboard.yml"
+          scp -P "${VPS_PORT:-22}" deploy/grafana/dashboards/jobpilot.json "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/dashboards/jobpilot.json"
 
       - name: Deploy on VPS
         run: |
@@ -122,6 +136,11 @@ jobs:
             if [ ! -f /opt/jobpilot/deploy/env/backend.env ]; then \
               cp /opt/jobpilot/deploy/env/backend.env.example /opt/jobpilot/deploy/env/backend.env; \
               echo 'Missing /opt/jobpilot/deploy/env/backend.env. Template created, please fill secrets and rerun.'; \
+              exit 1; \
+            fi; \
+            if [ ! -f /opt/jobpilot/deploy/env/monitoring.env ]; then \
+              cp /opt/jobpilot/deploy/env/monitoring.env.example /opt/jobpilot/deploy/env/monitoring.env; \
+              echo 'Missing /opt/jobpilot/deploy/env/monitoring.env. Template created, please fill secrets and rerun.'; \
               exit 1; \
             fi; \
             JOBPILOT_IMAGE='${{ env.IMAGE_NAME }}:${{ github.sha }}' \
