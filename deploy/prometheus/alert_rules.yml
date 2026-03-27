@@ -1,0 +1,34 @@
+groups:
+  - name: jobpilot_slo
+    rules:
+      # API P95 latency > 2s for 5 minutes
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API P95 latency exceeded 2s"
+          description: "P95 latency is {{ $value | humanizeDuration }}, threshold is 2s."
+
+      # HTTP 5xx error rate > 5% for 5 minutes
+      - alert: HighErrorRate
+        expr: >
+          rate(http_requests_total{status=~"5.."}[5m])
+          / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx error rate exceeded 5%"
+          description: "Error rate is {{ $value | humanizePercentage }}."
+
+      # Redis memory usage > 80% for 10 minutes
+      - alert: HighRedisMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage exceeded 80%"
+          description: "Redis memory is at {{ $value | humanizePercentage }}."

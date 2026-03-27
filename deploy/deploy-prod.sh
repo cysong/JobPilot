@@ -70,6 +70,12 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+MONITORING_ENV_FILE="${MONITORING_ENV_FILE:-deploy/env/monitoring.env}"
+if [[ ! -f "${MONITORING_ENV_FILE}" ]]; then
+  echo "ERROR: monitoring env file not found: ${APP_DIR}/${MONITORING_ENV_FILE}"
+  exit 1
+fi
+
 echo "Logging in to GHCR..."
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
@@ -84,7 +90,15 @@ echo "Running migrations..."
 docker compose -f "${COMPOSE_FILE}" run --rm --no-deps jobpilot-api uv run alembic upgrade head
 
 echo "Starting services..."
-docker compose -f "${COMPOSE_FILE}" up -d jobpilot-redis jobpilot-api jobpilot-worker jobpilot-beat
+docker compose -f "${COMPOSE_FILE}" up -d \
+  jobpilot-redis \
+  jobpilot-api \
+  jobpilot-worker \
+  jobpilot-beat \
+  jobpilot-prometheus \
+  jobpilot-grafana \
+  jobpilot-redis-exporter \
+  jobpilot-cadvisor
 
 echo "Waiting for API health..."
 for _ in {1..30}; do

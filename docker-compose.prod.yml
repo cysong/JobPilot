@@ -61,8 +61,66 @@ services:
     networks:
       - jobpilot-internal
 
+  jobpilot-prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: jobpilot-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - jobpilot-internal
+
+  jobpilot-grafana:
+    image: grafana/grafana:10.4.2
+    container_name: jobpilot-grafana
+    restart: unless-stopped
+    env_file:
+      - ./deploy/env/monitoring.env
+    ports:
+      - "127.0.0.1:13000:3000"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - jobpilot-prometheus
+    networks:
+      - jobpilot-internal
+
+  jobpilot-redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: jobpilot-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://jobpilot-redis:6379
+    depends_on:
+      jobpilot-redis:
+        condition: service_healthy
+    networks:
+      - jobpilot-internal
+
+  jobpilot-cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: jobpilot-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - jobpilot-internal
+
 volumes:
   redis-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   jobpilot-internal:

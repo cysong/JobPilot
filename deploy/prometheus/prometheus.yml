@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+scrape_configs:
+  # FastAPI application metrics
+  - job_name: jobpilot-api
+    static_configs:
+      - targets: ["jobpilot-api:8000"]
+    metrics_path: /metrics
+
+  # Redis metrics via redis-exporter
+  - job_name: redis
+    static_configs:
+      - targets: ["jobpilot-redis-exporter:9121"]
+
+  # Container resource metrics via cAdvisor
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["jobpilot-cadvisor:8080"]

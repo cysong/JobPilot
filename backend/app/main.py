@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis import asyncio as aioredis
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 from app import models  # noqa: F401  # Register all ORM models for metadata consistency
 from app.api.v1.router import api_router
 from app.core.cache import RedisBackend
@@ -121,6 +123,11 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
     }
 
+
+# Prometheus metrics endpoint (/metrics)
+# Skipped in development: prometheus_client hangs on Windows with uvicorn's spawn reloader
+if settings.ENVIRONMENT != "development":
+    Instrumentator().instrument(app).expose(app)
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")

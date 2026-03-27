@@ -177,19 +177,99 @@ Nginx 需要满足：
 
 ---
 
-## 11. 监控与告警（最小集）
+## 11. 可观测性栈（Prometheus + Grafana）
 
-建议监控：
-- API 健康检查接口
-- 容器重启次数
-- Celery 失败率与队列长度
-- Redis 内存使用率
-- Supabase 连接占用与慢查询
+### 11.1 架构概览
 
-初始告警阈值：
-- API P95 > 2s（持续 5 分钟）
-- Worker 失败率 > 5%
-- Redis 内存 > 80%
+```
+FastAPI /metrics ──┐
+redis-exporter     ├──► Prometheus(9090) ──► Grafana(3000) ──► Nginx /grafana
+cAdvisor           ┘                              │
+                                                  └──► Email Alert (SMTP)
+```
+
+监控服务全部运行在 `jobpilot-internal` Docker 网络内，不直接暴露公网端口。
+Grafana 通过 Nginx 反代对外开放：`https://api.jobpilot.me/grafana`
+
+### 11.2 容器清单（新增 4 个）
+
+| 容器 | 镜像 | 端口（宿主机） | 用途 |
+|---|---|---|---|
+| `jobpilot-prometheus` | `prom/prometheus:v2.51.2` | 无 | 指标采集与存储（保留 15 天） |
+| `jobpilot-grafana` | `grafana/grafana:10.4.2` | `127.0.0.1:13000` | 可视化 + 邮件告警 |
+| `jobpilot-redis-exporter` | `oliver006/redis_exporter:v1.58.0` | 无 | 将 Redis 指标转为 Prometheus 格式 |
+| `jobpilot-cadvisor` | `gcr.io/cadvisor/cadvisor:v0.49.1` | 无 | 容器 CPU/内存/网络资源 |
+
+### 11.3 文件结构
+
+```
+deploy/
+  prometheus/
+    prometheus.yml          ← 抓取目标配置（api / redis-exporter / cadvisor）
+    alert_rules.yml         ← 3 条核心告警规则
+  grafana/
+    provisioning/
+      datasources/
+        prometheus.yml      ← 自动注册 Prometheus 数据源
+      dashboards/
+        dashboard.yml       ← 自动加载 Dashboard 目录
+    dashboards/
+      jobpilot.json         ← 预置 4 面板 Dashboard
+  env/
+    monitoring.env.example  ← Grafana admin 密码 + SMTP 配置模板
+    monitoring.env          ← 实际配置（不入库，首次部署手动创建）
+```
+
+### 11.4 首次部署步骤
+
+1. 在 VPS 上复制环境变量模板并填写：
+   ```bash
+   cp /opt/jobpilot/deploy/env/monitoring.env.example \
+      /opt/jobpilot/deploy/env/monitoring.env
+   # 编辑 monitoring.env，填入强密码和 SMTP 配置
+   ```
+
+2. 正常触发 CI/CD 部署（`deploy-prod.sh` 已自动启动监控服务）。
+
+3. 验证：
+   ```bash
+   # FastAPI 指标端点
+   curl http://127.0.0.1:18000/metrics | head -20
+
+   # Prometheus 是否抓到目标
+   curl http://127.0.0.1:9090/api/v1/targets  # 从容器内访问，或临时端口映射
+   ```
+
+4. 访问 Grafana：`https://api.jobpilot.me/grafana`，用 `monitoring.env` 中的 admin 密码登录。
+
+### 11.5 Grafana Dashboard 面板
+
+预置 Dashboard（`deploy/grafana/dashboards/jobpilot.json`）包含：
+
+| 面板 | 指标 | 告警阈值颜色 |
+|---|---|---|
+| API 请求速率 | `rate(http_requests_total[5m])` | — |
+| API P95 延迟 | `histogram_quantile(0.95, ...)` | 黄 > 1s / 红 > 2s |
+| HTTP 5xx 错误率 | 5xx 占总请求比 | 黄 > 1% / 红 > 5% |
+| Redis 内存使用率 | `redis_memory_used_bytes / redis_memory_max_bytes` | 黄 > 60% / 红 > 80% |
+
+### 11.6 告警规则（`deploy/prometheus/alert_rules.yml`）
+
+| 规则 | 触发条件 | 持续时间 | 严重级别 |
+|---|---|---|---|
+| `HighAPILatency` | P95 延迟 > 2s | 5 分钟 | warning |
+| `HighErrorRate` | 5xx 错误率 > 5% | 5 分钟 | critical |
+| `HighRedisMemory` | Redis 内存 > 80% | 10 分钟 | warning |
+
+> 告警通过 Grafana 内置 SMTP 发送邮件。在 Grafana UI → Alerting → Contact points 中配置收件人。
+
+### 11.7 SLO 定义
+
+| 指标 | SLI | SLO 目标 |
+|---|---|---|
+| 可用性 | 非 5xx 请求占比 | 99.5% / 月（月允许故障 216 分钟） |
+| 延迟 | P95 < 2s 的请求比例 | 95% |
+| 任务成功率 | Celery 任务成功占比 | 98% |
 
 ---
 
