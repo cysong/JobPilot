@@ -220,29 +220,7 @@ deploy/
     monitoring.env          ← 实际配置（不入库，首次部署手动创建）
 ```
 
-### 11.4 首次部署步骤
-
-1. 在 VPS 上复制环境变量模板并填写：
-   ```bash
-   cp /opt/jobpilot/deploy/env/monitoring.env.example \
-      /opt/jobpilot/deploy/env/monitoring.env
-   # 编辑 monitoring.env，填入强密码和 SMTP 配置
-   ```
-
-2. 正常触发 CI/CD 部署（`deploy-prod.sh` 已自动启动监控服务）。
-
-3. 验证：
-   ```bash
-   # FastAPI 指标端点
-   curl http://127.0.0.1:18000/metrics | head -20
-
-   # Prometheus 是否抓到目标
-   curl http://127.0.0.1:9090/api/v1/targets  # 从容器内访问，或临时端口映射
-   ```
-
-4. 访问 Grafana：`https://api.freeclaw.cloud/grafana`，用 `monitoring.env` 中的 admin 密码登录。
-
-### 11.5 Grafana Dashboard 面板
+### 11.4 Grafana Dashboard 面板
 
 预置 Dashboard（`deploy/grafana/dashboards/jobpilot.json`）包含：
 
@@ -253,7 +231,7 @@ deploy/
 | HTTP 5xx 错误率 | 5xx 占总请求比 | 黄 > 1% / 红 > 5% |
 | Redis 内存使用率 | `redis_memory_used_bytes / redis_memory_max_bytes` | 黄 > 60% / 红 > 80% |
 
-### 11.6 告警规则（`deploy/prometheus/alert_rules.yml`）
+### 11.5 告警规则（`deploy/prometheus/alert_rules.yml`）
 
 | 规则 | 触发条件 | 持续时间 | 严重级别 |
 |---|---|---|---|
@@ -263,7 +241,7 @@ deploy/
 
 > 告警通过 Grafana 内置 SMTP 发送邮件。在 Grafana UI → Alerting → Contact points 中配置收件人。
 
-### 11.7 SLO 定义
+### 11.6 SLO 定义
 
 | 指标 | SLI | SLO 目标 |
 |---|---|---|
@@ -273,7 +251,247 @@ deploy/
 
 ---
 
-## 12. 回滚方案
+## 12. 首次部署操作手册
+
+首次部署按以下顺序执行，后续更新只需触发 CI/CD，无需重复。
+
+### 12.1 前置条件
+
+- VPS 已开通（本项目使用 Hostinger）
+- 域名 `freeclaw.cloud` 已购买
+- DNS 已将以下子域名 A 记录指向 VPS IP：
+  - `app.freeclaw.cloud`
+  - `api.freeclaw.cloud`
+
+验证 DNS 是否生效（解析到正确 IP 才能继续）：
+
+```bash
+dig app.freeclaw.cloud +short
+dig api.freeclaw.cloud +short
+```
+
+---
+
+### 12.2 VPS 环境初始化
+
+SSH 登录 VPS 后执行：
+
+```bash
+# 1. 安装 Docker
+curl -fsSL https://get.docker.com | sh
+
+# 2. 安装 Docker Compose 插件
+apt install -y docker-compose-plugin
+
+# 3. 安装 Nginx 和 Certbot
+apt update
+apt install -y nginx certbot python3-certbot-nginx
+
+# 4. 开放防火墙端口（仅开放 22/80/443）
+ufw allow 22
+ufw allow 80
+ufw allow 443
+ufw enable
+```
+
+---
+
+### 12.3 申请 SSL 证书
+
+DNS 生效后执行（必须在 DNS 生效之后，否则 Let's Encrypt 域名验证失败）：
+
+```bash
+certbot --nginx -d app.freeclaw.cloud -d api.freeclaw.cloud
+```
+
+过程中：
+- 输入邮箱（用于证书到期提醒）
+- 选择 `2`（自动将 HTTP 重定向到 HTTPS）
+
+验证自动续期：
+
+```bash
+certbot renew --dry-run
+```
+
+证书路径（供 Nginx 配置引用）：
+```
+/etc/letsencrypt/live/freeclaw.cloud/fullchain.pem
+/etc/letsencrypt/live/freeclaw.cloud/privkey.pem
+```
+
+---
+
+### 12.4 配置 GitHub Actions
+
+在 GitHub 仓库 **Settings → Secrets and variables → Actions** 中添加：
+
+**Secrets（Settings → Secrets and variables → Actions → Secrets）：**
+
+| 名称 | 说明 |
+|---|---|
+| `GHCR_USERNAME` | GitHub 用户名，用于登录 `ghcr.io` |
+| `GHCR_TOKEN` | GitHub PAT，需勾选 `write:packages` + `read:packages` |
+| `VPS_HOST` | VPS IP 地址 |
+| `VPS_USER` | SSH 用户名（通常为 `root`） |
+| `VPS_SSH_KEY` | SSH 私钥完整内容（含 `-----BEGIN...` 头尾） |
+| `VPS_PORT` | SSH 端口（非 22 才填，否则不创建此 Secret） |
+
+**Variables（Settings → Secrets and variables → Actions → Variables）：**
+
+| 名称 | 值 | 说明 |
+|---|---|---|
+| `VITE_API_BASE_URL` | `https://api.freeclaw.cloud` | 前端构建时注入，非敏感，放 Variables 而非 Secrets |
+
+> 说明：后端运行时业务变量（`DATABASE_URL`、`OPENAI_API_KEY` 等）不经过 GitHub Secrets，直接存放在 VPS 的 `backend.env` 文件中，首次部署时由 workflow 自动从模板生成后手动填写。
+
+GHCR_TOKEN 生成路径：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token，勾选 `write:packages`。
+
+---
+
+### 12.5 触发第一次部署（预期会失败一次）
+
+在 GitHub Actions → Deploy Production → **Run workflow** 手动触发。
+
+**预期结果**：在 `Deploy on VPS` 步骤失败，输出：
+
+```
+Missing .../backend.env. Template created, please fill secrets and rerun.
+```
+
+这是正常行为 — workflow 已将所有配置文件同步到 VPS，并自动从模板创建了 `backend.env` 和 `monitoring.env`。
+
+---
+
+### 12.6 SSH 进 VPS 填写配置文件
+
+```bash
+# 填写后端业务配置
+nano /opt/jobpilot/deploy/env/backend.env
+```
+
+必填项：
+
+| 变量 | 说明 |
+|---|---|
+| `SECRET_KEY` | 强随机字符串，可用 `openssl rand -hex 32` 生成 |
+| `DATABASE_URL` | Supabase PostgreSQL 连接串（含 `sslmode=require`） |
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `CORS_ORIGINS` | 保持 `["https://app.freeclaw.cloud"]` |
+
+```bash
+# 填写监控配置
+nano /opt/jobpilot/deploy/env/monitoring.env
+```
+
+必填项：
+
+| 变量 | 说明 |
+|---|---|
+| `GF_SECURITY_ADMIN_PASSWORD` | Grafana 登录密码（自定义，勿用默认） |
+| `GF_SMTP_USER` | 发件邮箱（Gmail 推荐） |
+| `GF_SMTP_PASSWORD` | Gmail App Password（非登录密码，需在 Google 账号开启两步验证后生成） |
+| `GF_SMTP_FROM_ADDRESS` | 同上发件邮箱 |
+
+---
+
+### 12.7 激活 Nginx 配置（首次一次性操作）
+
+```bash
+# 链接 JobPilot Nginx 配置到 sites-enabled
+ln -s /opt/jobpilot/deploy/nginx/jobpilot.conf /etc/nginx/sites-enabled/jobpilot
+
+# 验证语法
+nginx -t
+
+# 重载
+systemctl reload nginx
+```
+
+> 后续每次 CI/CD 部署会自动同步最新的 `jobpilot.conf` 到 `/opt/jobpilot/deploy/nginx/`，但 symlink 只需创建一次，Nginx 会实时读取最新内容。
+
+---
+
+### 12.8 重新触发部署
+
+再次 **Run workflow** — 这次应全程成功。
+
+成功后验证：
+
+```bash
+# 确认所有容器运行正常
+docker compose -f /opt/jobpilot/docker-compose.prod.yml ps
+
+# 验证 API
+curl https://api.freeclaw.cloud/health
+
+# 验证 FastAPI 指标端点
+curl http://127.0.0.1:18000/metrics | head -20
+```
+
+访问：
+- 前端：`https://app.freeclaw.cloud`
+- Grafana：`https://api.freeclaw.cloud/grafana`（用 `monitoring.env` 中的密码登录）
+
+---
+
+### 12.9 Grafana 邮件告警配置
+
+登录 Grafana → **Alerting → Contact points → Add contact point**：
+- Type: Email
+- Addresses: 填写告警收件人邮箱
+- 点击 **Test** 验证邮件发送正常后保存
+
+---
+
+### 12.10 部署后一次性补全操作
+
+**配置 Docker 日志大小限制**
+
+默认容器日志无上限，长期运行会写满磁盘。在 VPS 执行一次：
+
+```bash
+cat > /etc/docker/daemon.json << 'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+systemctl restart docker
+```
+
+**导出 Grafana 告警规则备份**
+
+Dashboard 通过 provisioning 文件自动恢复，但在 Grafana UI 中手动创建的告警规则存储在 `grafana-data` volume 中，volume 误删后会丢失。配置好告警规则后从 Grafana UI 导出 JSON 并提交到仓库：
+
+Grafana → Alerting → Alert rules → Export
+
+---
+
+### 12.11 验收清单
+
+**基础部署：**
+- CI 能构建并推送版本化镜像到 GHCR
+- VPS 可用只读凭据拉取私有镜像
+- Nginx `app/api` 路由正确，HTTPS 正常
+- Worker 可消费 Redis 队列任务
+- Supabase SSL 连接稳定
+- Migration 流程可重复执行且无并发冲突
+- 已验证至少一次镜像回滚
+
+**可观测性：**
+- `https://api.freeclaw.cloud/health` 返回 200
+- `http://127.0.0.1:18000/metrics` 有 Prometheus 格式输出
+- Grafana 可通过 `https://api.freeclaw.cloud/grafana` 访问
+- Grafana Dashboard 4 个面板有实时数据
+- 邮件告警 Test 发送成功
+
+---
+
+## 13. 回滚方案
 
 应用回滚：
 1. 将 compose 镜像 tag 回退到上一个稳定 `git-sha`。
@@ -287,20 +505,51 @@ deploy/
 
 ---
 
-## 13. 验收清单
+## 14. 日常运维手册
 
-- CI 能构建并推送版本化镜像到 GHCR
-- VPS 可用只读凭据拉取私有镜像
-- Nginx `app/api` 路由正确
-- WebSocket 可通过 Nginx 正常连接
-- Worker 可消费 Redis 队列任务
-- Supabase SSL 连接稳定
-- Migration 流程可重复执行且无并发冲突
-- 已验证至少一次镜像回滚
+### 13.1 日常（有告警时处理）
 
----
+- 查看告警邮件，响应 `HighAPILatency` / `HighErrorRate` / `HighRedisMemory`
+- 登录 `https://api.freeclaw.cloud/grafana` 巡检 Dashboard 趋势，发现阈值外异常
 
-## 14. 已落地测试文件
+### 13.2 每月定期操作
+
+**磁盘清理**（每次部署堆积旧镜像，长期不清理会撑满磁盘）
+
+```bash
+docker system prune -f
+df -h
+du -sh /var/lib/docker
+```
+
+**GHCR 旧镜像清理**
+
+GitHub → Packages → jobpilot → 手动删除旧 `git-sha` 版本，或在 Package Settings 中配置自动清理策略。
+
+**OS 安全补丁**
+
+```bash
+apt update && apt upgrade -y
+```
+
+**验证 SSL 证书状态**
+
+```bash
+certbot certificates
+# 确认 VALID 且剩余天数 > 30，certbot systemd timer 会自动续期
+```
+
+### 13.3 需持续关注的外部限制
+
+**Supabase 免费计划**
+
+超过 **7 天无活跃请求**数据库会自动暂停，恢复需登录 Supabase Dashboard 手动点击 Restore。低流量阶段需确保有定期访问，或升级付费计划。
+
+**GitHub Actions 额度**
+
+私有仓库每月 2000 分钟免费，按现有 workflow 约 5 分钟/次，正常使用不会超额。公开仓库无限制。
+
+## 15. 已落地文件清单
 
 - 后端镜像构建：`backend/Dockerfile`
 - 后端镜像构建忽略规则：`backend/.dockerignore`
@@ -310,34 +559,3 @@ deploy/
 - Nginx 配置模板：`deploy/nginx/jobpilot.conf`
 - 自动发布流程：`.github/workflows/deploy.yml`
 
----
-
-## 15. GitHub Secrets 清单
-
-以下是当前 `.github/workflows/deploy.yml` 实际读取的 Secrets：
-
-必需：
-- `GHCR_USERNAME`：用于登录 `ghcr.io`
-- `GHCR_TOKEN`：用于推送/拉取 GHCR 镜像
-- `VPS_HOST`：VPS 主机地址
-- `VPS_USER`：VPS SSH 用户
-- `VPS_SSH_KEY`：VPS SSH 私钥（建议专用 deploy key）
-
-可选：
-- `VPS_PORT`：SSH 端口，未设置时默认 `22`
-
-说明：
-- 后端运行时业务变量（如 `DATABASE_URL`、`OPENAI_API_KEY`、`CORS_ORIGINS`）不从 GitHub Secrets 注入容器。
-- 这些变量放在 VPS 文件：`/opt/jobpilot/deploy/env/backend.env`（首次部署会由模板自动生成）。
-- 前端变量 `VITE_API_BASE_URL` 由 GitHub Repository Variable 注入前端构建流程。
-
----
-
-## 16. GitHub Variables 清单
-
-当前 workflow 需要的 Variables：
-- `VITE_API_BASE_URL`：前端构建时使用，例如 `https://api.freeclaw.cloud`
-
-说明：
-- 此变量非敏感信息，建议放 Variables，不放 Secrets。
-- workflow 在前端构建前会校验该变量，未配置会直接失败并提示。
