@@ -18,6 +18,7 @@ concurrency:
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/jobpilot
   VPS_PORT: ${{ secrets.VPS_PORT }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-image:
@@ -42,6 +43,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
+          no-cache: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:main
