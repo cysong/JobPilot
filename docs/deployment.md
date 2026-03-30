@@ -342,7 +342,7 @@ certbot renew --dry-run
 
 | 名称 | 值 | 说明 |
 |---|---|---|
-| `VITE_API_BASE_URL` | `https://api.freeclaw.cloud/api/v1` | 前端构建时注入，非敏感，放 Variables 而非 Secrets |
+| `VITE_API_BASE_URL` | 可留空；如需显式指定可填 `https://api.freeclaw.cloud/api/v1` | 前端构建变量。留空时生产默认回退到同源 `/api/v1` |
 
 > 说明：后端运行时业务变量（`DATABASE_URL`、`OPENAI_API_KEY` 等）不经过 GitHub Secrets，直接存放在 VPS 的 `backend.env` 文件中，首次部署时由 workflow 自动从模板生成后手动填写。
 

@@ -109,6 +109,9 @@ docker compose -f "${COMPOSE_FILE}" up -d \
 echo "Waiting for API health..."
 for _ in {1..30}; do
   if curl -fsS "http://127.0.0.1:18000/health" >/dev/null; then
+    echo "Reloading nginx..."
+    nginx -t
+    systemctl reload nginx
     echo "Deployment succeeded."
     exit 0
   fi

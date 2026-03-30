@@ -3,8 +3,12 @@ import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } fro
 import type { ApiResponse } from '@/types/api'
 import { ApiError } from '@/types/api'
 
+const baseURL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? '/api/v1' : 'http://localhost:8000/api/v1')
+
 const rawClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  baseURL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

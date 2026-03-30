@@ -26,6 +26,17 @@
   - project auth query path `get_user_by_email(session, "user@example.com")` passed using the current pooler URL
   - `python -m compileall` could not complete in the sandbox because writing `__pycache__` was denied
 
+### 2026-03-30 - Frontend Same-Origin API Fallback
+
+- Updated the frontend API client to prefer a relative `/api/v1` base URL in production when `VITE_API_BASE_URL` is not explicitly provided.
+- Kept the existing local development fallback to `http://localhost:8000/api/v1`.
+- Updated the JobPilot Nginx site config so `app.freeclaw.cloud/api/` proxies to the backend, allowing the frontend to call the API over the same HTTPS origin and avoid mixed-content failures.
+- Updated the GitHub Actions frontend build workflow so `VITE_API_BASE_URL` is now optional instead of required.
+- Updated deployment docs to document the same-origin `/api/v1` production fallback.
+- Updated the production deployment script to run `nginx -t` and `systemctl reload nginx` after the API health check passes, so synchronized Nginx config changes are activated automatically.
+- Validation:
+  - `pnpm exec tsc --noEmit` passed in `frontend/`
+
 ### 2026-03-25 - Resume Modern PDF Stylesheet Migration
 
 - Reworked the resume `modern` PDF stylesheet to use typography and spacing patterns adapted from the legacy `resume-css-stylesheet.css` reference.

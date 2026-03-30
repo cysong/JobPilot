@@ -76,11 +76,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate frontend env
+      - name: Report frontend API base URL mode
         run: |
-          if [ -z "${VITE_API_BASE_URL}" ]; then
-            echo "VITE_API_BASE_URL is empty. Please set repository variable VITE_API_BASE_URL."
-            exit 1
+          if [ -n "${VITE_API_BASE_URL}" ]; then
+            echo "Building frontend with explicit VITE_API_BASE_URL=${VITE_API_BASE_URL}"
+          else
+            echo "VITE_API_BASE_URL is empty. Production build will fall back to same-origin /api/v1."
           fi
 
       - name: Build frontend
