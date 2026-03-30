@@ -63,7 +63,7 @@
 后端必需：
 - `APP_ENV=production`
 - `SECRET_KEY=<强随机字符串>`
-- `DATABASE_URL=<Supabase Session Pooler 连接串，含 sslmode=require>`
+- `DATABASE_URL=<Supabase Session Pooler 连接串，含 ssl=require>`
 - `REDIS_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_BROKER_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_RESULT_BACKEND=redis://jobpilot-redis:6379/1`
@@ -376,12 +376,12 @@ nano /opt/jobpilot/deploy/env/backend.env
 | 变量 | 说明 |
 |---|---|
 | `SECRET_KEY` | 强随机字符串，可用 `openssl rand -hex 32` 生成 |
-| `DATABASE_URL` | Supabase Session Pooler 连接串（含 `sslmode=require&prepared_statement_cache_size=0`） |
+| `DATABASE_URL` | Supabase Session Pooler 连接串（含 `ssl=require&prepared_statement_cache_size=0`） |
 
 推荐格式：
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require&prepared_statement_cache_size=0
+DATABASE_URL=postgresql+asyncpg://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?ssl=require&prepared_statement_cache_size=0
 ```
 
 说明：
