@@ -8,7 +8,7 @@
 - GHCR（GitHub Container Registry）作为镜像仓库
 - 一套共享 Nginx 作为统一反向代理网关（同时服务其他项目）
 - 后端 API、Celery Worker、Redis 均容器化
-- 数据库使用 Supabase PostgreSQL（托管）
+- 数据库使用 Supabase PostgreSQL（托管，生产环境使用 Session Pooler）
 
 优先级：低成本优先，同时保证基础稳定性与可回滚。
 
@@ -38,7 +38,7 @@
 - 缓存/队列
   - `redis:7-alpine` 官方镜像，仅内网可访问。
 - 数据库
-  - Supabase PostgreSQL，强制 SSL。
+- Supabase PostgreSQL，强制 SSL，生产环境使用 Session Pooler。
 
 网络原则：
 - 对公网只开放 Nginx 的 `80/443`。
@@ -63,7 +63,7 @@
 后端必需：
 - `APP_ENV=production`
 - `SECRET_KEY=<强随机字符串>`
-- `DATABASE_URL=<Supabase 连接串，含 sslmode=require>`
+- `DATABASE_URL=<Supabase Session Pooler 连接串，含 sslmode=require>`
 - `REDIS_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_BROKER_URL=redis://jobpilot-redis:6379/0`
 - `CELERY_RESULT_BACKEND=redis://jobpilot-redis:6379/1`
@@ -163,7 +163,8 @@ Nginx 需要满足：
 
 约束：
 - 禁止多实例同时执行 migration。
-- Supabase 优先使用 pooler 连接串（并发更稳）。
+- Supabase 生产环境使用 Session pooler 连接串。
+- 对 `asyncpg` + Supabase pooler，建议附带 `prepared_statement_cache_size=0`，避免 pgbouncer prepared statement 问题。
 
 ---
 
@@ -375,7 +376,18 @@ nano /opt/jobpilot/deploy/env/backend.env
 | 变量 | 说明 |
 |---|---|
 | `SECRET_KEY` | 强随机字符串，可用 `openssl rand -hex 32` 生成 |
-| `DATABASE_URL` | Supabase PostgreSQL 连接串（含 `sslmode=require`） |
+| `DATABASE_URL` | Supabase Session Pooler 连接串（含 `sslmode=require&prepared_statement_cache_size=0`） |
+
+推荐格式：
+
+```bash
+DATABASE_URL=postgresql+asyncpg://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require&prepared_statement_cache_size=0
+```
+
+说明：
+- 不要在 VPS 生产环境使用 `db.<project-ref>.supabase.co:5432` 直连地址。
+- 这类直连地址在部分仅 IPv4 的主机环境会解析到不可达地址，部署时常见报错为 `OSError: [Errno 101] Network is unreachable`。
+- Supabase Dashboard 中请复制 `Connection string -> URI -> Session pooler` 版本。
 | `OPENAI_API_KEY` | OpenAI API Key |
 | `CORS_ORIGINS` | 保持 `["https://app.freeclaw.cloud"]` |
 
@@ -558,4 +570,3 @@ certbot certificates
 - 后端环境变量模板：`deploy/env/backend.env.example`
 - Nginx 配置模板：`deploy/nginx/jobpilot.conf`
 - 自动发布流程：`.github/workflows/deploy.yml`
-

@@ -70,6 +70,12 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
+DATABASE_URL="$(grep -E '^DATABASE_URL=' "${ENV_FILE}" | tail -n 1 | cut -d= -f2-)"
+if [[ -z "${DATABASE_URL}" ]]; then
+  echo "ERROR: DATABASE_URL is missing from ${APP_DIR}/${ENV_FILE}"
+  exit 1
+fi
+
 MONITORING_ENV_FILE="${MONITORING_ENV_FILE:-deploy/env/monitoring.env}"
 if [[ ! -f "${MONITORING_ENV_FILE}" ]]; then
   echo "ERROR: monitoring env file not found: ${APP_DIR}/${MONITORING_ENV_FILE}"
