@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertCircle } from 'lucide-react'
 import type { TailoringLevel } from '@/types/application'
+import { useAuthStore } from '@/store/authStore'
 
 interface ApplicationDialogProps {
     open: boolean
@@ -33,7 +34,9 @@ interface ApplicationDialogProps {
 
 export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: ApplicationDialogProps) {
     const [selectedResumeId, setSelectedResumeId] = useState<string>('')
-    const [tailoringLevel, setTailoringLevel] = useState<TailoringLevel>('deep')
+    const { user } = useAuthStore()
+    const preferredTailoringLevel = user?.preferences?.default_tailoring_level ?? 'deep'
+    const [tailoringLevel, setTailoringLevel] = useState<TailoringLevel>(preferredTailoringLevel)
     const { data: resumesData, isLoading: isLoadingResumes } = useResumes()
     const { createApplication } = useApplicationMutations()
     const { data: matchDetail } = useQuery({
@@ -56,7 +59,7 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
                 onSuccess: () => {
                     onOpenChange(false)
                     setSelectedResumeId('')
-                    setTailoringLevel('deep')
+                    setTailoringLevel(preferredTailoringLevel)
                 }
             }
         )
@@ -67,8 +70,8 @@ export function ApplicationDialog({ open, onOpenChange, jobId, jobTitle }: Appli
 
     useEffect(() => {
         if (!open) return
-        setTailoringLevel('deep')
-    }, [open])
+        setTailoringLevel(preferredTailoringLevel)
+    }, [open, preferredTailoringLevel])
 
     useEffect(() => {
         const recommendedId = matchDetail?.recommended_resume?.id

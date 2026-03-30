@@ -22,6 +22,7 @@ class ResponseCode(int, Enum):
     BAD_REQUEST = 400  # Invalid parameters
     NOT_FOUND = 404  # Resource not found
     CONFLICT = 409  # Resource conflict
+    TOO_MANY_REQUESTS = 429  # Rate limit exceeded
     INTERNAL_ERROR = 500  # Server error
 
     @property
@@ -40,5 +41,6 @@ RESPONSE_MESSAGES: Dict[ResponseCode, str] = {
     ResponseCode.BAD_REQUEST: "Invalid request parameters",
     ResponseCode.NOT_FOUND: "Resource not found",
     ResponseCode.CONFLICT: "Resource conflict",
+    ResponseCode.TOO_MANY_REQUESTS: "Too many requests",
     ResponseCode.INTERNAL_ERROR: "Internal server error",
 }

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import {
     LogOut,
     Settings,
+    Shield,
     User,
 } from 'lucide-react'
 
@@ -49,7 +50,9 @@ export function UserNav() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.email?.split('@')[0] || 'User'}</p>
+                        <p className="text-sm font-medium leading-none">
+                            {user?.full_name?.trim() || user?.email?.split('@')[0] || 'User'}
+                        </p>
                         <p className="text-xs leading-none text-muted-foreground">
                             {user?.email}
                         </p>
@@ -57,17 +60,21 @@ export function UserNav() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
                         <User className="mr-2 h-4 w-4" />
                         <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <DropdownMenuItem onClick={() => navigate('/settings/account')} className="cursor-pointer">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Settings</span>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/settings/security')} className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Security</span>
+                    </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                 </DropdownMenuItem>

@@ -17,7 +17,15 @@ const rawClient: AxiosInstance = axios.create({
 
 const redirectToLogin = () => {
   const currentPath = window.location.pathname
-  if (currentPath !== '/login' && currentPath !== '/register') {
+  const publicPaths = new Set([
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/verify-email',
+    '/change-email-confirm',
+  ])
+  if (!publicPaths.has(currentPath)) {
     localStorage.removeItem('access_token')
     window.location.href = '/login'
   }

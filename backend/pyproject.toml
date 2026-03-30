@@ -31,6 +31,7 @@ dependencies = [
   "structlog>=24.1.0,<25.0.0",
   "fastapi-cache2[redis]>=0.1.8",
   "prometheus-fastapi-instrumentator>=6.1.0,<7.0.0",
+  "resend>=2.13.0,<3.0.0",
 ]
 
 [dependency-groups]

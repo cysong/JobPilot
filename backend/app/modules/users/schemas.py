@@ -7,9 +7,24 @@ including user skill management.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from app.shared.enums import ProficiencyLevel
+from app.modules.auth.schemas import SalaryExpectation, UserPreferences
+from app.shared.enums import ProficiencyLevel, TailoringLevel
+
+
+NZ_JOB_LOCATION_OPTIONS = [
+    "Auckland",
+    "Wellington",
+    "Christchurch",
+    "Hamilton",
+    "Tauranga",
+    "Dunedin",
+    "Palmerston North",
+    "Queenstown",
+    "Napier-Hastings",
+    "Nelson",
+]
 
 
 # ============================================
@@ -60,3 +75,52 @@ class SkillSyncResponse(BaseModel):
     total_skills: int = Field(..., description="Total skills after sync")
     manual_skills: int = Field(..., description="Manual skills count")
     auto_skills: int = Field(..., description="Auto skills count")
+
+
+class ProfilePreferencesResponse(UserPreferences):
+    """User profile preferences payload."""
+
+
+class ProfilePreferencesUpdate(BaseModel):
+    """Update profile preferences payload."""
+
+    default_tailoring_level: TailoringLevel | None = Field(default=None)
+    job_locations: list[str] = Field(default_factory=list)
+    salary_expectation: SalaryExpectation | None = None
+
+    @field_validator("default_tailoring_level", mode="before")
+    @classmethod
+    def validate_default_tailoring_level(
+        cls, value: TailoringLevel | str | None
+    ) -> TailoringLevel | None:
+        if value is None:
+            return value
+        if isinstance(value, TailoringLevel):
+            return value
+        normalized = value.strip().lower()
+        if normalized not in {item.value for item in TailoringLevel}:
+            raise ValueError(
+                "default_tailoring_level must be one of 'light', 'moderate', or 'deep'"
+            )
+        return TailoringLevel(normalized)
+
+    @field_validator("job_locations")
+    @classmethod
+    def validate_job_locations(cls, value: list[str]) -> list[str]:
+        normalized_locations: list[str] = []
+        seen: set[str] = set()
+        allowed_map = {item.lower(): item for item in NZ_JOB_LOCATION_OPTIONS}
+
+        for raw_item in value:
+            item = raw_item.strip()
+            if not item:
+                continue
+            canonical = allowed_map.get(item.lower())
+            if canonical is None:
+                raise ValueError(f"Unsupported job location: {item}")
+            if canonical.lower() in seen:
+                continue
+            seen.add(canonical.lower())
+            normalized_locations.append(canonical)
+
+        return normalized_locations

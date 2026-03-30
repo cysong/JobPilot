@@ -13,7 +13,9 @@ from uuid import uuid4
 from sqlalchemy import case, select, func, delete, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.models import User
 from app.modules.users.models import UserSkill
+from app.modules.users.schemas import ProfilePreferencesUpdate
 from app.modules.resumes.models import ResumeSkill
 from app.shared.enums import ProficiencyLevel
 
@@ -356,3 +358,44 @@ def compare_proficiency(level1: ProficiencyLevel, level2: ProficiencyLevel) -> i
         return 1
     else:
         return 0
+
+
+async def get_profile_preferences(
+    db: AsyncSession,
+    user_id: int,
+) -> dict[str, Any]:
+    """Return the stored profile preferences for a user."""
+    user = await db.get(User, user_id)
+    if not user:
+        return {}
+    return dict(user.preferences or {})
+
+
+async def update_profile_preferences(
+    db: AsyncSession,
+    user_id: int,
+    payload: ProfilePreferencesUpdate,
+) -> dict[str, Any]:
+    """Persist the supported profile preferences for a user."""
+    user = await db.get(User, user_id)
+    if not user:
+        return {}
+
+    user.preferences = {
+        "default_tailoring_level": (
+            payload.default_tailoring_level.value
+            if payload.default_tailoring_level is not None
+            else None
+        ),
+        "job_locations": payload.job_locations,
+        "salary_expectation": (
+            payload.salary_expectation.model_dump()
+            if payload.salary_expectation is not None
+            else None
+        ),
+    }
+    user.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(user)
+    return dict(user.preferences or {})

@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_DAYS: int = 7  # JWT token expires in 7 days
     PASSWORD_MIN_LENGTH: int = 8
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 60
+    EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
+    EMAIL_CHANGE_TOKEN_EXPIRE_HOURS: int = 24
+    SECURITY_TOKEN_RATE_LIMIT_WINDOW_MINUTES: int = 10
+    SECURITY_TOKEN_RATE_LIMIT_MAX_COUNT: int = 3
 
     # User Defaults
     # Default role for new users (USER/VIP/ADMIN)
@@ -65,6 +70,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     APP_TIMEZONE: str = "Pacific/Auckland"
+    APP_FRONTEND_URL: str = "http://localhost:5173"
+
+    # Email
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = ""
 
     # Logging
     LOG_LEVEL: str = "INFO"

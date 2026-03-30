@@ -2,12 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from '@/features/auth/Login'
 import Register from '@/features/auth/Register'
+import ForgotPassword from '@/features/auth/ForgotPassword'
+import ResetPassword from '@/features/auth/ResetPassword'
+import VerifyEmail from '@/features/auth/VerifyEmail'
+import ChangeEmailConfirmPage from '@/features/auth/ChangeEmailConfirmPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import MainLayout from '@/components/layout/MainLayout'
 import FullWidthLayout from '@/components/layout/FullWidthLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import LandingPage from '@/features/landing/LandingPage'
-import PlaceholderPage from '@/features/common/PlaceholderPage'
+import ProfilePage from '@/features/profile/ProfilePage'
+import AccountSettingsPage from '@/features/settings/AccountSettingsPage'
+import SecuritySettingsPage from '@/features/settings/SecuritySettingsPage'
 import UserDashboardPage from '@/features/dashboard/UserDashboardPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
 import JobDetailPage from '@/features/jobs/JobDetailPage'
@@ -49,6 +55,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login redirectPath="/admin/dashboard" />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/change-email-confirm" element={<ChangeEmailConfirmPage />} />
 
           {/* Protected routes - standard layout */}
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
@@ -59,8 +69,10 @@ function App() {
             <Route path="/applications/:applicationId" element={<ApplicationDetailPage />} />
             <Route path="/resumes" element={<ResumeListingPage />} />
             <Route path="/skills" element={<SkillsPage />} />
-            <Route path="/profile" element={<PlaceholderPage />} />
-            <Route path="/settings" element={<PlaceholderPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<Navigate to="/settings/account" replace />} />
+            <Route path="/settings/account" element={<AccountSettingsPage />} />
+            <Route path="/settings/security" element={<SecuritySettingsPage />} />
           </Route>
 
           {/* Protected routes - full width layout (document editors) */}

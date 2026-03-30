@@ -2,7 +2,18 @@
  * Authentication API client
  */
 import apiClient from './client'
-import type { LoginRequest, RegisterRequest, TokenResponse, User } from '@/types/auth'
+import type {
+  ChangeEmailRequest,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  LoginRequest,
+  MessageResponse,
+  RegisterRequest,
+  ResetPasswordRequest,
+  TokenResponse,
+  User,
+  VerifyTokenRequest,
+} from '@/types/auth'
 
 export const authApi = {
   /**
@@ -26,6 +37,41 @@ export const authApi = {
    */
   getCurrentUser: async (): Promise<User> => {
     const result = await apiClient.get<User, User>('/auth/me')
+    return result
+  },
+
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/forgot-password', data)
+    return result
+  },
+
+  resetPassword: async (data: ResetPasswordRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/reset-password', data)
+    return result
+  },
+
+  verifyEmail: async (data: VerifyTokenRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/verify-email', data)
+    return result
+  },
+
+  resendVerificationEmail: async (): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/resend-verification-email')
+    return result
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/change-password', data)
+    return result
+  },
+
+  requestEmailChange: async (data: ChangeEmailRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/change-email/request', data)
+    return result
+  },
+
+  confirmEmailChange: async (data: VerifyTokenRequest): Promise<MessageResponse> => {
+    const result = await apiClient.post<MessageResponse, MessageResponse>('/auth/change-email/confirm', data)
     return result
   },
 }

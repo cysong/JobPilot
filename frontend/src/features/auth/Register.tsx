@@ -95,7 +95,7 @@ export default function Register() {
 
       toast({
         title: 'Welcome to JobPilot!',
-        description: 'Your account has been successfully created.',
+        description: 'Your account has been created. Please check your email for verification instructions.',
       })
 
       navigate('/jobs')
