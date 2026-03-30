@@ -136,6 +136,7 @@ jobs:
       - name: Deploy on VPS
         run: |
           ssh -p "${VPS_PORT:-22}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "\
+            printf '%s\n' 'JOBPILOT_IMAGE=${{ env.IMAGE_NAME }}:${{ github.sha }}' > /opt/jobpilot/.env; \
             if [ ! -f /opt/jobpilot/deploy/env/backend.env ]; then \
               cp /opt/jobpilot/deploy/env/backend.env.example /opt/jobpilot/deploy/env/backend.env; \
               echo 'Missing /opt/jobpilot/deploy/env/backend.env. Template created, please fill secrets and rerun.'; \
@@ -146,7 +147,6 @@ jobs:
               echo 'Missing /opt/jobpilot/deploy/env/monitoring.env. Template created, please fill secrets and rerun.'; \
               exit 1; \
             fi; \
-            JOBPILOT_IMAGE='${{ env.IMAGE_NAME }}:${{ github.sha }}' \
             GHCR_USERNAME='${{ secrets.GHCR_USERNAME }}' \
             GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' \
             FRONTEND_ARTIFACT_ID='${{ needs.build-frontend.outputs.frontend_artifact_id }}' \

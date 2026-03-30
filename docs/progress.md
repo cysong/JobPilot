@@ -34,6 +34,7 @@
 - Updated the GitHub Actions frontend build workflow so `VITE_API_BASE_URL` is now optional instead of required.
 - Updated deployment docs to document the same-origin `/api/v1` production fallback.
 - Updated the production deployment script to run `nginx -t` and `systemctl reload nginx` after the API health check passes, so synchronized Nginx config changes are activated automatically.
+- Updated the production deployment flow so GitHub Actions writes `JOBPILOT_IMAGE` into `/opt/jobpilot/.env`, and the deploy script now loads that compose-level `.env` automatically before running `docker compose`.
 - Validation:
   - `pnpm exec tsc --noEmit` passed in `frontend/`
 

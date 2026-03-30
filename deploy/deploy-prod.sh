@@ -3,9 +3,17 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/jobpilot}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.env}"
 ENV_FILE="${ENV_FILE:-deploy/env/backend.env}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}"
 FRONTEND_DEST="${FRONTEND_DEST:-/var/www/jobpilot/current}"
+
+if [[ -f "${APP_DIR}/${COMPOSE_ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${APP_DIR}/${COMPOSE_ENV_FILE}"
+  set +a
+fi
 
 if [[ -z "${JOBPILOT_IMAGE:-}" ]]; then
   echo "ERROR: JOBPILOT_IMAGE is required."
