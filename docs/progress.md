@@ -35,6 +35,8 @@
 - Updated deployment docs to document the same-origin `/api/v1` production fallback.
 - Updated the production deployment script to run `nginx -t` and `systemctl reload nginx` after the API health check passes, so synchronized Nginx config changes are activated automatically.
 - Updated the production deployment flow so GitHub Actions writes `JOBPILOT_IMAGE` into `/opt/jobpilot/.env`, and the deploy script now loads that compose-level `.env` automatically before running `docker compose`.
+- Updated the same-origin `/api/` Nginx proxy to preserve the original request host instead of forcing `api.freeclaw.cloud`.
+- Updated the production API container command to start Uvicorn with `--proxy-headers --forwarded-allow-ips=*` so redirect URLs are generated from the forwarded HTTPS request context.
 - Validation:
   - `pnpm exec tsc --noEmit` passed in `frontend/`
 
