@@ -1596,6 +1596,25 @@ None at this stage.
   - frontend requested `/auth/login`
   - expected backend path was `/api/v1/auth/login`
 
+### 2026-03-30 - Job Detail Title Trailing Actions Flow Layout
+
+- Updated the job detail title row so trailing UI elements now participate in the same inline flow as the title text instead of rendering as a separate wrapped row.
+- Moved the save icon and expired badge into the title heading's trailing inline content group.
+- This keeps current and future trailing title actions or tags visually attached to the title and allows them to wrap with the title's final line when space is tight.
+
+### 2026-03-30 - Job Detail Original Posting Action Returned to Top Bar
+
+- Moved the original posting action out of the sidebar `Operations` card and back into the sticky top action bar.
+- Placed it between `Next` and `Share`.
+- Updated the button label to `Open on` while keeping the existing source-site icon mapping unchanged.
+
+### 2026-03-30 - Job Detail Share Action Enabled
+
+- Wired the top-bar `Share` button on the job detail page.
+- Share behavior now prefers the browser's native `navigator.share(...)` flow when available.
+- Browsers without native sharing fall back to copying the current job detail URL to the clipboard with toast feedback.
+- Dismissed native share-sheet cancellations do not show an error toast.
+
 ### 2026-03-26 - Job Detail Action Hierarchy Refresh
 
 **Completed Tasks:**
