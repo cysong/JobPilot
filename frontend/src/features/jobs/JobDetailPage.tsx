@@ -259,9 +259,9 @@ export default function JobDetailPage() {
                 Back to Search
               </Link>
             </Button>
-            <div className="flex gap-2 items-center">
-              {detailNavigation.previousJobId ? (
-                <Button variant="outline" size="sm" asChild>
+	            <div className="flex gap-2 items-center">
+	              {detailNavigation.previousJobId ? (
+	                <Button variant="outline" size="sm" asChild>
                   <Link
                     to={`/jobs/${detailNavigation.previousJobId}?${searchParams.toString()}`}
                   >
@@ -284,16 +284,38 @@ export default function JobDetailPage() {
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Link>
                 </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              )}
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
+	              ) : (
+	                <Button variant="outline" size="sm" disabled>
+	                  Next
+	                  <ChevronRight className="h-4 w-4 ml-1" />
+	                </Button>
+	              )}
+	              {job.share_link && (
+	                <Button variant="outline" size="sm" asChild>
+	                  <a
+	                    href={job.share_link}
+	                    target="_blank"
+	                    rel="noopener noreferrer"
+	                    aria-label="Open Original Posting"
+	                    className="inline-flex items-center gap-2"
+	                  >
+	                    <span>Open on</span>
+	                    {sourceMeta.iconSrc ? (
+	                      <img
+	                        src={sourceMeta.iconSrc}
+	                        alt={`${sourceMeta.label} icon`}
+	                        className="h-4 w-4 rounded-sm object-contain"
+	                      />
+	                    ) : SourceIcon ? (
+	                      <SourceIcon className="h-4 w-4" />
+	                    ) : null}
+	                  </a>
+	                </Button>
+	              )}
+	              <Button variant="outline" size="sm">
+	                <Share2 className="h-4 w-4 mr-2" />
+	                Share
+	              </Button>
             </div>
 
             <ApplicationDialog
@@ -489,32 +511,9 @@ export default function JobDetailPage() {
                   </TooltipProvider>
                 )}
 
-                {job.share_link && (
-                  <Button variant="outline" size="sm" asChild className="w-full">
-                    <a
-                      href={job.share_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Open Original Posting"
-                      className="relative flex w-full items-center justify-center"
-                    >
-                      <span>Open Original Posting</span>
-                      {sourceMeta.iconSrc ? (
-                        <img
-                          src={sourceMeta.iconSrc}
-                          alt={`${sourceMeta.label} icon`}
-                          className="absolute right-1 h-4 w-4 rounded-sm object-contain"
-                        />
-                      ) : SourceIcon ? (
-                        <SourceIcon className="absolute right-1 h-4 w-4" />
-                      ) : null}
-                    </a>
-                  </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  size="sm"
+	                <Button
+	                  variant="outline"
+	                  size="sm"
                   onClick={handleToggleExpiration}
                   disabled={setJobExpiration.isPending}
                   className={cn(
