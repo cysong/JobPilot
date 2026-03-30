@@ -11,6 +11,98 @@
 
 ## Work Log
 
+### 2026-03-30 - Account Security Stage 1 Backend Foundations
+
+- Extended backend auth/user foundations for the account-security design:
+  - added `users.email_verified_at`
+  - added `users.password_changed_at`
+  - added `users.preferences`
+  - added `user_security_tokens`
+- Expanded auth schemas and `/api/v1/auth/*` backend routes for:
+  - forgot password
+  - reset password
+  - verify email
+  - resend verification email
+  - change password
+  - change email request/confirm
+- Expanded `GET /api/v1/auth/me` response shape to include:
+  - `email_verified_at`
+  - `password_changed_at`
+  - `preferences`
+- Added backend security-token infrastructure:
+  - new `token_service.py`
+  - SHA-256 token hashing
+  - per-user/token-type invalidation of older active tokens
+  - DB-backed rate limiting for token generation
+- Added backend email delivery skeleton:
+  - new `email_service.py`
+  - Resend-based verification/reset/change-email message helpers
+  - new config settings for Resend and frontend URL generation
+- Added Alembic migration:
+  - `20260330_1200_b4f2c8d9e1a7_add_account_security_fields.py`
+- Added focused backend auth security tests:
+  - `backend/tests/modules/auth/test_auth_security.py`
+- Validation:
+  - `python -m compileall backend/app/modules/auth backend/app/models.py backend/app/core/config.py` passed
+  - `uv run pytest tests/modules/auth/test_auth_security.py` passed
+
+### 2026-03-30 - Account Security Stage 2 Public Auth Flows
+
+- Added public auth backend/frontend flow coverage for:
+  - forgot password
+  - reset password
+  - verify email
+  - change email confirm
+- Updated backend registration flow to attempt sending the initial verification email after user creation without making registration itself fail if email delivery is unavailable.
+- Added frontend auth pages:
+  - `ForgotPassword`
+  - `ResetPassword`
+  - `VerifyEmail`
+  - `ChangeEmailConfirmPage`
+- Added public frontend routes:
+  - `/forgot-password`
+  - `/reset-password`
+  - `/verify-email`
+  - `/change-email-confirm`
+- Expanded frontend auth API client and auth typings for the new auth endpoints and `auth/me` payload shape.
+- Added login-page `Forgot password?` entry.
+- Validation:
+  - `pnpm exec tsc --noEmit` passed in `frontend/`
+  - `uv run pytest tests/modules/auth/test_auth_security.py` passed
+
+### 2026-03-30 - Account Security Stage 3 Authenticated Settings and Profile
+
+- Added backend profile-preference APIs:
+  - `GET /api/v1/users/profile/preferences`
+  - `PATCH /api/v1/users/profile/preferences`
+- Added backend validation/normalization for:
+  - `default_tailoring_level`
+  - `job_locations`
+  - `salary_expectation`
+- Added frontend `ProfilePage` and wired it to the new profile-preference APIs.
+- Added frontend `SecuritySettingsPage` and wired password change flow to backend `POST /api/v1/auth/change-password`.
+- Replaced the old `/profile` placeholder with the real profile preferences page.
+- Validation:
+  - `pnpm exec tsc --noEmit` passed in `frontend/`
+  - `uv run pytest tests/modules/auth/test_auth_security.py tests/modules/users/test_profile_preferences.py` passed
+
+### 2026-03-30 - Account Security Stage 4 Account Settings and Verification Banner
+
+- Added frontend `AccountSettingsPage` for:
+  - current email display
+  - verification status
+  - resend verification email
+  - change email request
+- Added authenticated email verification banner in the main app layout for users whose email is not yet verified.
+- Replaced the old `/settings` placeholder with a redirect to `/settings/account`.
+- Added real routes for:
+  - `/settings/account`
+  - `/settings/security`
+- Updated user-menu navigation so `Settings` now opens the real account settings page.
+- Validation:
+  - `pnpm exec tsc --noEmit` passed in `frontend/`
+  - `uv run pytest tests/modules/auth/test_auth_security.py tests/modules/users/test_profile_preferences.py` passed
+
 ### 2026-03-30 - Asyncpg Prepared Statement Cache Compatibility
 
 - Updated database engine creation to automatically detect Supabase transaction pooler URLs (`*.pooler.supabase.com:6543`).
@@ -1635,6 +1727,14 @@ None at this stage.
   - direct overwrite behavior for existing `resume_skills.extracted_from`
   - direct persistence of `None` extracted-from payloads
   - deletion behavior when analyzed technical skills become empty
+
+### 2026-03-30 - Profile Tailoring Level Alignment
+
+**Completed Tasks:**
+- Extended profile preference `default_tailoring_level` to support `light`, `moderate`, and `deep`.
+- Updated backend and frontend profile preference types/validation to align with the application tailoring enum.
+- Changed application creation dialog to default from `authStore.user.preferences.default_tailoring_level` when available.
+- Added tests covering `moderate` acceptance in auth/profile preference schemas.
 
 ### 2026-03-19 - Job Detail Original Posting Link Placement
 

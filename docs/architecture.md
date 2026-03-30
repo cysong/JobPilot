@@ -1132,6 +1132,57 @@ enum DocumentFormat {
   PlainText
 }
 
+### 6.2 API Response Strategy Update (2026-03-30)
+
+This section supplements the existing unified response design.
+
+Target success envelope:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {}
+}
+```
+
+Adopt a dual-track strategy:
+
+- Short term: fix `CustomAPIRoute` so normal JSON success responses are wrapped into the unified envelope.
+- Long term: all new routes must explicitly use `ApiResponse[T]`, and legacy routes will be migrated gradually.
+
+`CustomAPIRoute` short-term responsibilities:
+
+- Wrap normal JSON success payloads returned by routes.
+- Skip wrapping when the payload already has `code`, `message`, and `data`.
+- Pass through special responses without modification:
+  - `StreamingResponse`
+  - `FileResponse`
+  - `RedirectResponse`
+  - `204` / `304` responses
+  - non-JSON responses
+
+New route standard:
+
+- New routes must declare `response_model=ApiResponse[T]`.
+- New routes should explicitly return the envelope instead of depending on implicit wrapping.
+- Legacy raw-payload responses are allowed only for existing routes during migration.
+
+Migration order:
+
+1. `auth`
+2. `users`
+3. `resumes`
+4. `jobs`
+5. `applications`
+6. `admin`
+
+Frontend compatibility:
+
+- Frontend API client continues to unwrap `{code, message, data}`.
+- Raw payload compatibility remains only as a migration bridge.
+- New frontend code must not depend on raw success payloads.
+
 ### users
 ```sql
 CREATE TABLE users (
