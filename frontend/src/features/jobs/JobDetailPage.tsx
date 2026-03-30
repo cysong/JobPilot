@@ -321,43 +321,49 @@ export default function JobDetailPage() {
                 />
               )}
 
-              <div className="pr-28">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleToggleSaved}
-                          disabled={saveJob.isPending || unsaveJob.isPending}
-                          aria-label={isSaved ? "Unsave job" : "Save job"}
-                          className={cn(
-                            "h-8 w-8 text-slate-500 hover:text-amber-600",
-                            isSaved && "text-amber-500 hover:text-amber-600",
-                          )}
-                        >
-                          <Star
-                            className={cn(
-                              "h-4 w-4",
-                              isSaved && "fill-amber-500 text-amber-500",
-                            )}
-                          />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{isSaved ? "Saved" : "Save job"}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {job.is_expired && (
-                    <Badge className="bg-red-500 text-white hover:bg-red-600">Expired</Badge>
-                  )}
-                </div>
-                <JobSourceCompanyLine
-                  source={job.source}
-                  companyName={job.company_name}
+	              <div className="pr-28">
+	                <div className="mb-2">
+	                  <h1 className="text-2xl font-bold leading-tight text-slate-900">
+	                    <span>{job.title}</span>
+	                    <span className="ml-2 inline-flex items-center gap-2 align-middle">
+	                      <TooltipProvider>
+	                        <Tooltip>
+	                          <TooltipTrigger asChild>
+	                            <Button
+	                              variant="ghost"
+	                              size="icon"
+	                              onClick={handleToggleSaved}
+	                              disabled={saveJob.isPending || unsaveJob.isPending}
+	                              aria-label={isSaved ? "Unsave job" : "Save job"}
+	                              className={cn(
+	                                "inline-flex h-8 w-8 align-middle text-slate-500 hover:text-amber-600",
+	                                isSaved && "text-amber-500 hover:text-amber-600",
+	                              )}
+	                            >
+	                              <Star
+	                                className={cn(
+	                                  "h-4 w-4",
+	                                  isSaved && "fill-amber-500 text-amber-500",
+	                                )}
+	                              />
+	                            </Button>
+	                          </TooltipTrigger>
+	                          <TooltipContent>
+	                            <p>{isSaved ? "Saved" : "Save job"}</p>
+	                          </TooltipContent>
+	                        </Tooltip>
+	                      </TooltipProvider>
+	                      {job.is_expired && (
+	                        <Badge className="align-middle bg-red-500 text-white hover:bg-red-600">
+	                          Expired
+	                        </Badge>
+	                      )}
+	                    </span>
+	                  </h1>
+	                </div>
+	                <JobSourceCompanyLine
+	                  source={job.source}
+	                  companyName={job.company_name}
                   advertiserName={job.advertiser_name}
                   className="mb-4 text-lg"
                 />
