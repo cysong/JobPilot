@@ -1555,6 +1555,18 @@ None at this stage.
 - Updated the job detail page sidebar container to use the same desktop sticky positioning pattern as the application detail page.
 - Kept mobile behavior unchanged so the sidebar remains in normal document flow on smaller screens.
 
+### 2026-03-30 - Frontend API Base URL Normalization for Production Deploy
+
+- Fixed frontend API base URL handling so an origin-only `VITE_API_BASE_URL` no longer drops the backend version prefix.
+- Updated `frontend/src/api/client.ts` to normalize API base URLs:
+  - keep `/api/v1` when already present
+  - expand `/api` to `/api/v1`
+  - append `/api/v1` when only the origin is provided
+- Updated `docs/deployment.md` to recommend `VITE_API_BASE_URL=https://api.freeclaw.cloud/api/v1`.
+- Documented the production symptom in `docs/issues.md`:
+  - frontend requested `/auth/login`
+  - expected backend path was `/api/v1/auth/login`
+
 ### 2026-03-26 - Job Detail Action Hierarchy Refresh
 
 **Completed Tasks:**

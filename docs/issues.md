@@ -540,3 +540,26 @@ Validated parsing via `compile(source, path, 'exec')` over all modified backend 
 ### Verification
 - When the Save button is disabled, `Ctrl+S` / `Cmd+S` no longer triggers save.
 - When content is dirty and no save is in progress, both button click and keyboard shortcut still work.
+
+---
+
+## 2026-03-30 - Production frontend API base URL dropped `/api/v1`
+
+### Problem
+- Production frontend requests were sent to paths like `/auth/login`.
+- Backend routes are mounted under `/api/v1`, so the expected path was `/api/v1/auth/login`.
+
+### Root Cause
+- `frontend/src/api/client.ts` treated `VITE_API_BASE_URL` as a complete API prefix.
+- Deployment docs recommended `https://api.freeclaw.cloud`, which is only the origin.
+- Nginx proxied the request path as-is and did not strip `/api/v1`.
+
+### Solution
+- Normalize `VITE_API_BASE_URL` in the frontend client.
+- Keep explicit `/api/v1` values unchanged.
+- Expand origin-only values like `https://api.freeclaw.cloud` to `https://api.freeclaw.cloud/api/v1`.
+- Update deployment docs to recommend the full versioned API base URL.
+
+### Verification
+- The frontend client now maps origin-only values to `/api/v1`.
+- Existing local values such as `http://localhost:8000/api/v1` still work unchanged.
