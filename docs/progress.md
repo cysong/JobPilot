@@ -11,6 +11,21 @@
 
 ## Work Log
 
+### 2026-03-30 - Asyncpg Prepared Statement Cache Compatibility
+
+- Updated database engine creation to automatically detect Supabase transaction pooler URLs (`*.pooler.supabase.com:6543`).
+- In that mode the async engine now uses:
+  - `NullPool`
+  - UUID-based `prepared_statement_name_func`
+  - default `prepared_statement_cache_size=0` when the URL does not already provide one
+- This keeps direct PostgreSQL connections on the normal SQLAlchemy pool while making Supabase transaction-pooler connections compatible with asyncpg without adding extra environment variables.
+- Validation:
+  - read-only Python `compile(..., 'exec')` checks passed for `backend/app/core/config.py` and `backend/app/core/database.py`
+  - local Supabase pooler validation passed with a one-shot `SELECT 1`
+  - local repeated connect/query loop passed for 30 iterations without `DuplicatePreparedStatementError`
+  - project auth query path `get_user_by_email(session, "user@example.com")` passed using the current pooler URL
+  - `python -m compileall` could not complete in the sandbox because writing `__pycache__` was denied
+
 ### 2026-03-25 - Resume Modern PDF Stylesheet Migration
 
 - Reworked the resume `modern` PDF stylesheet to use typography and spacing patterns adapted from the legacy `resume-css-stylesheet.css` reference.
