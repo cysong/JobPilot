@@ -6,6 +6,7 @@ import type {
     UpdateResumeRequest,
     ResumeListResponse,
     ResumeExportRequest,
+    FormalResumeLimit,
     TargetJobTitleOptionsResponse,
     UpdateTargetJobTitlesRequest,
 } from '@/types/resume'
@@ -26,6 +27,11 @@ export const resumeApi = {
                 params: keyword ? { keyword } : undefined,
             },
         )
+        return result
+    },
+
+    getFormalResumeLimit: async () => {
+        const result = await client.get<FormalResumeLimit, FormalResumeLimit>('/resumes/formal-limit')
         return result
     },
 

@@ -134,7 +134,17 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                     <FileText className="w-6 h-6" />
                 </div>
 
-                <h3 className="font-bold text-slate-900 truncate pr-16">{resume.title}</h3>
+                <div className="flex items-center gap-2">
+                    <h3 className="min-w-0 flex-1 truncate font-bold text-slate-900">{resume.title}</h3>
+                    {resume.is_draft && (
+                        <Badge
+                            variant="outline"
+                            className="border-yellow-200 bg-yellow-50 font-normal text-yellow-700"
+                        >
+                            Draft
+                        </Badge>
+                    )}
+                </div>
                 <p className="text-sm text-slate-500 mt-1">
                     Updated {formatDistanceToNow(new Date(resume.updated_at), { addSuffix: true })}
                 </p>
@@ -160,14 +170,6 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                             </Badge>
                         )}
                     </div>
-
-                    {resume.is_draft && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
-                                Draft
-                            </Badge>
-                        </div>
-                    )}
                 </div>
             </Link>
 

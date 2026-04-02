@@ -29,8 +29,6 @@ from app.modules.resumes.schemas import (
     WorkflowResponse,
 )
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
-from app.core.config import settings
-
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
 
@@ -119,15 +117,17 @@ async def check_formal_resume_limit(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Check formal resume limit for current user."""
-    can_create, current_count = await service.ResumeService.check_formal_resume_limit(
-        db, current_user.id
+    can_create, current_count, limit = await service.ResumeService.check_formal_resume_limit(
+        db,
+        current_user.id,
+        current_user.role,
     )
 
     return FormalResumeLimit(
-        limit=settings.USER_FORMAL_RESUME_LIMIT,
+        limit=limit,
         current_count=current_count,
         can_create_more=can_create,
-        remaining=max(0, settings.USER_FORMAL_RESUME_LIMIT - current_count),
+        remaining=None if limit is None else max(0, limit - current_count),
     )
 
 
@@ -209,7 +209,12 @@ async def finalize_resume(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Mark resume as formal version (finalize from draft)."""
-    resume = await service.ResumeService.finalize_resume(db, resume_id, current_user.id)
+    resume = await service.ResumeService.finalize_resume(
+        db,
+        resume_id,
+        current_user.id,
+        current_user.role,
+    )
     return ResumeResponse.model_validate(resume)
 
 

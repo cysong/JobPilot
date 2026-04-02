@@ -20,6 +20,13 @@ export const useTargetJobTitleOptions = (keyword: string, enabled = true) => {
     })
 }
 
+export const useFormalResumeLimit = () => {
+    return useQuery({
+        queryKey: ['resume-formal-limit'],
+        queryFn: () => resumeApi.getFormalResumeLimit(),
+    })
+}
+
 export const useResumeForEdit = (resumeId: string) => {
     return useQuery<DocumentEditData>({
         queryKey: ['resume-edit', resumeId],
@@ -108,12 +115,16 @@ export const useResumeMutations = () => {
         mutationFn: (id: string) => resumeApi.finalizeResume(id),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['resumes'] })
+            queryClient.invalidateQueries({ queryKey: ['resume-formal-limit'] })
             queryClient.invalidateQueries({ queryKey: ['resumes', data.id] })
             queryClient.invalidateQueries({ queryKey: ['resume-edit', data.id] })
             toast({ title: 'Success', description: 'Resume finalized successfully' })
         },
-        onError: () => {
-            toast({ title: 'Error', description: 'Failed to finalize resume', variant: 'destructive' })
+        onError: (error) => {
+            const description = error instanceof ApiError
+              ? error.message
+              : 'Failed to finalize resume'
+            toast({ title: 'Error', description, variant: 'destructive' })
         }
     })
 

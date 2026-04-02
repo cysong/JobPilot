@@ -160,10 +160,10 @@ class WorkflowResponse(BaseModel):
 
 class FormalResumeLimit(BaseModel):
     """Formal resume limit check response"""
-    limit: int
+    limit: int | None
     current_count: int
     can_create_more: bool
-    remaining: int
+    remaining: int | None
 
 
 # ============================================

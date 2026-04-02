@@ -59,6 +59,13 @@ export interface TargetJobTitleOptionsResponse {
     selection_limit: number
 }
 
+export interface FormalResumeLimit {
+    limit: number | null
+    current_count: number
+    can_create_more: boolean
+    remaining: number | null
+}
+
 export interface UpdateTargetJobTitlesRequest {
     target_job_titles: string[]
 }

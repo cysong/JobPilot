@@ -29,7 +29,7 @@ from app.modules.resumes.schemas import (
     TargetJobTitleOption,
 )
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
-from app.shared.enums import TaskType, ProficiencyLevel
+from app.shared.enums import Role, TaskType, ProficiencyLevel
 from app.core.config import settings
 from app.modules.workflow import TaskExecution
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
@@ -38,6 +38,15 @@ from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 
 class ResumeService:
     """Service class for Resume-related operations."""
+
+    @staticmethod
+    def get_formal_resume_limit(role: Role) -> int | None:
+        """Return the formal resume limit for the given user role."""
+        if role == Role.ADMIN:
+            return None
+        if role == Role.VIP:
+            return settings.VIP_FORMAL_RESUME_LIMIT
+        return settings.USER_FORMAL_RESUME_LIMIT
 
     @staticmethod
     async def get_resume_for_edit(
@@ -360,18 +369,23 @@ class ResumeService:
         return merged
 
     @staticmethod
-    async def finalize_resume(db: AsyncSession, resume_id: str, user_id: int) -> Resume:
+    async def finalize_resume(
+        db: AsyncSession,
+        resume_id: str,
+        user_id: int,
+        role: Role,
+    ) -> Resume:
         """Mark resume as formal version (finalize from draft)."""
         resume = await ResumeService.get_resume_by_id(db, resume_id, user_id)
         if not resume:
             raise NotFoundError("Resume not found")
 
-        can_create, current_count = await ResumeService.check_formal_resume_limit(
-            db, user_id
+        can_create, current_count, limit = await ResumeService.check_formal_resume_limit(
+            db, user_id, role
         )
         if not can_create:
             raise BusinessError(
-                f"Formal resume limit ({settings.USER_FORMAL_RESUME_LIMIT}) exceeded. Current count: {current_count}",
+                f"Formal resume limit ({limit}) exceeded. Current count: {current_count}",
                 response_code=ResponseCode.RESUME_LIMIT_EXCEEDED,
             )
 
@@ -417,7 +431,11 @@ class ResumeService:
         return resume
 
     @staticmethod
-    async def check_formal_resume_limit(db: AsyncSession, user_id: int) -> tuple[bool, int]:
+    async def check_formal_resume_limit(
+        db: AsyncSession,
+        user_id: int,
+        role: Role,
+    ) -> tuple[bool, int, int | None]:
         """Check if user can create more formal resumes."""
         query = (
             select(func.count())
@@ -434,9 +452,10 @@ class ResumeService:
         result = await db.execute(query)
         current_count = result.scalar_one()
 
-        can_create_more = current_count < settings.USER_FORMAL_RESUME_LIMIT
+        limit = ResumeService.get_formal_resume_limit(role)
+        can_create_more = limit is None or current_count < limit
 
-        return can_create_more, current_count
+        return can_create_more, current_count, limit
 
     @staticmethod
     async def _trigger_analysis_if_needed(
