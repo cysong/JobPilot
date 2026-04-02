@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     # Email
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = ""
+    RESEND_REPLY_TO_EMAIL: str = ""
 
     # Logging
     LOG_LEVEL: str = "INFO"

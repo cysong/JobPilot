@@ -103,6 +103,13 @@
   - `pnpm exec tsc --noEmit` passed in `frontend/`
   - `uv run pytest tests/modules/auth/test_auth_security.py tests/modules/users/test_profile_preferences.py` passed
 
+### 2026-04-02 - Auth Email Reply-To Support
+
+- Extended backend email settings with `RESEND_REPLY_TO_EMAIL`.
+- Updated Resend auth email delivery payloads to include `reply_to` when configured.
+- Updated local and production backend environment examples with the new reply-to setting.
+- Added focused backend tests covering both reply-to-enabled and reply-to-omitted email payloads.
+
 ### 2026-03-30 - Asyncpg Prepared Statement Cache Compatibility
 
 - Updated database engine creation to automatically detect Supabase transaction pooler URLs (`*.pooler.supabase.com:6543`).

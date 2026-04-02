@@ -26,14 +26,16 @@ class AuthEmailService:
         import resend
 
         resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send(
-            {
-                "from": settings.RESEND_FROM_EMAIL,
-                "to": [to_email],
-                "subject": subject,
-                "html": html,
-            }
-        )
+        payload = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+        }
+        if settings.RESEND_REPLY_TO_EMAIL:
+            payload["reply_to"] = settings.RESEND_REPLY_TO_EMAIL
+
+        resend.Emails.send(payload)
 
     @classmethod
     async def send_verification_email(cls, to_email: str, token: str) -> None:
