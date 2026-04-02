@@ -344,7 +344,7 @@ certbot renew --dry-run
 |---|---|---|
 | `VITE_API_BASE_URL` | 可留空；如需显式指定可填 `https://api.freeclaw.cloud/api/v1` | 前端构建变量。留空时生产默认回退到同源 `/api/v1` |
 
-> 说明：后端运行时业务变量（`DATABASE_URL`、`OPENAI_API_KEY` 等）不经过 GitHub Secrets，直接存放在 VPS 的 `backend.env` 文件中，首次部署时由 workflow 自动从模板生成后手动填写。
+> 说明：后端运行时业务变量（`DATABASE_URL`、`OPENAI_API_KEY` 等）不经过 GitHub Secrets，仓库内唯一维护模板为 `backend/.env.example`。首次部署时 workflow 会直接把它上传为 VPS 上的 `deploy/env/backend.env.example`；如果 `deploy/env/backend.env` 缺失，部署脚本会基于该模板自动创建一份并提示你填写真实值后重试。
 
 GHCR_TOKEN 生成路径：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token，勾选 `write:packages`。
 
@@ -567,6 +567,7 @@ certbot certificates
 - 后端镜像构建忽略规则：`backend/.dockerignore`
 - 生产编排：`docker-compose.prod.yml`
 - VPS 部署脚本：`deploy/deploy-prod.sh`
-- 后端环境变量模板：`deploy/env/backend.env.example`
+- 后端环境变量唯一模板源：`backend/.env.example`
+- 部署时自动同步生成：`deploy/env/backend.env.example`
 - Nginx 配置模板：`deploy/nginx/jobpilot.conf`
 - 自动发布流程：`.github/workflows/deploy.yml`

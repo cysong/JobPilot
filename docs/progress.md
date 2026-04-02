@@ -110,6 +110,20 @@
 - Updated local and production backend environment examples with the new reply-to setting.
 - Added focused backend tests covering both reply-to-enabled and reply-to-omitted email payloads.
 
+### 2026-04-02 - Backend Env Template Single Source
+
+- Consolidated backend env example maintenance to a single source file: `backend/.env.example`.
+- Merged deploy-only backend template variables back into the single source template, including:
+  - `OPENROUTER_API_KEY`
+  - `OPENROUTER_API_BASE`
+  - `CELERY_LOGLEVEL`
+  - `CELERY_WORKER_POOL`
+  - `CELERY_WORKER_CONCURRENCY`
+  - `CELERY_PREFETCH_MULTIPLIER`
+- Updated the production deploy workflow to upload `backend/.env.example` directly as `deploy/env/backend.env.example` on the VPS.
+- Updated the production deploy script to auto-create `deploy/env/backend.env` from the uploaded template when the real env file is missing, then stop with an explicit fill-and-rerun message.
+- Updated deployment docs to describe the single-source template workflow.
+
 ### 2026-03-30 - Asyncpg Prepared Statement Cache Compatibility
 
 - Updated database engine creation to automatically detect Supabase transaction pooler URLs (`*.pooler.supabase.com:6543`).

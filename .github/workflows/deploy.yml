@@ -122,9 +122,9 @@ jobs:
               /opt/jobpilot/deploy/grafana/dashboards \
               /var/www/jobpilot/current"
           scp -P "${VPS_PORT:-22}" docker-compose.prod.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/docker-compose.prod.yml"
+          scp -P "${VPS_PORT:-22}" backend/.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/backend.env.example"
           scp -P "${VPS_PORT:-22}" deploy/deploy-prod.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/deploy-prod.sh"
           scp -P "${VPS_PORT:-22}" deploy/nginx/jobpilot.conf "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/nginx/jobpilot.conf"
-          scp -P "${VPS_PORT:-22}" deploy/env/backend.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/backend.env.example"
           scp -P "${VPS_PORT:-22}" deploy/env/monitoring.env.example "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/env/monitoring.env.example"
           scp -P "${VPS_PORT:-22}" deploy/prometheus/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/prometheus.yml"
           scp -P "${VPS_PORT:-22}" deploy/prometheus/alert_rules.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/alert_rules.yml"
