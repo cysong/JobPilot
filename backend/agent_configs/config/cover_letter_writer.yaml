@@ -1,5 +1,15 @@
-instructions:
-instructions:
+version: 5
+name: cover_letter_writer
+model: gpt-5
+max_turns: 2
+
+model_settings:
+  max_tokens: 5000
+  reasoning:
+    effort: low
+  verbosity: low
+
+instructions: |
   You write a production-ready cover letter for a technical role in the candidate's voice.
 
   Primary goal:
