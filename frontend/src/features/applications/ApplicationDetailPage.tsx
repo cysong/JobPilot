@@ -6,9 +6,11 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Copy,
   Download,
   ExternalLink,
   FileText,
@@ -130,6 +132,7 @@ type ReviewPanelProps = {
   editPath?: string
   onDownload?: () => Promise<void>
   isDownloading?: boolean
+  onCopy?: () => void
   emptyMessage: string
 }
 
@@ -144,8 +147,18 @@ function DocumentReviewPanel({
   editPath,
   onDownload,
   isDownloading,
+  onCopy,
   emptyMessage,
 }: ReviewPanelProps) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    if (!onCopy) return
+    onCopy()
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
@@ -159,6 +172,16 @@ function DocumentReviewPanel({
           {editPath && isReady && (
             <Button asChild variant="outline" size="sm">
               <Link to={editPath}>Edit</Link>
+            </Button>
+          )}
+          {onCopy && isReady && (
+            <Button variant="outline" size="sm" onClick={handleCopy}>
+              {copied ? (
+                <Check className="mr-2 h-4 w-4 text-green-500" />
+              ) : (
+                <Copy className="mr-2 h-4 w-4" />
+              )}
+              {copied ? 'Copied!' : 'Copy'}
             </Button>
           )}
           {onDownload && isReady && (
@@ -720,6 +743,11 @@ export default function ApplicationDetailPage() {
                   editPath={`/applications/${application.id}/cover-letter`}
                   onDownload={handleDownloadCoverLetterPdf}
                   isDownloading={isDownloadingCoverLetter}
+                  onCopy={
+                    coverLetterDocument?.content
+                      ? () => navigator.clipboard.writeText(coverLetterDocument.content)
+                      : undefined
+                  }
                   emptyMessage={coverLetterEmptyMessage}
                 />
               </TabsContent>
