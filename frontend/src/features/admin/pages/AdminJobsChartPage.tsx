@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -40,6 +41,108 @@ function pickColor(index: number) {
 function pickSeriesColor(name: string, seriesNames: string[]) {
   const index = seriesNames.indexOf(name)
   return pickColor(index >= 0 ? index : 0)
+}
+
+// Returns true if a YYYY-MM-DD string falls on Saturday or Sunday
+function isWeekend(dateStr: string): boolean {
+  const day = new Date(dateStr + 'T12:00:00Z').getUTCDay()
+  return day === 0 || day === 6
+}
+
+// Returns true if a YYYY-MM-DD string falls on Monday
+function isMonday(dateStr: string): boolean {
+  return new Date(dateStr + 'T12:00:00Z').getUTCDay() === 1
+}
+
+// Scans hour-by-hour to find timestamps that are exactly midnight in the given timezone.
+// Returns all midnights whose timestamp falls between startTs and endTs.
+function getMidnightsInRange(startTs: number, endTs: number, timezone: string): number[] {
+  const hourMs = 3600 * 1000
+  const results: number[] = []
+  const seenDates = new Set<string>()
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
+  // Scan from 26h before start so the first day's midnight is always captured
+  const scanStart = Math.floor(startTs / hourMs) * hourMs - 26 * hourMs
+
+  for (let t = scanStart; t <= endTs + hourMs; t += hourMs) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(t)
+
+    const hour = parts.find((p) => p.type === 'hour')?.value
+    const minute = parts.find((p) => p.type === 'minute')?.value
+
+    if (hour === '00' && minute === '00') {
+      const dateStr = dateFormatter.format(t)
+      if (!seenDates.has(dateStr)) {
+        seenDates.add(dateStr)
+        if (t >= startTs && t <= endTs) {
+          results.push(t)
+        }
+      }
+    }
+  }
+
+  return results
+}
+
+// Computes explicit XAxis ticks for the scatter chart.
+// Interval: 3h for 1-day range, 6h for 3-day, 12h for 7-day.
+// Every tick at offset 0 from a midnight is guaranteed to be in midnightSet.
+function computeScatterTicks(
+  startTs: number,
+  endTs: number,
+  timezone: string,
+  days: number,
+): { ticks: number[]; midnightSet: Set<number> } {
+  const intervalHours = days <= 1 ? 3 : days <= 3 ? 6 : 12
+  const hourMs = 3600 * 1000
+  // Scan a slightly extended range so even the day before startTs has a midnight seed
+  const scanStart = Math.floor(startTs / hourMs) * hourMs - 26 * hourMs
+  const seenDates = new Set<string>()
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
+  const seedMidnights: number[] = []
+
+  for (let t = scanStart; t <= endTs + hourMs; t += hourMs) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(t)
+
+    const hour = parts.find((p) => p.type === 'hour')?.value
+    const minute = parts.find((p) => p.type === 'minute')?.value
+
+    if (hour === '00' && minute === '00') {
+      const dateStr = dateFormatter.format(t)
+      if (!seenDates.has(dateStr)) {
+        seenDates.add(dateStr)
+        seedMidnights.push(t)
+      }
+    }
+  }
+
+  const tickSet = new Set<number>()
+  const midnightSet = new Set<number>()
+
+  for (const midnight of seedMidnights) {
+    for (let i = 0; i < 24 / intervalHours; i++) {
+      const t = midnight + i * intervalHours * hourMs
+      if (t >= startTs && t <= endTs) {
+        tickSet.add(t)
+        if (i === 0) midnightSet.add(t)
+      }
+    }
+  }
+
+  return {
+    ticks: Array.from(tickSet).sort((a, b) => a - b),
+    midnightSet,
+  }
 }
 
 interface TrendTooltipProps {
@@ -106,18 +209,6 @@ function ScatterPointTooltip({ active, payload }: ScatterTooltipProps) {
       </div>
     </div>
   )
-}
-
-function formatTickDateTime(timestamp: number, timezone: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    hour12: false,
-  })
-    .format(timestamp)
-    .replace(',', '')
 }
 
 function formatTooltipDateTime(timestamp: number, timezone: string) {
@@ -214,6 +305,28 @@ export default function AdminJobsChartPage() {
     })
   }, [series])
 
+  // Chart 1: map shortDate → full date string for weekend/monday detection
+  const dateMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const d of chartData) map[d.shortDate as string] = d.date as string
+    return map
+  }, [chartData])
+
+  // Chart 1: shortDate values that fall on Monday (used for vertical reference lines)
+  const mondayDates = useMemo(
+    () => chartData.filter((d) => isMonday(d.date as string)).map((d) => d.shortDate as string),
+    [chartData],
+  )
+
+  // Chart 2: explicit ticks and midnight set derived from scatter time range
+  const { scatterTicks, scatterMidnightSet } = useMemo(() => {
+    if (!scatterData) return { scatterTicks: [], scatterMidnightSet: new Set<number>() }
+    const startTs = new Date(scatterData.startDateTime).getTime()
+    const endTs = new Date(scatterData.endDateTime).getTime()
+    const { ticks, midnightSet } = computeScatterTicks(startTs, endTs, scatterData.timezone, scatterDays)
+    return { scatterTicks: ticks, scatterMidnightSet: midnightSet }
+  }, [scatterData, scatterDays])
+
   const scatterPoints = useMemo(() => {
     const timezone = scatterData?.timezone ?? 'UTC'
     return (scatterData?.points ?? []).map((point: JobsTimeScatterPoint) => {
@@ -309,8 +422,26 @@ export default function AdminJobsChartPage() {
                       dataKey="shortDate"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 11 }}
                       minTickGap={24}
+                      tick={(props: { x?: number; y?: number; payload?: { value: string } }) => {
+                        const { x = 0, y = 0, payload } = props
+                        if (!payload) return <g />
+                        const fullDate = dateMap[payload.value]
+                        const weekend = fullDate ? isWeekend(fullDate) : false
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            dy={12}
+                            textAnchor="middle"
+                            fill={weekend ? '#f97316' : '#64748b'}
+                            fontWeight={weekend ? 600 : 400}
+                            fontSize={11}
+                          >
+                            {payload.value}
+                          </text>
+                        )
+                      }}
                     />
                     <YAxis
                       allowDecimals={false}
@@ -319,6 +450,17 @@ export default function AdminJobsChartPage() {
                       tick={{ fill: '#94a3b8', fontSize: 11 }}
                     />
                     <Tooltip content={<TrendTooltip />} />
+
+                    {/* Vertical line at each Monday marking the start of the week */}
+                    {mondayDates.map((date) => (
+                      <ReferenceLine
+                        key={`monday-${date}`}
+                        x={date}
+                        stroke="#cbd5e1"
+                        strokeDasharray="3 3"
+                        strokeWidth={1}
+                      />
+                    ))}
 
                     {series.map((s: JobsDailyTrendSeries) => {
                       if (hiddenSeries[s.name]) return null
@@ -423,9 +565,39 @@ export default function AdminJobsChartPage() {
                       scale="time"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 11 }}
-                      minTickGap={36}
-                      tickFormatter={(value: number) => formatTickDateTime(value, scatterData.timezone)}
+                      ticks={scatterTicks}
+                      minTickGap={0}
+                      tick={(props: { x?: number; y?: number; payload?: { value: number } }) => {
+                        const { x = 0, y = 0, payload } = props
+                        if (!payload) return <g />
+                        const ts = payload.value
+                        const isMidnight = scatterMidnightSet.has(ts)
+                        const label = isMidnight
+                          ? new Intl.DateTimeFormat('en-US', {
+                              timeZone: scatterData.timezone,
+                              month: '2-digit',
+                              day: '2-digit',
+                            }).format(ts)
+                          : new Intl.DateTimeFormat('en-US', {
+                              timeZone: scatterData.timezone,
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            }).format(ts)
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            dy={12}
+                            textAnchor="middle"
+                            fill={isMidnight ? '#f97316' : '#64748b'}
+                            fontWeight={isMidnight ? 600 : 400}
+                            fontSize={11}
+                          >
+                            {label}
+                          </text>
+                        )
+                      }}
                     />
                     <YAxis
                       type="number"
@@ -436,6 +608,17 @@ export default function AdminJobsChartPage() {
                       tick={{ fill: '#94a3b8', fontSize: 11 }}
                     />
                     <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<ScatterPointTooltip />} />
+
+                    {/* Vertical line at each day boundary (midnight in chart timezone) */}
+                    {Array.from(scatterMidnightSet).map((ts) => (
+                      <ReferenceLine
+                        key={`midnight-${ts}`}
+                        x={ts}
+                        stroke="#cbd5e1"
+                        strokeDasharray="3 3"
+                        strokeWidth={1}
+                      />
+                    ))}
 
                     {scatterSeries.map(([source, points]) => (
                       <Scatter
