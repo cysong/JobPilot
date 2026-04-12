@@ -624,7 +624,7 @@ export default function ApplicationDetailPage() {
                   )}
                 </div>
 
-                <JobAttributeList job={application.job ?? {}} className="text-sm text-slate-600" />
+                <JobAttributeList job={application.job ?? {}} className="text-sm text-slate-600" showCategory={false} showSalary={true} />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 text-sm text-slate-500">
