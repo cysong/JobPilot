@@ -15,7 +15,11 @@ from app.modules.applications.schemas import (
     ApplicationResolutionUpdateRequest,
     ApplicationRetryRequest,
     ApplicationStatusUpdateRequest,
+    StatusHistoryEntry,
+    StatusHistoryListResponse,
+    StatusHistoryNoteUpdateRequest,
 )
+from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
 from app.modules.applications.service import ApplicationService
 from app.modules.resumes.schemas import ResumeExportRequest
 from app.modules.auth.dependencies import get_current_user
@@ -217,6 +221,41 @@ async def update_application_status(
         target_status=payload.status,
         note=payload.note,
     )
+
+
+@router.get("/{application_id}/history", response_model=StatusHistoryListResponse)
+async def get_application_status_history(
+    application_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get status change history for an application, newest first."""
+    application = await ApplicationService.get_application_by_id(db, application_id, current_user)
+    if not application:
+        raise NotFoundError("Application not found")
+    items = await StatusHistoryRepository.list_for_application(db, application_id)
+    return StatusHistoryListResponse(items=items)
+
+
+@router.patch("/{application_id}/history/{history_id}/note", response_model=StatusHistoryEntry)
+async def update_history_note(
+    application_id: str,
+    history_id: str,
+    payload: StatusHistoryNoteUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Add or update the note on a status history entry."""
+    application = await ApplicationService.get_application_by_id(db, application_id, current_user)
+    if not application:
+        raise NotFoundError("Application not found")
+    entry = await StatusHistoryRepository.get_by_id(db, history_id, application_id)
+    if not entry:
+        raise NotFoundError("History entry not found")
+    updated = await StatusHistoryRepository.update_note(db, entry, payload.note)
+    await db.commit()
+    await db.refresh(updated)
+    return updated
 
 
 @router.patch("/{application_id}/resolution", response_model=ApplicationDetail)

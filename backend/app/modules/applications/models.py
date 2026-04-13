@@ -27,6 +27,11 @@ if TYPE_CHECKING:
     from app.modules.resumes.models import Document, Resume
 
 
+def _uuid() -> str:
+    """Generate UUID4 string for primary keys."""
+    return str(uuid4())
+
+
 class ApplicationStatusHistory(Base):
     """Records each status transition for an application."""
 
@@ -49,11 +54,6 @@ class ApplicationStatusHistory(Base):
     application: Mapped["Application"] = relationship(
         "Application", back_populates="status_history"
     )
-
-
-def _uuid() -> str:
-    """Generate UUID4 string for primary keys."""
-    return str(uuid4())
 
 
 class OutboxEvent(Base, TimestampMixin):

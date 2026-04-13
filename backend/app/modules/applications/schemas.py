@@ -37,7 +37,6 @@ class ApplicationStatusUpdateRequest(BaseModel):
     note: Optional[str] = Field(
         default=None,
         description="Optional note for status change history",
-        max_length=500,
     )
 
 
@@ -48,8 +47,33 @@ class ApplicationResolutionUpdateRequest(BaseModel):
     note: Optional[str] = Field(
         default=None,
         description="Optional note for resolution change history",
-        max_length=500,
     )
+
+
+class StatusHistoryEntry(BaseModel):
+    """A single status transition record."""
+
+    id: str
+    application_id: str
+    from_status: Optional[ApplicationStatus] = None
+    to_status: ApplicationStatus
+    changed_at: datetime
+    changed_by_id: Optional[int] = None
+    note: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatusHistoryListResponse(BaseModel):
+    """Response for application status history."""
+
+    items: list[StatusHistoryEntry]
+
+
+class StatusHistoryNoteUpdateRequest(BaseModel):
+    """Request payload for adding or updating a note on a history entry."""
+
+    note: str
 
 
 class ApplicationJobInfo(BaseModel):

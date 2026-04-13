@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.exceptions import BadRequestError, NotFoundError, JobPilotException
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
+from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
 from app.modules.applications.schemas import ApplicationCreateRequest, ApplicationRetryRequest
 from app.modules.auth.models import User
 from app.modules.jobs.service import JobService
@@ -64,52 +65,6 @@ class ApplicationService:
     }
 
     @staticmethod
-    def _append_status_history(
-        application: Application,
-        from_status: ApplicationStatus,
-        to_status: ApplicationStatus,
-        operator_user_id: int,
-        note: str | None = None,
-    ) -> None:
-        """Append status transition record into tailoring_progress JSON."""
-        progress = dict(application.tailoring_progress or {})
-        history = list(progress.get("status_history", []))
-        history.append(
-            {
-                "changed_at": datetime.now(timezone.utc).isoformat(),
-                "from_status": from_status.value,
-                "to_status": to_status.value,
-                "operator_user_id": operator_user_id,
-                "note": note,
-            }
-        )
-        progress["status_history"] = history
-        application.tailoring_progress = progress
-
-    @staticmethod
-    def _append_resolution_history(
-        application: Application,
-        from_resolution: ApplicationResolution,
-        to_resolution: ApplicationResolution,
-        operator_user_id: int,
-        note: str | None = None,
-    ) -> None:
-        """Append resolution transition record into tailoring_progress JSON."""
-        progress = dict(application.tailoring_progress or {})
-        history = list(progress.get("resolution_history", []))
-        history.append(
-            {
-                "changed_at": datetime.now(timezone.utc).isoformat(),
-                "from_resolution": from_resolution.value,
-                "to_resolution": to_resolution.value,
-                "operator_user_id": operator_user_id,
-                "note": note,
-            }
-        )
-        progress["resolution_history"] = history
-        application.tailoring_progress = progress
-
-    @staticmethod
     async def update_status(
         db: AsyncSession,
         application_id: str,
@@ -141,13 +96,6 @@ class ApplicationService:
             )
             raise BadRequestError(message)
 
-        ApplicationService._append_status_history(
-            application=application,
-            from_status=current_status,
-            to_status=target_status,
-            operator_user_id=user.id,
-            note=note,
-        )
         application.status = target_status
         now = datetime.now(timezone.utc)
         if target_status == ApplicationStatus.APPLIED and application.applied_at is None:
@@ -157,6 +105,15 @@ class ApplicationService:
         application.updated_at = now
         if target_status != ApplicationStatus.FAILED:
             application.last_error = None
+
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=current_status,
+            to_status=target_status,
+            changed_by_id=user.id,
+            note=note,
+        )
 
         await db.commit()
         await db.refresh(application)
@@ -202,13 +159,6 @@ class ApplicationService:
             )
 
         now = datetime.now(timezone.utc)
-        ApplicationService._append_resolution_history(
-            application=application,
-            from_resolution=current_resolution,
-            to_resolution=target_resolution,
-            operator_user_id=user.id,
-            note=note,
-        )
         application.resolution = target_resolution
         application.resolved_at = now if target_resolution != ApplicationResolution.ACTIVE else None
         application.resolution_note = note if target_resolution != ApplicationResolution.ACTIVE else None
@@ -520,7 +470,15 @@ class ApplicationService:
             tailoring_progress={"steps": {}, "current_step": "created"}
         )
         await ApplicationRepository.create(db, application=application)
-        
+
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=None,
+            to_status=ApplicationStatus.PENDING,
+            changed_by_id=user.id,
+        )
+
         await ApplicationService._submit_initialization_task(
             db=db,
             application=application,
@@ -636,18 +594,28 @@ class ApplicationService:
             parent_document=previous_resume_document,
             change_comments="Retry: Copied template for application tailoring",
         )
+        previous_status = application.status
         application.source_resume_id = resume_template.id
         application.resume_document_id = retry_working_document.id
 
         await ApplicationRepository.mark_pending(db, application)
         application.tailoring_level = selected_tailoring_level
 
-        # Reset progress
+        # Reset workflow progress (status history is in a dedicated table, unaffected)
         application.tailoring_progress = {
             "steps": {},
             "current_step": "retrying",
             "message": "Restarting tailoring and cover letter generation",
         }
+
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=previous_status,
+            to_status=ApplicationStatus.PENDING,
+            changed_by_id=user.id,
+            note=f'Retried with "{resume_template.title}" · level: {selected_tailoring_level.value}',
+        )
 
         await ApplicationService._submit_generation_tasks(
             db=db,

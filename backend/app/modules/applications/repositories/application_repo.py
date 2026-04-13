@@ -168,6 +168,7 @@ class ApplicationRepository:
         *,
         clear_error: bool = True,
     ) -> None:
+        # Note: history entry for retry-triggered PENDING is written by the service layer.
         application.status = ApplicationStatus.PENDING
         if clear_error:
             application.last_error = None
@@ -175,8 +176,18 @@ class ApplicationRepository:
 
     @staticmethod
     async def mark_failed(db: AsyncSession, application: Application, error: str) -> None:
+        from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
+        from_status = application.status
         application.mark_failed(error)
         await db.flush()
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=from_status,
+            to_status=ApplicationStatus.FAILED,
+            changed_by_id=None,
+            note=f"Generation failed: {error[:200]}" if error else None,
+        )
 
     @staticmethod
     async def mark_ready(
@@ -186,6 +197,8 @@ class ApplicationRepository:
         cover_letter_document_id: str | None = None,
         resume_document_id: str | None = None,
     ) -> None:
+        from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
+        from_status = application.status
         application.status = ApplicationStatus.READY
         if cover_letter_document_id:
             application.cover_letter_document_id = cover_letter_document_id
@@ -193,11 +206,27 @@ class ApplicationRepository:
             application.resume_document_id = resume_document_id
         application.last_error = None
         await db.flush()
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=from_status,
+            to_status=ApplicationStatus.READY,
+            changed_by_id=None,
+        )
 
     @staticmethod
     async def mark_tailoring(db: AsyncSession, application: Application) -> None:
+        from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
+        from_status = application.status
         application.status = ApplicationStatus.TAILORING
         await db.flush()
+        await StatusHistoryRepository.append(
+            db=db,
+            application_id=application.id,
+            from_status=from_status,
+            to_status=ApplicationStatus.TAILORING,
+            changed_by_id=None,
+        )
 
     @staticmethod
     async def list_same_company_for_user(
