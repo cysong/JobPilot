@@ -27,6 +27,30 @@ if TYPE_CHECKING:
     from app.modules.resumes.models import Document, Resume
 
 
+class ApplicationStatusHistory(Base):
+    """Records each status transition for an application."""
+
+    __tablename__ = "application_status_history"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True, default=_uuid)
+    application_id: Mapped[str] = mapped_column(
+        ForeignKey("applications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    from_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    changed_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    application: Mapped["Application"] = relationship(
+        "Application", back_populates="status_history"
+    )
+
+
 def _uuid() -> str:
     """Generate UUID4 string for primary keys."""
     return str(uuid4())
@@ -129,6 +153,12 @@ class Application(Base, TimestampMixin):
         "Document", foreign_keys=[resume_document_id])
     cover_letter_document: Mapped[Optional["Document"]] = relationship(
         "Document", foreign_keys=[cover_letter_document_id])
+    status_history: Mapped[list["ApplicationStatusHistory"]] = relationship(
+        "ApplicationStatusHistory",
+        back_populates="application",
+        order_by="ApplicationStatusHistory.changed_at.desc()",
+        lazy="noload",
+    )
 
     def mark_failed(self, error: str):
         """Helper to mark application failed with error message."""
