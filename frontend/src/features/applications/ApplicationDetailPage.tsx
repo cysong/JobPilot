@@ -29,6 +29,7 @@ import {
   ApplicationOperationsCard,
   type ApplicationStatusAction,
 } from '@/features/applications/components/ApplicationOperationsCard'
+import { TimelineCard } from '@/features/applications/components/TimelineCard'
 import {
   getApplicationMaterialEmptyMessage,
   getApplicationMaterialState,
@@ -311,6 +312,7 @@ export default function ApplicationDetailPage() {
   const [retryTailoringLevel, setRetryTailoringLevel] = useState<TailoringLevel>('light')
   const [jdLanguage, setJdLanguage] = useState<'en' | 'zh'>('en')
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('jd')
+  const [forceEditLatest, setForceEditLatest] = useState(false)
   const [detailNavigation, setDetailNavigation] = useState<DetailNavigationState>({
     previousApplicationId: null,
     nextApplicationId: null,
@@ -538,7 +540,7 @@ export default function ApplicationDetailPage() {
   }
 
   const handleStatusUpdate = (status: ApplicationStatus) => {
-    updateStatus.mutate({ id: application.id, status })
+    updateStatus.mutate({ id: application.id, status }, { onSuccess: () => setForceEditLatest(true) })
   }
 
   const handleResolutionUpdate = (resolution: ApplicationResolution) => {
@@ -777,6 +779,11 @@ export default function ApplicationDetailPage() {
               onDownloadResumePdf={handleDownloadResumePdf}
               onDownloadCoverLetterPdf={handleDownloadCoverLetterPdf}
               onOpenRetryDialog={openRetryDialog}
+            />
+            <TimelineCard
+              applicationId={application.id}
+              forceEditLatest={forceEditLatest}
+              onForceEditLatestConsumed={() => setForceEditLatest(false)}
             />
             <OtherRolesCard items={companyRoles} isLoading={isCompanyRolesLoading} searchParams={searchParams} />
           </aside>

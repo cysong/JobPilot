@@ -118,3 +118,17 @@ export interface ApplicationListResponse {
     page_size: number;
     total_pages: number;
 }
+
+export interface StatusHistoryEntry {
+    id: string;
+    application_id: string;
+    from_status: ApplicationStatus | null;
+    to_status: ApplicationStatus;
+    changed_at: string;
+    changed_by_id: number | null;
+    note: string | null;
+}
+
+export interface StatusHistoryListResponse {
+    items: StatusHistoryEntry[];
+}

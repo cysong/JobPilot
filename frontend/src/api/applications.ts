@@ -6,6 +6,8 @@ import type {
     ApplicationListResponse,
     CreateApplicationRequest,
     RetryApplicationRequest,
+    StatusHistoryEntry,
+    StatusHistoryListResponse,
     UpdateApplicationResolutionRequest,
     UpdateApplicationStatusRequest,
 } from '@/types/application';
@@ -102,6 +104,19 @@ export const applicationApi = {
             responseType: 'blob'
         });
         return result;
+    },
+
+    getStatusHistory: async (applicationId: string): Promise<StatusHistoryListResponse> => {
+        return client.get<StatusHistoryListResponse, StatusHistoryListResponse>(
+            `/applications/${applicationId}/history`
+        );
+    },
+
+    updateHistoryNote: async (applicationId: string, historyId: string, note: string): Promise<StatusHistoryEntry> => {
+        return client.patch<StatusHistoryEntry, StatusHistoryEntry>(
+            `/applications/${applicationId}/history/${historyId}/note`,
+            { note }
+        );
     },
 
     exportCoverLetterPdf: async (applicationId: string, options?: ResumeExportRequest) => {

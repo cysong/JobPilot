@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { applicationApi } from '@/api/applications'
+import { historyQueryKey } from '@/features/applications/hooks/useApplicationHistory'
 import type {
     ApplicationCompanyRole,
     ApplicationListRequest,
@@ -123,6 +124,7 @@ export const useApplicationMutations = () => {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['applications'] })
             queryClient.invalidateQueries({ queryKey: ['applications', data.id] })
+            queryClient.invalidateQueries({ queryKey: historyQueryKey(data.id) })
             toast({ title: 'Success', description: 'Resume and cover letter regeneration started' })
         },
         onError: () => {
@@ -137,6 +139,7 @@ export const useApplicationMutations = () => {
             queryClient.invalidateQueries({ queryKey: ['applications'] })
             queryClient.invalidateQueries({ queryKey: ['applications', data.id] })
             queryClient.invalidateQueries({ queryKey: ['application', 'by-job', data.job_id] })
+            queryClient.invalidateQueries({ queryKey: historyQueryKey(data.id) })
             toast({ title: 'Success', description: 'Application status updated' })
         },
         onError: (error: unknown) => {
