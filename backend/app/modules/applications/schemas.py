@@ -63,6 +63,7 @@ class ApplicationJobInfo(BaseModel):
     company_logo: Optional[str] = None
     location_label: Optional[str] = None
     work_types_label: Optional[str] = None
+    salary_label: Optional[str] = None
     classification: Optional[str] = None
     sub_classification: Optional[str] = None
     share_link: Optional[str] = None

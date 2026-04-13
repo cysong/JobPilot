@@ -47,6 +47,7 @@ export interface Application {
         company_logo?: string;
         location_label?: string | null;
         work_types_label?: string | null;
+        salary_label?: string | null;
         classification?: string | null;
         sub_classification?: string | null;
         share_link?: string;
