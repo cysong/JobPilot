@@ -64,9 +64,9 @@ def upgrade() -> None:
              jsonb_array_elements(
                  CASE
                      WHEN a.tailoring_progress IS NOT NULL
-                      AND a.tailoring_progress ? 'status_history'
-                      AND jsonb_typeof(a.tailoring_progress->'status_history') = 'array'
-                     THEN a.tailoring_progress->'status_history'
+                      AND a.tailoring_progress::jsonb ? 'status_history'
+                      AND jsonb_typeof(a.tailoring_progress::jsonb->'status_history') = 'array'
+                     THEN a.tailoring_progress::jsonb->'status_history'
                      ELSE '[]'::jsonb
                  END
              ) AS entry
