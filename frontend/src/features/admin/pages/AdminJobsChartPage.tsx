@@ -17,10 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useJobsDailyTrend } from '../hooks/useJobsDailyTrend'
 import { useJobsTimeScatter } from '../hooks/useJobsTimeScatter'
 import type {
-  JobsDailyTrendResponse,
   JobsDailyTrendSeries,
   JobsTimeScatterPoint,
-  JobsTimeScatterResponse,
 } from '../types'
 
 const COLORS = [
