@@ -282,13 +282,55 @@ export default function AdminJobsChartPage() {
     [chartData],
   )
 
-  // Chart 2: explicit ticks and midnight set derived from scatter time range
-  const { scatterTicks, scatterMidnightSet } = useMemo(() => {
-    if (!scatterData) return { scatterTicks: [], scatterMidnightSet: new Set<number>() }
+  // Chart 1: explicit tick list so weekend labels are never dropped by Recharts auto-skip.
+  // 7D → every day; 30D → Mon + Sat (shows week boundaries + weekend start);
+  // 60D → Mon only (keeps label density reasonable).
+  const trendTicks = useMemo(() => {
+    if (trendDays <= 7) {
+      return chartData.map((d) => d.shortDate as string)
+    }
+    return chartData
+      .filter((d) => {
+        const full = d.date as string
+        const day = new Date(full + 'T12:00:00Z').getUTCDay()
+        return trendDays <= 30 ? day === 1 || day === 6 : day === 1
+      })
+      .map((d) => d.shortDate as string)
+  }, [chartData, trendDays])
+
+  // Chart 2: explicit ticks, midnight set, and domain derived from scatter time range.
+  // Domain is based on the query range (not dataMin/dataMax) so midnight ticks that
+  // fall in hours with no data are never clipped as out-of-domain.
+  const { scatterTicks, scatterMidnightSet, scatterDomain } = useMemo(() => {
+    if (!scatterData) return {
+      scatterTicks: [],
+      scatterMidnightSet: new Set<number>(),
+      scatterDomain: ['dataMin', 'dataMax'] as [string, string],
+    }
     const startTs = new Date(scatterData.startDateTime).getTime()
     const endTs = new Date(scatterData.endDateTime).getTime()
     const { ticks, midnightSet } = computeScatterTicks(startTs, endTs, scatterData.timezone, scatterDays)
-    return { scatterTicks: ticks, scatterMidnightSet: midnightSet }
+
+    let visibleTicks: number[]
+    if (scatterDays <= 1) {
+      // 1D: every 3h tick for readable time distribution
+      visibleTicks = ticks
+    } else if (scatterDays <= 3) {
+      // 3D: midnight + noon only (2 ticks/day)
+      const noonSet = new Set(
+        Array.from(midnightSet).map((midnight) => midnight + 12 * 3600 * 1000),
+      )
+      visibleTicks = ticks.filter((t) => midnightSet.has(t) || noonSet.has(t))
+    } else {
+      // 7D: only midnight
+      visibleTicks = Array.from(midnightSet)
+    }
+
+    return {
+      scatterTicks: visibleTicks.sort((a, b) => a - b),
+      scatterMidnightSet: midnightSet,
+      scatterDomain: [startTs, endTs] as [number, number],
+    }
   }, [scatterData, scatterDays])
 
   const scatterPoints = useMemo(() => {
@@ -389,7 +431,7 @@ export default function AdminJobsChartPage() {
                       dataKey="shortDate"
                       axisLine={false}
                       tickLine={false}
-                      minTickGap={24}
+                      ticks={trendTicks}
                       tick={(props: { x?: string | number; y?: string | number; payload?: { value: string } }) => {
                         const { x = 0, y = 0, payload } = props
                         if (!payload) return <g />
@@ -531,12 +573,13 @@ export default function AdminJobsChartPage() {
                     <XAxis
                       type="number"
                       dataKey="timestamp"
-                      domain={['dataMin', 'dataMax']}
+                      domain={scatterDomain}
                       scale="time"
                       axisLine={false}
                       tickLine={false}
                       ticks={scatterTicks}
-                      minTickGap={0}
+                      height={36}
+                      minTickGap={1}
                       tick={(props: { x?: string | number; y?: string | number; payload?: { value: number } }) => {
                         const { x = 0, y = 0, payload } = props
                         if (!payload) return <g />
