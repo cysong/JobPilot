@@ -53,9 +53,6 @@ function isWeekend(dateStr: string): boolean {
 function isMonday(dateStr: string): boolean {
   return new Date(dateStr + 'T12:00:00Z').getUTCDay() === 1
 }
-
-
-
 // Computes explicit XAxis ticks for the scatter chart.
 // Interval: 3h for 1-day range, 6h for 3-day, 12h for 7-day.
 // Every tick at offset 0 from a midnight is guaranteed to be in midnightSet.
@@ -73,14 +70,15 @@ function computeScatterTicks(
   const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
   const seedMidnights: number[] = []
 
-  for (let t = scanStart; t <= endTs + hourMs; t += hourMs) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(t)
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 
+  for (let t = scanStart; t <= endTs + hourMs; t += hourMs) {
+    const parts = timeFormatter.formatToParts(t)
     const hour = parts.find((p) => p.type === 'hour')?.value
     const minute = parts.find((p) => p.type === 'minute')?.value
 
@@ -235,11 +233,12 @@ export default function AdminJobsChartPage() {
   const [scatterDays, setScatterDays] = useState(7)
   const trendQuery = useJobsDailyTrend(trendDays)
   const scatterQuery = useJobsTimeScatter(scatterDays)
-  const data = trendQuery.data as unknown as JobsDailyTrendResponse | undefined
-  const scatterData = scatterQuery.data as unknown as JobsTimeScatterResponse | undefined
+  const data = trendQuery.data
+  const scatterData = scatterQuery.data
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({})
 
   const series: JobsDailyTrendSeries[] = data?.series ?? []
+  // Merge sources from both charts so the same source always maps to the same color index
   const sourceColorNames = useMemo(() => {
     const names = new Set<string>()
 
@@ -373,10 +372,13 @@ export default function AdminJobsChartPage() {
         </CardHeader>
         <CardContent>
           {trendQuery.isLoading && <ChartStateBox message="Loading chart..." />}
-          {!trendQuery.isLoading && (!data || series.length === 0) && (
+          {!trendQuery.isLoading && trendQuery.isError && (
+            <ChartStateBox message="Failed to load chart data." />
+          )}
+          {!trendQuery.isLoading && !trendQuery.isError && (!data || series.length === 0) && (
             <ChartStateBox message="No data." />
           )}
-          {!trendQuery.isLoading && data && series.length > 0 && (
+          {!trendQuery.isLoading && !trendQuery.isError && data && series.length > 0 && (
             <div className="space-y-4">
               <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
                 <ResponsiveContainer width="100%" height="100%">
@@ -516,10 +518,13 @@ export default function AdminJobsChartPage() {
         </CardHeader>
         <CardContent>
           {scatterQuery.isLoading && <ChartStateBox message="Loading scatter chart..." />}
-          {!scatterQuery.isLoading && (!scatterData || scatterPoints.length === 0) && (
+          {!scatterQuery.isLoading && scatterQuery.isError && (
+            <ChartStateBox message="Failed to load scatter data." />
+          )}
+          {!scatterQuery.isLoading && !scatterQuery.isError && (!scatterData || scatterPoints.length === 0) && (
             <ChartStateBox message="No scatter data." />
           )}
-          {!scatterQuery.isLoading && scatterData && scatterPoints.length > 0 && (
+          {!scatterQuery.isLoading && !scatterQuery.isError && scatterData && scatterPoints.length > 0 && (
             <div className="space-y-4">
               <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
                 <ResponsiveContainer width="100%" height="100%">
