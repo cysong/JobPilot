@@ -24,6 +24,7 @@ import { JobSearch } from "@/features/jobs/components/JobSearch";
 import { JobPagination } from "@/features/jobs/components/JobPagination";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function JobListingPage() {
@@ -42,12 +43,14 @@ export default function JobListingPage() {
     workTypes,
     companies,
     sources,
+    hideExpired,
     isRecommendedView,
     isSavedView,
     activeFilterCount,
     handleViewChange,
     handleFilterChange,
     handleViewStatusChange,
+    handleHideExpiredChange,
     handleClearAllFilters,
     handleResetAllJobsSearch,
   } = useJobListState();
@@ -79,6 +82,7 @@ export default function JobListingPage() {
     companies,
     sources,
     view_status: viewStatus,
+    hide_expired: hideExpired || undefined,
   };
   const jobsQuery = useJobs(jobFilters, isSearchParamsReady && !isRecommendedView && !isSavedView);
 
@@ -178,6 +182,15 @@ export default function JobListingPage() {
                     <TabsTrigger value="viewed">Viewed</TabsTrigger>
                   </TabsList>
                 </Tabs>
+
+                {/* Hide Expired Switch */}
+                <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-600">
+                  <Switch
+                    checked={hideExpired}
+                    onCheckedChange={handleHideExpiredChange}
+                  />
+                  Hide expired
+                </label>
 
                 {/* Filter Toggle Button */}
                 <Button

@@ -170,6 +170,9 @@ export interface JobFiltersRequest {
   listed_after?: string
   listed_before?: string
 
+  // Expiration filter
+  hide_expired?: boolean
+
   // Pagination
   page: number
   page_size: number

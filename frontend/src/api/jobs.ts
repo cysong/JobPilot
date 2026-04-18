@@ -71,6 +71,10 @@ export const jobsApi = {
       params.append('view_status', filters.view_status)
     }
 
+    if (filters.hide_expired) {
+      params.append('hide_expired', 'true')
+    }
+
     // Add date range filters
     if (filters.listed_after) {
       params.append('listed_after', filters.listed_after)

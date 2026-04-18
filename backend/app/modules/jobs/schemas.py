@@ -193,6 +193,7 @@ class JobFiltersRequest(BaseModel):
     companies: Optional[list[str]] = Field(None, description="Filter by company names")
     sources: Optional[list[str]] = Field(None, description="Filter by job sources")
     view_status: str = Field("all", description="Viewed status filter: all, viewed, unviewed")
+    hide_expired: bool = Field(False, description="Exclude expired jobs when True")
 
     # Date range
     listed_after: Optional[datetime] = Field(None, description="Filter jobs listed after this date")

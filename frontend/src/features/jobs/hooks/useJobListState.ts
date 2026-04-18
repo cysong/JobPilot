@@ -22,6 +22,7 @@ const JOB_TRACKED_SEARCH_KEYS = [
   "sort_by",
   "sort_order",
   "view_status",
+  "hide_expired",
   "location_cities",
   "work_types",
   "companies",
@@ -57,6 +58,7 @@ export const useJobListState = () => {
   const workTypes = searchParams.getAll("work_types");
   const companies = searchParams.getAll("companies");
   const sources = searchParams.getAll("sources");
+  const hideExpired = searchParams.get("hide_expired") === "true";
   const isRecommendedView = viewMode === "recommended";
   const isSavedView = viewMode === "saved";
   const activeFilterCount =
@@ -98,6 +100,17 @@ export const useJobListState = () => {
     setSearchParams(newParams);
   };
 
+  const handleHideExpiredChange = (value: boolean) => {
+    const newParams = cloneSearchParams(searchParams);
+    if (value) {
+      newParams.set("hide_expired", "true");
+    } else {
+      newParams.delete("hide_expired");
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   const handleClearAllFilters = () => {
     clearPersistedSearchParams();
     clearJobListSessionState();
@@ -107,6 +120,7 @@ export const useJobListState = () => {
     newParams.delete("companies");
     newParams.delete("sources");
     newParams.delete("view_status");
+    newParams.delete("hide_expired");
     newParams.set("page", "1");
     setSearchParams(newParams);
   };
@@ -136,12 +150,14 @@ export const useJobListState = () => {
     workTypes,
     companies,
     sources,
+    hideExpired,
     isRecommendedView,
     isSavedView,
     activeFilterCount,
     handleViewChange,
     handleFilterChange,
     handleViewStatusChange,
+    handleHideExpiredChange,
     handleClearAllFilters,
     handleResetAllJobsSearch,
   };

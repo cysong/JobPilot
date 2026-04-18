@@ -107,6 +107,10 @@ class JobService:
         if filters.listed_before:
             query = query.where(SeekJob.listed_at <= filters.listed_before)
 
+        # Exclude expired jobs
+        if filters.hide_expired:
+            query = query.where(SeekJob.effective_is_expired.is_(False))
+
         # Apply viewed status filter
         if filters.view_status == "viewed":
             query = query.where(
