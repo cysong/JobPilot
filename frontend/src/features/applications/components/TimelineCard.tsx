@@ -49,7 +49,7 @@ interface EntryRowProps {
   isLatest?: boolean
   isEditing?: boolean
   noteText?: string
-  textareaRef?: React.RefObject<HTMLTextAreaElement>
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>
   onNoteChange?: (v: string) => void
   onEditStart?: () => void
   onSave?: () => void

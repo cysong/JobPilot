@@ -54,40 +54,7 @@ function isMonday(dateStr: string): boolean {
   return new Date(dateStr + 'T12:00:00Z').getUTCDay() === 1
 }
 
-// Scans hour-by-hour to find timestamps that are exactly midnight in the given timezone.
-// Returns all midnights whose timestamp falls between startTs and endTs.
-function getMidnightsInRange(startTs: number, endTs: number, timezone: string): number[] {
-  const hourMs = 3600 * 1000
-  const results: number[] = []
-  const seenDates = new Set<string>()
-  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
-  // Scan from 26h before start so the first day's midnight is always captured
-  const scanStart = Math.floor(startTs / hourMs) * hourMs - 26 * hourMs
 
-  for (let t = scanStart; t <= endTs + hourMs; t += hourMs) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(t)
-
-    const hour = parts.find((p) => p.type === 'hour')?.value
-    const minute = parts.find((p) => p.type === 'minute')?.value
-
-    if (hour === '00' && minute === '00') {
-      const dateStr = dateFormatter.format(t)
-      if (!seenDates.has(dateStr)) {
-        seenDates.add(dateStr)
-        if (t >= startTs && t <= endTs) {
-          results.push(t)
-        }
-      }
-    }
-  }
-
-  return results
-}
 
 // Computes explicit XAxis ticks for the scatter chart.
 // Interval: 3h for 1-day range, 6h for 3-day, 12h for 7-day.
@@ -423,7 +390,7 @@ export default function AdminJobsChartPage() {
                       axisLine={false}
                       tickLine={false}
                       minTickGap={24}
-                      tick={(props: { x?: number; y?: number; payload?: { value: string } }) => {
+                      tick={(props: { x?: string | number; y?: string | number; payload?: { value: string } }) => {
                         const { x = 0, y = 0, payload } = props
                         if (!payload) return <g />
                         const fullDate = dateMap[payload.value]
@@ -567,7 +534,7 @@ export default function AdminJobsChartPage() {
                       tickLine={false}
                       ticks={scatterTicks}
                       minTickGap={0}
-                      tick={(props: { x?: number; y?: number; payload?: { value: number } }) => {
+                      tick={(props: { x?: string | number; y?: string | number; payload?: { value: number } }) => {
                         const { x = 0, y = 0, payload } = props
                         if (!payload) return <g />
                         const ts = payload.value
