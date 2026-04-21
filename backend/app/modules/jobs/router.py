@@ -26,10 +26,12 @@ from app.modules.jobs.schemas import (
     ResumeBriefInfo,
     SavedJobListResponse,
     SavedJobStatus,
+    SourceMeta,
     JobViewedStatus,
     UserJobMatchDetailResponse,
     UserJobMatchResponse,
 )
+from app.modules.jobs.source_config import load_source_metas
 from app.modules.matching.repository import UserJobMatchRepository
 from app.modules.resumes.repository import ResumeRepository
 from app.shared.pagination import PaginationParams
@@ -229,6 +231,20 @@ async def search_company_filters(
 ):
     """Search company options for company filter dropdown."""
     return await service.JobService.search_companies(db, q, limit)
+
+
+@router.get("/sources/meta", response_model=list[SourceMeta])
+async def get_source_metas(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Return display metadata for all known job sources.
+
+    Icons are bundled in the frontend and keyed by `key`; the backend only
+    owns label / brand_color / flags. Loaded from backend/config/sources.yaml
+    and memoized per-process (restart the API to pick up changes).
+    """
+    return load_source_metas()
 
 
 @router.get("/{job_id}/saved", response_model=SavedJobStatus)

@@ -1,0 +1,31 @@
+# Job source display metadata.
+#
+# Consumed by GET /api/v1/jobs/sources/meta. The backend only exposes
+# non-visual metadata (label / brand_color / flags). Icons are bundled
+# in the frontend and looked up by `key` — see frontend/src/config/sourceIcons.ts.
+#
+# To add a new source:
+#   1. Append a new entry here (must match the value written to seek_jobs.source).
+#   2. Drop the icon file at frontend/src/assets/source-icons/<key>.<ext>.
+#   3. Register it in frontend/src/config/sourceIcons.ts.
+#
+# Order of this list is preserved and used as the default display order.
+
+sources:
+  - key: linkedin
+    label: LinkedIn
+    brand_color: "#0A66C2"
+    external_apply: true
+    enabled: true
+
+  - key: seek
+    label: Seek
+    brand_color: "#0D3880"
+    external_apply: false
+    enabled: true
+
+  - key: greenhouse
+    label: Greenhouse
+    brand_color: "#27AE60"
+    external_apply: true
+    enabled: true

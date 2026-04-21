@@ -213,6 +213,29 @@ class JobFiltersOptions(BaseModel):
 
 
 # ============================================
+# Source Display Metadata
+# ============================================
+
+class SourceMeta(BaseModel):
+    """Display metadata for a job source (icon is bundled in frontend, looked up by key)."""
+
+    key: str = Field(
+        ...,
+        description="Lowercase identifier matching seek_jobs.source value (e.g. 'linkedin', 'seek', 'greenhouse')",
+    )
+    label: str = Field(..., description="Human-readable display name")
+    brand_color: Optional[str] = Field(
+        default=None,
+        description="Hex color (e.g. '#0A66C2') used for tags, chart series, etc.",
+    )
+    external_apply: bool = Field(
+        default=False,
+        description="Whether application happens on an external site (affects apply-button wording)",
+    )
+    enabled: bool = Field(default=True, description="Whether this source is active")
+
+
+# ============================================
 # Job Analysis Schemas
 # ============================================
 
