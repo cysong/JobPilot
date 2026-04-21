@@ -17,9 +17,15 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/utils/cn'
 
+export type FilterDropdownOption = string | { value: string; label: string }
+
 interface FilterDropdownProps {
   label: string
-  options: string[]
+  /**
+   * Either raw strings (value == label) or { value, label } pairs when the
+   * display string differs from the value submitted to the server.
+   */
+  options: FilterDropdownOption[]
   selectedValues: string[]
   onSelectionChange: (values: string[]) => void
   searchPlaceholder?: string
@@ -27,9 +33,17 @@ interface FilterDropdownProps {
   className?: string
 }
 
+type NormalizedOption = { value: string; label: string }
+
+const normalizeOption = (option: FilterDropdownOption): NormalizedOption =>
+  typeof option === 'string' ? { value: option, label: option } : option
+
 /**
  * Reusable multi-select filter dropdown component using Command UI
- * Allows searching and selecting multiple options with checkmarks
+ * Allows searching and selecting multiple options with checkmarks.
+ *
+ * Options can be raw strings (value == label) or { value, label } pairs —
+ * `selectedValues` and `onSelectionChange` always work in terms of `value`.
  */
 export function FilterDropdown({
   label,
@@ -78,12 +92,19 @@ export function FilterDropdown({
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
-                const isSelected = selectedValues.includes(option)
+                const { value, label: optionLabel } = normalizeOption(option)
+                const isSelected = selectedValues.includes(value)
+                // Combine both so cmdk's built-in substring filter matches
+                // either the raw key ("linkedin") or the display label
+                // ("LinkedIn"), regardless of case.
+                const searchValue = value === optionLabel
+                  ? value
+                  : `${value} ${optionLabel}`
                 return (
                   <CommandItem
-                    key={option}
-                    value={option}
-                    onSelect={() => handleSelect(option)}
+                    key={value}
+                    value={searchValue}
+                    onSelect={() => handleSelect(value)}
                     className="cursor-pointer"
                   >
                     <div
@@ -96,7 +117,7 @@ export function FilterDropdown({
                     >
                       {isSelected && <Check className="h-3 w-3" />}
                     </div>
-                    <span className="flex-1">{option}</span>
+                    <span className="flex-1">{optionLabel}</span>
                   </CommandItem>
                 )
               })}

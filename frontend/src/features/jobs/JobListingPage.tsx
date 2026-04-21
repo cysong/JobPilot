@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Sparkles,
   Briefcase,
@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
 
 export default function JobListingPage() {
   const {
@@ -57,6 +58,27 @@ export default function JobListingPage() {
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
+
+  // Source meta (label / brand_color) for the Source filter dropdown.
+  // Subscribe to `byKey` so the dropdown re-derives once the async fetch
+  // resolves, and trigger `fetchIfNeeded` here so labels are available even
+  // if the job list is empty (no JobCard mounted yet to warm the cache).
+  const sourceMetaByKey = useSourceMetaStore((s) => s.byKey);
+  const fetchSourceMeta = useSourceMetaStore((s) => s.fetchIfNeeded);
+  useEffect(() => {
+    void fetchSourceMeta();
+  }, [fetchSourceMeta]);
+
+  const sourceFilterOptions = useMemo(
+    () =>
+      (filterOptions?.sources ?? []).map((key) => ({
+        value: key,
+        label: getSourceMetaByKey(key)?.label ?? key,
+      })),
+    // `sourceMetaByKey` in deps ensures we re-derive labels after the meta
+    // fetch resolves; `getSourceMetaByKey` reads the same store snapshot.
+    [filterOptions?.sources, sourceMetaByKey],
+  );
 
   // Recommended view: fetch matched jobs
   const matchFilters = {
@@ -219,7 +241,7 @@ export default function JobListingPage() {
                     {/* Filter Dropdowns */}
                     <FilterDropdown
                       label="Source"
-                      options={filterOptions.sources}
+                      options={sourceFilterOptions}
                       selectedValues={sources}
                       onSelectionChange={(values) =>
                         handleFilterChange("sources", values)
