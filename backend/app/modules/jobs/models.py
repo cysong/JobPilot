@@ -261,13 +261,13 @@ class JobAnalysis(Base, TimestampMixin):
     # Responsibilities & Requirements
     # ============================================
     seniority: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, comment="Seniority level (Junior, Intermediate, Senior, Lead)"
+        String(200), nullable=True, comment="Seniority level (Junior, Intermediate, Senior, Lead)"
     )
     key_responsibilities: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, comment="Main job responsibilities (3-5 key points)"
     )
     experience_years: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, comment="Required experience (e.g., '3-5 years', '5+ years')"
+        String(200), nullable=True, comment="Required experience (e.g., '3-5 years', '5+ years')"
     )
     education_requirement: Mapped[Optional[str]] = mapped_column(
         String(200), nullable=True, comment="Education requirement"
