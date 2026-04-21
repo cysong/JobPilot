@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CartesianGrid,
@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getSourceMetaByKey, useSourceMetaStore } from '@/store/sourceMetaStore'
 import { useJobsDailyTrend } from '../hooks/useJobsDailyTrend'
 import { useJobsTimeScatter } from '../hooks/useJobsTimeScatter'
 import type {
@@ -36,7 +37,22 @@ function pickColor(index: number) {
   return COLORS[index % COLORS.length]
 }
 
+/**
+ * Resolve the color for a source series. Prefers the `brand_color`
+ * configured in backend/config/sources.yaml (exposed via sourceMetaStore)
+ * so e.g. LinkedIn tracks always render in LinkedIn blue. Falls back to a
+ * stable palette index when the source has no brand_color set or when the
+ * name isn't a real source (e.g. the 'Total' series — but callers already
+ * short-circuit Total with a dedicated color, so in practice fallback is
+ * only hit for sources configured with `brand_color: null`).
+ *
+ * Read-only lookup via `getSourceMetaByKey`; the owning component must
+ * subscribe to the store separately so it re-renders once the async fetch
+ * resolves.
+ */
 function pickSeriesColor(name: string, seriesNames: string[]) {
+  const meta = getSourceMetaByKey(name)
+  if (meta?.brand_color) return meta.brand_color
   const index = seriesNames.indexOf(name)
   return pickColor(index >= 0 ? index : 0)
 }
@@ -234,6 +250,16 @@ export default function AdminJobsChartPage() {
   const data = trendQuery.data
   const scatterData = scatterQuery.data
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({})
+
+  // Subscribe to the source-meta store so chart colors re-render once the
+  // async fetch resolves (pickSeriesColor reads brand_color synchronously).
+  // fetchIfNeeded is idempotent — first admin to open this page triggers
+  // the fetch; subsequent opens short-circuit on the cached store state.
+  useSourceMetaStore((s) => s.byKey)
+  const fetchSourceMeta = useSourceMetaStore((s) => s.fetchIfNeeded)
+  useEffect(() => {
+    void fetchSourceMeta()
+  }, [fetchSourceMeta])
 
   const series: JobsDailyTrendSeries[] = data?.series ?? []
   // Merge sources from both charts so the same source always maps to the same color index

@@ -1,13 +1,21 @@
 import { Banknote, Clock, Globe, MapPin, Tag, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
-import linkedinIcon from "@/assets/source-icons/linkedin.svg";
-import seekIcon from "@/assets/source-icons/seek.ico";
+import { getSourceIcon } from "@/config/sourceIcons";
+import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
 
-type SourceMeta = {
+/**
+ * UI-ready rendering info for a job source. Label / brand color come from
+ * the backend (/api/v1/jobs/sources/meta, cached in sourceMetaStore) while
+ * the icon asset is resolved from the frontend bundle via sourceIcons.ts.
+ * When the key is unknown or metadata has not loaded yet, we fall back to
+ * the raw string + a generic globe icon so the UI always renders.
+ */
+type SourceDisplay = {
   icon?: LucideIcon;
   iconSrc?: string;
   label: string;
+  brandColor?: string | null;
 };
 
 type JobDisplayFields = {
@@ -21,19 +29,44 @@ type JobDisplayFields = {
 
 export const getSourceMeta = (
   source: string | null | undefined,
-): SourceMeta => {
+): SourceDisplay => {
   const raw = source?.trim();
-  const normalized = raw?.toLowerCase();
-  const label = raw && raw.length > 0 ? raw : "unknown";
+  const iconSrc = getSourceIcon(raw);
+  const meta = getSourceMetaByKey(raw);
 
-  if (normalized === "linkedin") {
-    return { iconSrc: linkedinIcon, label };
-  }
-  if (normalized === "seek") {
-    return { iconSrc: seekIcon, label };
-  }
+  const label =
+    meta?.label ?? (raw && raw.length > 0 ? raw : "unknown");
 
-  return { icon: Globe, label };
+  if (iconSrc) {
+    return { iconSrc, label, brandColor: meta?.brand_color ?? null };
+  }
+  return { icon: Globe, label, brandColor: meta?.brand_color ?? null };
+};
+
+/**
+ * React-aware variant. Two responsibilities:
+ *   1. Lazily trigger the source-meta fetch the first time any component
+ *      actually needs it (post-login prefetch was wasteful for users who
+ *      never open a job view). `fetchIfNeeded` is idempotent and dedupes
+ *      concurrent calls via an `inflight` promise, so every card mounting
+ *      at once still results in a single request. When a prior fetch
+ *      ended in `error`, the next mount naturally retries.
+ *   2. Subscribe to the store so the label / brand color update once the
+ *      async fetch resolves (avoids a frozen Globe fallback).
+ *
+ * Pure helpers outside React (e.g. chart data builders) should use
+ * `getSourceMeta` and accept whatever is cached at call time.
+ */
+export const useSourceDisplay = (
+  source: string | null | undefined,
+): SourceDisplay => {
+  // Subscribe so the label/brandColor update once the store resolves.
+  useSourceMetaStore((state) => state.byKey);
+  const fetchIfNeeded = useSourceMetaStore((state) => state.fetchIfNeeded);
+  useEffect(() => {
+    void fetchIfNeeded();
+  }, [fetchIfNeeded]);
+  return getSourceMeta(source);
 };
 
 export const getCompanyDisplayName = (
@@ -77,7 +110,7 @@ export function JobSourceCompanyLine({
   className,
   iconClassName,
 }: JobSourceCompanyLineProps) {
-  const sourceMeta = getSourceMeta(source);
+  const sourceMeta = useSourceDisplay(source);
   const SourceIcon = sourceMeta.icon;
   const companyDisplay = getCompanyDisplayName(companyName, advertiserName);
 
@@ -127,7 +160,7 @@ export function JobAttributeList({
   showCategory = true,
   showSalary = false,
 }: JobAttributeListProps) {
-  const sourceMeta = getSourceMeta(job.source);
+  const sourceMeta = useSourceDisplay(job.source);
   const SourceIcon = sourceMeta.icon;
   const category = formatJobCategory(job);
 

@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/card'
 import {
   formatJobCategory,
-  getSourceMeta,
   JobSalaryDisplay,
+  useSourceDisplay,
 } from '@/components/job/jobDisplay'
 
 interface JobCardProps {
@@ -30,7 +30,7 @@ interface JobCardProps {
 
 export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
-    const sourceMeta = getSourceMeta(job.source)
+    const sourceMeta = useSourceDisplay(job.source)
     const SourceIcon = sourceMeta.icon
     const categoryText = formatJobCategory(job)
 

@@ -46,8 +46,8 @@ import {
   JobAttributeList,
   formatJobCategory,
   getCompanyDisplayName,
-  getSourceMeta,
   JobSourceCompanyLine,
+  useSourceDisplay,
 } from "@/components/job/jobDisplay";
 import { cn } from "@/utils/cn";
 import {
@@ -224,7 +224,7 @@ export default function JobDetailPage() {
       : job.content;
   const isSaved = Boolean(savedStatus?.is_saved);
   const categoryText = formatJobCategory(job);
-  const sourceMeta = getSourceMeta(job.source);
+  const sourceMeta = useSourceDisplay(job.source);
   const SourceIcon = sourceMeta.icon;
 
   const handleToggleSaved = () => {
