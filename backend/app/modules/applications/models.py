@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
 from app.shared.enums import ApplicationResolution, ApplicationStatus, TailoringLevel
+from app.shared.sqlalchemy_helpers import EnumColumn
 
 if TYPE_CHECKING:
     from app.modules.auth.models import User
@@ -43,8 +44,14 @@ class ApplicationStatusHistory(Base):
         nullable=False,
         index=True,
     )
-    from_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    to_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    from_status: Mapped[Optional[ApplicationStatus]] = mapped_column(
+        EnumColumn(ApplicationStatus, name="application_status"),
+        nullable=True,
+    )
+    to_status: Mapped[ApplicationStatus] = mapped_column(
+        EnumColumn(ApplicationStatus, name="application_status"),
+        nullable=False,
+    )
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     changed_by_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -101,13 +108,13 @@ class Application(Base, TimestampMixin):
     cover_letter_document_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[ApplicationStatus] = mapped_column(
-        SQLEnum(ApplicationStatus, native_enum=False),
+        EnumColumn(ApplicationStatus, name="application_status"),
         default=ApplicationStatus.PENDING,
         nullable=False,
         index=True,
     )
     resolution: Mapped[ApplicationResolution] = mapped_column(
-        SQLEnum(ApplicationResolution, native_enum=False),
+        EnumColumn(ApplicationResolution, name="application_resolution"),
         default=ApplicationResolution.ACTIVE,
         nullable=False,
         index=True,

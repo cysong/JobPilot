@@ -11,16 +11,20 @@ class Role(str, Enum):
 
 
 class ApplicationStatus(str, Enum):
-    """Application status enumeration"""
-    PENDING = "Pending"              # Waiting for processing
-    TAILORING = "Tailoring"          # AI customization in progress
-    READY = "Ready"                  # Materials ready for submission
-    APPLIED = "Applied"              # Application submitted
-    PHONE_SCREEN = "PhoneScreen"     # Phone screening stage
-    INTERVIEWING = "Interviewing"    # Interview stage
-    OFFER = "Offer"                  # Offer received
-    REJECTED = "Rejected"            # Application rejected
-    FAILED = "Failed"                # Application failed
+    """Application status enumeration.
+
+    Convention: name == value, UPPER_SNAKE_CASE. Display labels live in
+    the frontend, never in this enum.
+    """
+    PENDING = "PENDING"
+    TAILORING = "TAILORING"
+    READY = "READY"
+    APPLIED = "APPLIED"
+    PHONE_SCREEN = "PHONE_SCREEN"
+    INTERVIEWING = "INTERVIEWING"
+    OFFER = "OFFER"
+    REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class ApplicationResolution(str, Enum):
