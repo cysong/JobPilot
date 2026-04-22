@@ -164,6 +164,35 @@ uv run python run_celery_beat.py
 - [ ] **v1.2** - Milestones & Achievements (Gamification elements)
 - [ ] **v2.0** - LinkedIn Integration (Networking and referral assistance)
 
+## Conventions
+
+### Enums (DB ↔ backend ↔ frontend)
+
+To prevent silent case-mismatch bugs, every enum that crosses the
+storage boundary follows the same shape:
+
+1. **`name == value`, UPPER_SNAKE_CASE.** Python enum members declare
+   `FOO = "FOO"`. The display label (`"Phone Screen"`, etc.) lives in
+   the frontend, never in the enum value.
+2. **Native PostgreSQL `ENUM` type.** Use the `EnumColumn` helper from
+   `app/shared/sqlalchemy_helpers.py` — it forces `native_enum=True`
+   and `values_callable`, so the DB stores the enum *value* (not the
+   Python member name, which historically diverged and broke Pydantic
+   reads).
+3. **Single PG type, reused across columns.** When two columns hold
+   the same enum (e.g. `applications.status` and
+   `application_status_history.to_status`), pass the same `name=`
+   to `EnumColumn` — they share one PG ENUM type.
+4. **Frontend literal union mirrors the value set.** Display labels
+   live in a per-component `LABEL_MAP`, not in the type union.
+5. **Adding a value:** dedicated alembic migration with
+   `ALTER TYPE <name> ADD VALUE 'NEW_VALUE'`. Run outside a
+   transaction (`autocommit_block`). Enum values are append-only —
+   renames/removals require a full type rebuild and data migration.
+
+`tests/test_enum_columns.py` enforces rule (2) automatically. New
+columns missing `values_callable` will fail CI.
+
 ## Documentation
 
 Complete specifications and architecture documentation:
