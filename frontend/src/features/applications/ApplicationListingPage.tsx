@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     Select,
     SelectContent,
@@ -206,6 +207,18 @@ export default function ApplicationListingPage() {
                                                         {app.job?.title || 'Unknown Job'}
                                                     </CardTitle>
                                                 </Link>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="ghost" size="icon" asChild className="h-7 w-7 text-slate-500 hover:text-slate-700">
+                                                                <Link to={`/jobs/${app.job_id}`} aria-label="View job details">
+                                                                    <ExternalLink className="h-4 w-4" />
+                                                                </Link>
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>View job details</TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                                 {app.resolution !== 'ACTIVE' && (
                                                     <ApplicationResolutionBadge resolution={app.resolution} />
                                                 )}
@@ -226,6 +239,8 @@ export default function ApplicationListingPage() {
                                     <JobAttributeList
                                         job={app.job ?? {}}
                                         className="text-sm text-slate-500"
+                                        showCategory={false}
+                                        showSalary
                                     />
 
                                     <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -250,12 +265,6 @@ export default function ApplicationListingPage() {
                                                     Retry
                                                 </Button>
                                             )}
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/jobs/${app.job_id}`}>
-                                                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
-                                                    View Job
-                                                </Link>
-                                            </Button>
                                         </div>
                                     </div>
                                 </CardContent>

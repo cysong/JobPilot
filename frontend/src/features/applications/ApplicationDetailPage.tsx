@@ -48,6 +48,7 @@ import { JobLanguageSelect } from '@/components/job/JobLanguageSelect'
 import {
   JobAttributeList,
   JobSourceCompanyLine,
+  useSourceDisplay,
 } from '@/components/job/jobDisplay'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +66,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuthStore } from '@/store/authStore'
 import type {
@@ -301,6 +303,8 @@ export default function ApplicationDetailPage() {
   const [searchParams] = useSearchParams()
   const serializedSearchParams = searchParams.toString()
   const { data: application, isLoading, isError } = useApplication(applicationId || '')
+  const sourceMeta = useSourceDisplay(application?.job?.source)
+  const SourceIcon = sourceMeta.icon
   const { retryCoverLetter, updateStatus, updateResolution } = useApplicationMutations()
   const { data: resumesData, isLoading: isLoadingResumes } = useResumes()
   const { user } = useAuthStore()
@@ -601,13 +605,28 @@ export default function ApplicationDetailPage() {
               )}
               <Button
                 size="sm"
+                variant="outline"
                 asChild={Boolean(application.job?.share_link)}
                 disabled={!application.job?.share_link}
               >
                 {application.job?.share_link ? (
-                  <a href={application.job.share_link} target="_blank" rel="noopener noreferrer">
-                    Apply on Source Site
-                    <ExternalLink className="ml-2 h-4 w-4" />
+                  <a
+                    href={application.job.share_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Apply on ${sourceMeta.label}`}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <span>Apply on</span>
+                    {sourceMeta.iconSrc ? (
+                      <img
+                        src={sourceMeta.iconSrc}
+                        alt={`${sourceMeta.label} icon`}
+                        className="h-4 w-4 rounded-sm object-contain"
+                      />
+                    ) : SourceIcon ? (
+                      <SourceIcon className="h-4 w-4" />
+                    ) : null}
                   </a>
                 ) : (
                   <span>Apply on Source Site</span>
@@ -627,11 +646,18 @@ export default function ApplicationDetailPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="text-2xl font-bold text-slate-900">{application.job?.title || 'Unknown Job'}</h1>
-                      <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
-                        <Link to={`/jobs/${application.job_id}`} aria-label="View job details">
-                          <ExternalLink className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
+                              <Link to={`/jobs/${application.job_id}`} aria-label="View job details">
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View job details</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     <JobSourceCompanyLine
                       source={application.job?.source}
