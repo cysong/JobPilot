@@ -27,7 +27,7 @@ import type {
 
 const DASHBOARD_APPLICATION_PAGE_SIZE = 100
 const DASHBOARD_ACTIVITY_DAYS = 14
-const DASHBOARD_MATCH_LIMIT = 6
+const DASHBOARD_MATCH_LIMIT = 3
 const DASHBOARD_SAVED_LIMIT = 4
 const DASHBOARD_TOP_SKILLS_LIMIT = 8
 
@@ -98,7 +98,7 @@ const getAttentionApplications = (applications: Application[]): DashboardApplica
       if (scoreDelta !== 0) return scoreDelta
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     })
-    .slice(0, 5)
+    .slice(0, 3)
     .map(buildApplicationItem)
 }
 
