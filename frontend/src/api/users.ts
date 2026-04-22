@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { UserPreferences } from '@/types/auth'
+import type { User, UserPreferences, UserProfileUpdateRequest } from '@/types/auth'
 
 export const usersApi = {
   getProfilePreferences: async (): Promise<UserPreferences> => {
@@ -9,6 +9,11 @@ export const usersApi = {
 
   updateProfilePreferences: async (data: UserPreferences): Promise<UserPreferences> => {
     const result = await apiClient.patch<UserPreferences, UserPreferences>('/users/profile/preferences', data)
+    return result
+  },
+
+  updateProfile: async (data: UserProfileUpdateRequest): Promise<User> => {
+    const result = await apiClient.patch<User, User>('/users/profile', data)
     return result
   },
 }

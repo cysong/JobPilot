@@ -29,6 +29,7 @@ export interface User {
   id: number
   email: string
   full_name: string
+  avatar_seed?: string | null
   role: Role
   is_active: boolean
   email_verified_at?: string | null
@@ -36,6 +37,11 @@ export interface User {
   preferences?: UserPreferences
   created_at: string
   updated_at: string
+}
+
+export interface UserProfileUpdateRequest {
+  full_name?: string
+  avatar_seed?: string | null
 }
 
 export interface LoginRequest {

@@ -77,6 +77,13 @@ class SkillSyncResponse(BaseModel):
     auto_skills: int = Field(..., description="Auto skills count")
 
 
+class UserProfileUpdate(BaseModel):
+    """Update user identity fields (name & avatar)."""
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    avatar_seed: str | None = Field(default=None, max_length=64)
+
+
 class ProfilePreferencesResponse(UserPreferences):
     """User profile preferences payload."""
 

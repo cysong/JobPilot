@@ -1,16 +1,40 @@
-"""User profile preference endpoints."""
+"""User profile identity and preference endpoints."""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import BadRequestError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.modules.auth.schemas import UserResponse
 from app.modules.users import service
-from app.modules.users.schemas import ProfilePreferencesResponse, ProfilePreferencesUpdate
+from app.modules.users.schemas import (
+    ProfilePreferencesResponse,
+    ProfilePreferencesUpdate,
+    UserProfileUpdate,
+)
 
 router = APIRouter(prefix="/users/profile", tags=["User Profile"])
+
+
+@router.patch("", response_model=UserResponse)
+async def update_user_profile(
+    payload: UserProfileUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Update identity fields (full_name, avatar_seed) for the current user."""
+    try:
+        updated = await service.update_user_profile(
+            db=db,
+            user=current_user,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise BadRequestError(str(exc))
+    return updated
 
 
 @router.get("/preferences", response_model=ProfilePreferencesResponse)

@@ -1,10 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import {
-    LogOut,
-    Settings,
-    Shield,
-    User,
-} from 'lucide-react'
+import { LogOut, Settings } from 'lucide-react'
 
 import {
     Avatar,
@@ -15,13 +10,13 @@ import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/store/authStore'
+import { getAvatarUrl } from '@/lib/avatar'
 
 export function UserNav() {
     const navigate = useNavigate()
@@ -32,7 +27,6 @@ export function UserNav() {
         navigate('/')
     }
 
-    // Get initials for avatar fallback
     const initials = user?.email
         ? user.email.substring(0, 2).toUpperCase()
         : 'JP'
@@ -42,7 +36,7 @@ export function UserNav() {
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email || 'User'}`} alt={user?.email || 'User'} />
+                        <AvatarImage src={getAvatarUrl(user)} alt={user?.email || 'User'} />
                         <AvatarFallback>{initials}</AvatarFallback>
                     </Avatar>
                 </Button>
@@ -59,20 +53,10 @@ export function UserNav() {
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings/account')} className="cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings/security')} className="cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Security</span>
-                    </DropdownMenuItem>
-                </DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => navigate('/settings/profile')} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/store/authStore'
+import { getAvatarUrl } from '@/lib/avatar'
 
 export function AdminUserNav() {
   const navigate = useNavigate()
@@ -35,7 +36,7 @@ export function AdminUserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={`https://api.dicebear.com/7.x/identicon/svg?seed=${user?.email || 'Admin'}`} alt={user?.email || 'Admin'} />
+            <AvatarImage src={getAvatarUrl(user, 'Admin')} alt={user?.email || 'Admin'} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
         </Button>

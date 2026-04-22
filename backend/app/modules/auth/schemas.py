@@ -149,6 +149,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
+    avatar_seed: str | None = None
     role: Role
     is_active: bool
     email_verified_at: datetime | None = None

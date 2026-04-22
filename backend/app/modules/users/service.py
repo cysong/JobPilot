@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import User
 from app.modules.users.models import UserSkill
-from app.modules.users.schemas import ProfilePreferencesUpdate
+from app.modules.users.schemas import ProfilePreferencesUpdate, UserProfileUpdate
 from app.modules.resumes.models import ResumeSkill
 from app.shared.enums import ProficiencyLevel
 
@@ -358,6 +358,36 @@ def compare_proficiency(level1: ProficiencyLevel, level2: ProficiencyLevel) -> i
         return 1
     else:
         return 0
+
+
+async def update_user_profile(
+    db: AsyncSession,
+    user: User,
+    payload: UserProfileUpdate,
+) -> User:
+    """Update the user's identity fields (full_name, avatar_seed)."""
+    changed = False
+
+    if payload.full_name is not None:
+        new_name = payload.full_name.strip()
+        if not new_name:
+            raise ValueError("full_name cannot be empty")
+        if new_name != user.full_name:
+            user.full_name = new_name
+            changed = True
+
+    if "avatar_seed" in payload.model_fields_set:
+        new_seed = payload.avatar_seed.strip() if payload.avatar_seed else None
+        if new_seed != user.avatar_seed:
+            user.avatar_seed = new_seed or None
+            changed = True
+
+    if changed:
+        user.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(user)
+
+    return user
 
 
 async def get_profile_preferences(

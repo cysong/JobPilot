@@ -52,6 +52,11 @@ class User(Base, TimestampMixin):
         nullable=False,
         comment="User full name"
     )
+    avatar_seed: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Seed for the DiceBear avatar; null falls back to email"
+    )
 
     # Role & Permissions
     role: Mapped[Role] = mapped_column(

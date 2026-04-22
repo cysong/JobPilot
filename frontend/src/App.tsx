@@ -11,9 +11,10 @@ import MainLayout from '@/components/layout/MainLayout'
 import FullWidthLayout from '@/components/layout/FullWidthLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import LandingPage from '@/features/landing/LandingPage'
-import ProfilePage from '@/features/profile/ProfilePage'
-import AccountSettingsPage from '@/features/settings/AccountSettingsPage'
-import SecuritySettingsPage from '@/features/settings/SecuritySettingsPage'
+import SettingsLayout from '@/features/settings/SettingsLayout'
+import SettingsProfilePage from '@/features/settings/ProfilePage'
+import SettingsAccountPage from '@/features/settings/AccountPage'
+import SettingsJobPreferencesPage from '@/features/settings/JobPreferencesPage'
 import UserDashboardPage from '@/features/dashboard/UserDashboardPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
 import JobDetailPage from '@/features/jobs/JobDetailPage'
@@ -69,10 +70,14 @@ function App() {
             <Route path="/applications/:applicationId" element={<ApplicationDetailPage />} />
             <Route path="/resumes" element={<ResumeListingPage />} />
             <Route path="/skills" element={<SkillsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<Navigate to="/settings/account" replace />} />
-            <Route path="/settings/account" element={<AccountSettingsPage />} />
-            <Route path="/settings/security" element={<SecuritySettingsPage />} />
+            <Route path="/profile" element={<Navigate to="/settings/preferences" replace />} />
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="profile" replace />} />
+              <Route path="profile" element={<SettingsProfilePage />} />
+              <Route path="account" element={<SettingsAccountPage />} />
+              <Route path="preferences" element={<SettingsJobPreferencesPage />} />
+              <Route path="security" element={<Navigate to="../account" replace />} />
+            </Route>
           </Route>
 
           {/* Protected routes - full width layout (document editors) */}
