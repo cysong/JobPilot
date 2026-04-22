@@ -28,15 +28,15 @@ const DASHBOARD_SAVED_LIMIT = 4
 const DASHBOARD_TOP_SKILLS_LIMIT = 8
 
 const INITIAL_STATUS_COUNTS: Record<ApplicationStatus, number> = {
-  Pending: 0,
-  Tailoring: 0,
-  Ready: 0,
-  Applied: 0,
-  PhoneScreen: 0,
-  Interviewing: 0,
-  Offer: 0,
-  Rejected: 0,
-  Failed: 0,
+  PENDING: 0,
+  TAILORING: 0,
+  READY: 0,
+  APPLIED: 0,
+  PHONE_SCREEN: 0,
+  INTERVIEWING: 0,
+  OFFER: 0,
+  REJECTED: 0,
+  FAILED: 0,
 }
 
 const getCompanyName = (application: Application): string =>
@@ -107,12 +107,12 @@ const buildApplicationSnapshot = (applications: Application[]): DashboardApplica
   return {
     counts,
     activeCount:
-      counts.Pending +
-      counts.Tailoring +
-      counts.Ready +
-      counts.Applied +
-      counts.PhoneScreen +
-      counts.Interviewing,
+      counts.PENDING +
+      counts.TAILORING +
+      counts.READY +
+      counts.APPLIED +
+      counts.PHONE_SCREEN +
+      counts.INTERVIEWING,
     attentionItems: getAttentionApplications(applications),
   }
 }
@@ -265,7 +265,7 @@ const buildMetrics = ({
     label: 'Ready to Apply',
     value: readyToApply,
     helper: 'Applications with materials ready',
-    href: '/applications?status=Ready',
+    href: '/applications?status=READY',
     tone: readyToApply > 0 ? 'success' : 'default',
   },
   {
@@ -376,14 +376,14 @@ const buildHeroMessage = ({
   matches: UserJobMatch[]
   resumeSummary: DashboardResumeSummary
 }): string => {
-  if (applications.counts.Ready > 0) {
-    return `You have ${applications.counts.Ready} application${applications.counts.Ready > 1 ? 's' : ''} ready to submit.`
+  if (applications.counts.READY > 0) {
+    return `You have ${applications.counts.READY} application${applications.counts.READY > 1 ? 's' : ''} ready to submit.`
   }
-  if (applications.counts.Failed > 0) {
-    return `You have ${applications.counts.Failed} failed generation${applications.counts.Failed > 1 ? 's' : ''} to review.`
+  if (applications.counts.FAILED > 0) {
+    return `You have ${applications.counts.FAILED} failed generation${applications.counts.FAILED > 1 ? 's' : ''} to review.`
   }
-  if (applications.counts.Pending + applications.counts.Tailoring > 0) {
-    const total = applications.counts.Pending + applications.counts.Tailoring
+  if (applications.counts.PENDING + applications.counts.TAILORING > 0) {
+    const total = applications.counts.PENDING + applications.counts.TAILORING
     return `${total} application${total > 1 ? 's are' : ' is'} currently being prepared.`
   }
   if (matches.length > 0) {
@@ -494,7 +494,7 @@ export const useUserDashboard = () => {
     }),
     metrics: buildMetrics({
       applicationSnapshot,
-      readyToApply: applicationSnapshot.counts.Ready,
+      readyToApply: applicationSnapshot.counts.READY,
       savedCount: savedJobsQuery.data?.total || 0,
       finalizedResumeCount: resumeSummary.finalizedCount,
     }),

@@ -45,28 +45,28 @@ export function ApplicationPipelineCard({ data, isLoading, hasError }: Applicati
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Preparing</div>
             <div className="mt-2 text-2xl font-bold text-slate-950">
-              {data.counts.Pending + data.counts.Tailoring}
+              {data.counts.PENDING + data.counts.TAILORING}
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Ready</div>
-            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Ready}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.READY}</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Applied</div>
-            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Applied}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.APPLIED}</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Interviewing</div>
-            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Interviewing}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.INTERVIEWING}</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Offer</div>
-            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Offer}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.OFFER}</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">Rejected</div>
-            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.Rejected}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-950">{data.counts.REJECTED}</div>
           </div>
         </div>
 
