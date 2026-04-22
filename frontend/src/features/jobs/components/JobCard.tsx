@@ -2,6 +2,7 @@ import {
   MapPin,
   Clock,
   CircleCheck,
+  Tag,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -130,7 +131,10 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
 
           <div className="flex flex-wrap gap-2 pt-1">
             {categoryText && (
-              <span className="text-xs text-slate-500">{categoryText}</span>
+              <span className="flex items-center gap-1 text-xs text-slate-500">
+                <Tag className="h-3.5 w-3.5" />
+                {categoryText}
+              </span>
             )}
             <span className="ml-auto whitespace-nowrap text-xs text-slate-400 flex items-center">
               {savedAt
