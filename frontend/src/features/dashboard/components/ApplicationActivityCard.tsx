@@ -229,19 +229,19 @@ export function ApplicationActivityCard({
             <MetricCard
               label="Phone Screens"
               value={data.outcomes.phoneScreens.toString()}
-              helper="Applications currently in phone screen"
+              helper="Applications that ever reached phone screen"
               icon={Users}
             />
             <MetricCard
               label="Interviews"
               value={data.outcomes.interviewing.toString()}
-              helper="Applications currently interviewing"
+              helper="Applications that ever reached interviewing"
               icon={Target}
             />
             <MetricCard
               label="Offers"
               value={data.outcomes.offers.toString()}
-              helper="Applications marked as offer"
+              helper="Applications that ever received an offer"
               icon={Trophy}
             />
           </div>

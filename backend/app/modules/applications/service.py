@@ -520,6 +520,25 @@ class ApplicationService:
         )
 
     @staticmethod
+    async def get_funnel_counts(db: AsyncSession, user: User) -> dict[str, int]:
+        """Counts of applications that ever reached each funnel stage."""
+        funnel_statuses = [
+            ApplicationStatus.APPLIED,
+            ApplicationStatus.PHONE_SCREEN,
+            ApplicationStatus.INTERVIEWING,
+            ApplicationStatus.OFFER,
+        ]
+        counts = await StatusHistoryRepository.count_ever_reached_by_status(
+            db, user.id, funnel_statuses
+        )
+        return {
+            "applied": counts.get(ApplicationStatus.APPLIED, 0),
+            "phone_screens": counts.get(ApplicationStatus.PHONE_SCREEN, 0),
+            "interviewing": counts.get(ApplicationStatus.INTERVIEWING, 0),
+            "offers": counts.get(ApplicationStatus.OFFER, 0),
+        }
+
+    @staticmethod
     async def get_application_by_id(
         db: AsyncSession, application_id: str, user: User
     ) -> Optional[Application]:

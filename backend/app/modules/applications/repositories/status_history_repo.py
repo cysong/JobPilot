@@ -4,10 +4,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.models import ApplicationStatusHistory
+from app.modules.applications.models import Application, ApplicationStatusHistory
 from app.shared.enums import ApplicationStatus
 
 
@@ -76,3 +76,35 @@ class StatusHistoryRepository:
         entry.note = note
         await db.flush()
         return entry
+
+    @staticmethod
+    async def count_ever_reached_by_status(
+        db: AsyncSession,
+        user_id: int,
+        statuses: list[ApplicationStatus],
+    ) -> dict[ApplicationStatus, int]:
+        """Count distinct applications per `to_status`, scoped to one user.
+
+        An application is counted under a status if it has at least one history
+        entry with that `to_status` — i.e. it ever reached the stage, even if
+        the current status has since moved past it (e.g. interviewed → rejected).
+        """
+        if not statuses:
+            return {}
+        result = await db.execute(
+            select(
+                ApplicationStatusHistory.to_status,
+                func.count(distinct(ApplicationStatusHistory.application_id)),
+            )
+            .join(Application, Application.id == ApplicationStatusHistory.application_id)
+            .where(
+                Application.user_id == user_id,
+                Application.is_deleted.is_(False),
+                ApplicationStatusHistory.to_status.in_(statuses),
+            )
+            .group_by(ApplicationStatusHistory.to_status)
+        )
+        counts: dict[ApplicationStatus, int] = {status: 0 for status in statuses}
+        for to_status, count in result.all():
+            counts[to_status] = int(count)
+        return counts

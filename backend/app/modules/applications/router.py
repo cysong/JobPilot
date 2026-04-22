@@ -11,6 +11,7 @@ from app.modules.applications.schemas import (
     ApplicationCompanyRoleListResponse,
     ApplicationCreateRequest,
     ApplicationDetail,
+    ApplicationFunnelResponse,
     ApplicationListResponse,
     ApplicationResolutionUpdateRequest,
     ApplicationRetryRequest,
@@ -65,6 +66,16 @@ async def create_application(
     """Create a new application and kick off cover letter generation workflow."""
     application = await ApplicationService.create_application(db, current_user, payload)
     return application
+
+
+@router.get("/funnel", response_model=ApplicationFunnelResponse)
+async def get_application_funnel(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Counts of applications that ever reached each funnel stage."""
+    counts = await ApplicationService.get_funnel_counts(db, current_user)
+    return ApplicationFunnelResponse(**counts)
 
 
 @router.get("/{application_id}/resume/edit", response_model=DocumentEditResponse)

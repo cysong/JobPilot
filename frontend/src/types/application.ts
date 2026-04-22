@@ -132,3 +132,10 @@ export interface StatusHistoryEntry {
 export interface StatusHistoryListResponse {
     items: StatusHistoryEntry[];
 }
+
+export interface ApplicationFunnelResponse {
+    applied: number;
+    phone_screens: number;
+    interviewing: number;
+    offers: number;
+}

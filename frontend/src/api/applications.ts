@@ -2,6 +2,7 @@ import client from './client';
 import type {
     Application,
     ApplicationCompanyRoleListResponse,
+    ApplicationFunnelResponse,
     ApplicationListRequest,
     ApplicationListResponse,
     CreateApplicationRequest,
@@ -35,6 +36,13 @@ export const applicationApi = {
     getByJobId: async (jobId: number) => {
         const result = await client.get<Application, Application>(`/jobs/${jobId}/application`);
         return result || null;
+    },
+
+    getFunnel: async () => {
+        const result = await client.get<ApplicationFunnelResponse, ApplicationFunnelResponse>(
+            '/applications/funnel',
+        );
+        return result;
     },
 
     list: async (filters: ApplicationListRequest) => {

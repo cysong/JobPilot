@@ -76,6 +76,21 @@ class StatusHistoryNoteUpdateRequest(BaseModel):
     note: str
 
 
+class ApplicationFunnelResponse(BaseModel):
+    """Per-stage counts of applications that ever reached each funnel stage.
+
+    Counts are derived from `application_status_history`, so they include
+    applications whose current status has moved past the stage (e.g. an
+    application that interviewed and is now rejected still counts under
+    `interviewing`).
+    """
+
+    applied: int
+    phone_screens: int
+    interviewing: int
+    offers: int
+
+
 class ApplicationJobInfo(BaseModel):
     """Job fields exposed within application responses."""
 

@@ -5,7 +5,11 @@ import { jobsApi } from '@/api/jobs'
 import { resumeApi } from '@/api/resumes'
 import { skillsApi } from '@/api/skills'
 import { useAuthStore } from '@/store/authStore'
-import type { Application, ApplicationStatus } from '@/types/application'
+import type {
+  Application,
+  ApplicationFunnelResponse,
+  ApplicationStatus,
+} from '@/types/application'
 import type { UserJobMatch } from '@/types/job'
 import type { ResumeListItem } from '@/types/resume'
 import type { UserSkill } from '@/types/skill'
@@ -177,7 +181,8 @@ const buildActivityPoints = (
 
 const buildApplicationActivity = (
   applications: Application[],
-  periodDays: number
+  periodDays: number,
+  funnel: ApplicationFunnelResponse | null,
 ): DashboardApplicationActivity => {
   const points = buildActivityPoints(applications, periodDays)
   const addedCount = points.reduce((sum, point) => sum + point.addedCount, 0)
@@ -209,9 +214,9 @@ const buildApplicationActivity = (
         averageDaysToApply === null ? 'N/A' : `${averageDaysToApply.toFixed(1)}d`,
     },
     outcomes: {
-      phoneScreens: applications.filter((application) => application.status === 'PHONE_SCREEN').length,
-      interviewing: applications.filter((application) => application.status === 'INTERVIEWING').length,
-      offers: applications.filter((application) => application.status === 'OFFER').length,
+      phoneScreens: funnel?.phone_screens ?? 0,
+      interviewing: funnel?.interviewing ?? 0,
+      offers: funnel?.offers ?? 0,
     },
   }
 }
@@ -427,6 +432,10 @@ export const useUserDashboard = () => {
         queryFn: fetchAllApplications,
       },
       {
+        queryKey: ['dashboard', 'application-funnel'],
+        queryFn: () => applicationApi.getFunnel(),
+      },
+      {
         queryKey: ['dashboard', 'job-matches'],
         queryFn: () =>
           jobsApi.getJobMatches({
@@ -454,8 +463,16 @@ export const useUserDashboard = () => {
     ],
   })
 
-  const [applicationsQuery, matchesQuery, savedJobsQuery, resumesQuery, skillsQuery] = results
+  const [
+    applicationsQuery,
+    funnelQuery,
+    matchesQuery,
+    savedJobsQuery,
+    resumesQuery,
+    skillsQuery,
+  ] = results
   const applications = applicationsQuery.data || []
+  const funnel = funnelQuery.data ?? null
   const matches = matchesQuery.data || []
   const savedJobs =
     savedJobsQuery.data?.items.map<UserJobMatch>((item) => ({
@@ -477,7 +494,11 @@ export const useUserDashboard = () => {
   const skills = skillsQuery.data?.items || []
 
   const applicationSnapshot = buildApplicationSnapshot(applications)
-  const applicationActivity = buildApplicationActivity(applications, DASHBOARD_ACTIVITY_DAYS)
+  const applicationActivity = buildApplicationActivity(
+    applications,
+    DASHBOARD_ACTIVITY_DAYS,
+    funnel,
+  )
   const resumeSummary = buildResumeSummary(resumes)
   const skillsSummary = buildSkillsSummary(
     skills,
