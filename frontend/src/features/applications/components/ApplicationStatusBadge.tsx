@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { STATUS_PALETTE } from '@/features/applications/statusPalette';
 import type { ApplicationStatus } from '@/types/application';
 import { cn } from '@/utils/cn';
 
@@ -7,46 +8,33 @@ interface ApplicationStatusBadgeProps {
     className?: string;
 }
 
-type ApplicationStatusPresentation = {
+const STATUS_LABEL: Record<ApplicationStatus, string> = {
+    PENDING: 'Pending',
+    TAILORING: 'Tailoring',
+    READY: 'Ready',
+    APPLIED: 'Applied',
+    PHONE_SCREEN: 'Phone Screen',
+    INTERVIEWING: 'Interviewing',
+    OFFER: 'Offer',
+    REJECTED: 'Rejected',
+    FAILED: 'Failed',
+};
+
+export type ApplicationStatusPresentation = {
     label: string;
-    className?: string;
-    variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success';
+    badgeClass: string;
 };
 
 export function getApplicationStatusPresentation(status: ApplicationStatus): ApplicationStatusPresentation {
-    switch (status) {
-        case 'PENDING':
-            return { label: 'Pending', variant: 'secondary' };
-        case 'TAILORING':
-            return { label: 'Tailoring', variant: 'secondary', className: 'animate-pulse' };
-        case 'READY':
-            return { label: 'Ready', className: 'bg-green-500 hover:bg-green-600' };
-        case 'APPLIED':
-            return { label: 'Applied', variant: 'outline' };
-        case 'PHONE_SCREEN':
-            return { label: 'Phone Screen', variant: 'outline' };
-        case 'INTERVIEWING':
-            return { label: 'Interviewing', variant: 'outline' };
-        case 'OFFER':
-            return { label: 'Offer', className: 'bg-amber-400 text-slate-900 hover:bg-amber-500' };
-        case 'REJECTED':
-            return { label: 'Rejected', variant: 'secondary' };
-        case 'FAILED':
-            return { label: 'Failed', className: 'bg-red-500 text-white hover:bg-red-600' };
-        default:
-            return { label: status || 'Unknown', variant: 'secondary' };
-    }
+    const palette = STATUS_PALETTE[status];
+    return {
+        label: STATUS_LABEL[status] ?? status ?? 'Unknown',
+        badgeClass: cn(palette?.badgeClass, palette?.badgeExtraClass),
+    };
 }
 
 export function ApplicationStatusBadge({ status, className }: ApplicationStatusBadgeProps) {
-    const presentation = getApplicationStatusPresentation(status);
+    const { label, badgeClass } = getApplicationStatusPresentation(status);
 
-    return (
-        <Badge
-            variant={presentation.variant}
-            className={cn(presentation.className, className)}
-        >
-            {presentation.label}
-        </Badge>
-    );
+    return <Badge className={cn(badgeClass, className)}>{label}</Badge>;
 }

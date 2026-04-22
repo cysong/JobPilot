@@ -1,7 +1,16 @@
+import { STATUS_PALETTE } from '@/features/applications/statusPalette'
 import type { Application, ApplicationStatus } from '@/types/application'
 
 export type ApplicationMaterialKind = 'resume' | 'coverLetter'
 export type ApplicationMaterialState = 'Pending' | 'Generating' | 'Ready' | 'Failed'
+
+// Material states map to a subset of ApplicationStatus so they share palette colors.
+const MATERIAL_STATE_TO_STATUS: Record<ApplicationMaterialState, ApplicationStatus> = {
+  Pending: 'PENDING',
+  Generating: 'TAILORING',
+  Ready: 'READY',
+  Failed: 'FAILED',
+}
 
 type ApplicationMaterialSource = Pick<
   Application,
@@ -43,15 +52,4 @@ export const getApplicationMaterialEmptyMessage = (
 
 export const getApplicationMaterialStateClassName = (
   state: ApplicationMaterialState,
-): string => {
-  switch (state) {
-    case 'Ready':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    case 'Generating':
-      return 'border-sky-200 bg-sky-50 text-sky-700'
-    case 'Failed':
-      return 'border-red-200 bg-red-50 text-red-700'
-    default:
-      return 'border-slate-200 bg-slate-100 text-slate-500'
-  }
-}
+): string => STATUS_PALETTE[MATERIAL_STATE_TO_STATUS[state]].pillClass

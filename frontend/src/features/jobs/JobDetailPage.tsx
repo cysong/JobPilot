@@ -463,13 +463,7 @@ export default function JobDetailPage() {
                           className={cn(
                             "inline-flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                             "hover:brightness-95",
-                            applicationStatusPresentation?.className,
-                            applicationStatusPresentation?.variant === "secondary" &&
-                              "border-transparent bg-secondary text-secondary-foreground",
-                            applicationStatusPresentation?.variant === "outline" &&
-                              "text-foreground",
-                            applicationStatusPresentation?.variant == null &&
-                              "border-transparent bg-primary text-primary-foreground",
+                            applicationStatusPresentation?.badgeClass,
                           )}
                         >
                           <span>{applicationStatusPresentation?.label}</span>

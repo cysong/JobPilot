@@ -9,7 +9,9 @@ import {
   useApplicationStatusHistory,
   useUpdateHistoryNote,
 } from '@/features/applications/hooks/useApplicationHistory'
-import type { StatusHistoryEntry } from '@/types/application'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { STATUS_PALETTE } from '@/features/applications/statusPalette'
+import type { ApplicationStatus, StatusHistoryEntry } from '@/types/application'
 
 // Relative time for < 7 days, absolute otherwise
 function formatEntryTime(iso: string): string {
@@ -36,18 +38,6 @@ const STATUS_LABEL: Record<string, string> = {
   OFFER: 'Offer',
   REJECTED: 'Rejected',
   FAILED: 'Failed',
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'text-slate-500',
-  TAILORING: 'text-blue-500',
-  READY: 'text-green-600',
-  APPLIED: 'text-indigo-600',
-  PHONE_SCREEN: 'text-violet-600',
-  INTERVIEWING: 'text-amber-600',
-  OFFER: 'text-emerald-600',
-  REJECTED: 'text-red-500',
-  FAILED: 'text-red-600',
 }
 
 // ── Single entry row ────────────────────────────────────────────────────────
@@ -78,7 +68,8 @@ function EntryRow({
   isSaving = false,
 }: EntryRowProps) {
   const label = STATUS_LABEL[entry.to_status] ?? entry.to_status
-  const color = STATUS_COLOR[entry.to_status] ?? 'text-slate-600'
+  const color =
+    STATUS_PALETTE[entry.to_status as ApplicationStatus]?.textClass ?? 'text-slate-600'
   const NOTE_LIMIT = 120
   const longNote = entry.note && entry.note.length > NOTE_LIMIT
 
@@ -175,7 +166,7 @@ export function TimelineCard({
   const pendingEditRef = useRef(false)
   const lastLatestIdRef = useRef<string | null>(null)
 
-  const { data, isLoading } = useApplicationStatusHistory(applicationId)
+  const { data, isLoading, isError } = useApplicationStatusHistory(applicationId)
   const updateNote = useUpdateHistoryNote(applicationId)
 
   const entries: StatusHistoryEntry[] = data?.items ?? []
@@ -233,28 +224,30 @@ export function TimelineCard({
     )
   }
 
-  if (isLoading) {
-    return (
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Timeline</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!entries.length) return null
-
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Timeline</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {isLoading && (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        )}
+
+        {!isLoading && isError && (
+          <Alert variant="destructive">
+            <AlertTitle>Unable to load timeline</AlertTitle>
+            <AlertDescription>Please try again later.</AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && entries.length === 0 && (
+          <p className="text-sm text-slate-500">No status history yet.</p>
+        )}
+
         {/* Latest entry — always visible */}
         {latestEntry && (
           <EntryRow
