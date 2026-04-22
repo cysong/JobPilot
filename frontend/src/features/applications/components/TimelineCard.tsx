@@ -12,6 +12,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { STATUS_PALETTE } from '@/features/applications/statusPalette'
 import type { ApplicationStatus, StatusHistoryEntry } from '@/types/application'
+import { cn } from '@/utils/cn'
 
 // Relative time for < 7 days, absolute otherwise
 function formatEntryTime(iso: string): string {
@@ -248,47 +249,48 @@ export function TimelineCard({
           <p className="text-sm text-slate-500">No status history yet.</p>
         )}
 
-        {/* Latest entry — always visible */}
-        {latestEntry && (
-          <EntryRow
-            entry={latestEntry}
-            isLatest
-            isEditing={isEditingLatest}
-            noteText={noteText}
-            textareaRef={textareaRef}
-            onNoteChange={setNoteText}
-            onEditStart={startEdit}
-            onSave={saveNote}
-            onCancel={cancelEdit}
-            isSaving={updateNote.isPending}
-          />
-        )}
+        {/* Entries flow as a single uniform list; older ones collapsed by default */}
+        {(expanded ? entries : entries.slice(0, 1)).map((entry, i) => {
+          const isLatest = i === 0
+          return (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              isLatest={isLatest}
+              isEditing={isLatest && isEditingLatest}
+              noteText={isLatest ? noteText : undefined}
+              textareaRef={isLatest ? textareaRef : undefined}
+              onNoteChange={isLatest ? setNoteText : undefined}
+              onEditStart={isLatest ? startEdit : undefined}
+              onSave={isLatest ? saveNote : undefined}
+              onCancel={isLatest ? cancelEdit : undefined}
+              isSaving={isLatest && updateNote.isPending}
+            />
+          )
+        })}
 
-        {/* Expand / collapse older entries */}
         {olderEntries.length > 0 && (
-          <>
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
-            >
-              {expanded ? (
-                <ChevronUp className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
-              {expanded
-                ? 'Collapse'
-                : `${olderEntries.length} earlier ${olderEntries.length === 1 ? 'entry' : 'entries'}`}
-            </button>
-
-            {expanded && (
-              <div className="space-y-3 border-t border-slate-100 pt-3">
-                {olderEntries.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} />
-                ))}
-              </div>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className={cn(
+              'flex w-full items-center justify-center gap-1 text-xs text-slate-400 transition-colors hover:text-slate-600',
+              // Subtle fold-line above the button while collapsed hints at hidden entries.
+              !expanded && 'border-t border-dashed border-slate-200 pt-2',
+              expanded && 'pt-1',
             )}
-          </>
+          >
+            {expanded ? (
+              <>
+                <ChevronUp className="h-3.5 w-3.5" />
+                Collapse
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3.5 w-3.5" />
+                {olderEntries.length} earlier {olderEntries.length === 1 ? 'entry' : 'entries'}
+              </>
+            )}
+          </button>
         )}
       </CardContent>
     </Card>
