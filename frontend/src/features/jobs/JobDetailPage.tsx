@@ -171,6 +171,12 @@ export default function JobDetailPage() {
     ? getApplicationStatusPresentation(application.status)
     : null;
 
+  // Hook calls must precede any early return to keep the hook order
+  // stable across renders (React #310). useSourceDisplay handles
+  // null/undefined source so calling it before `job` is loaded is safe.
+  const sourceMeta = useSourceDisplay(job?.source);
+  const SourceIcon = sourceMeta.icon;
+
   // Restore search params when going back to listing page
   const backUrl = `/jobs?${searchParams.toString()}`;
 
@@ -224,8 +230,6 @@ export default function JobDetailPage() {
       : job.content;
   const isSaved = Boolean(savedStatus?.is_saved);
   const categoryText = formatJobCategory(job);
-  const sourceMeta = useSourceDisplay(job.source);
-  const SourceIcon = sourceMeta.icon;
 
   const handleToggleSaved = () => {
     if (isSaved) {
