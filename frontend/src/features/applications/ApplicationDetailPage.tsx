@@ -83,32 +83,32 @@ import {
 } from '@/utils/listState'
 
 const STATUS_ACTIONS: Record<ApplicationStatus, ApplicationStatusAction[]> = {
-  Pending: [],
-  Tailoring: [],
-  Ready: [{ label: 'Mark as Applied', nextStatus: 'Applied', variant: 'default' }],
-  Applied: [
-    { label: 'Move to Phone Screen', nextStatus: 'PhoneScreen', variant: 'default' },
-    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  PENDING: [],
+  TAILORING: [],
+  READY: [{ label: 'Mark as Applied', nextStatus: 'APPLIED', variant: 'default' }],
+  APPLIED: [
+    { label: 'Move to Phone Screen', nextStatus: 'PHONE_SCREEN', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'REJECTED', variant: 'outline' },
   ],
-  PhoneScreen: [
-    { label: 'Move to Interviewing', nextStatus: 'Interviewing', variant: 'default' },
-    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  PHONE_SCREEN: [
+    { label: 'Move to Interviewing', nextStatus: 'INTERVIEWING', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'REJECTED', variant: 'outline' },
   ],
-  Interviewing: [
-    { label: 'Mark Offer Received', nextStatus: 'Offer', variant: 'default' },
-    { label: 'Mark as Rejected', nextStatus: 'Rejected', variant: 'outline' },
+  INTERVIEWING: [
+    { label: 'Mark Offer Received', nextStatus: 'OFFER', variant: 'default' },
+    { label: 'Mark as Rejected', nextStatus: 'REJECTED', variant: 'outline' },
   ],
-  Offer: [],
-  Rejected: [],
-  Failed: [],
+  OFFER: [],
+  REJECTED: [],
+  FAILED: [],
 }
 
 const APPLIED_AND_AFTER_STATUSES: ApplicationStatus[] = [
-  'Applied',
-  'PhoneScreen',
-  'Interviewing',
-  'Offer',
-  'Rejected',
+  'APPLIED',
+  'PHONE_SCREEN',
+  'INTERVIEWING',
+  'OFFER',
+  'REJECTED',
 ]
 
 const APPLICATION_LIST_RETURN_INTENT_KEY = 'applications:list:return-intent'
@@ -466,14 +466,14 @@ export default function ApplicationDetailPage() {
   const canResolveApplication =
     isApplicationActive &&
     !APPLIED_AND_AFTER_STATUSES.includes(application.status) &&
-    !['Failed'].includes(application.status)
+    !['FAILED'].includes(application.status)
   const statusPresentation = getApplicationStatusPresentation(application.status)
   const primaryAction = statusActions[0] || null
   const secondaryStatusActions = primaryAction
     ? statusActions.filter((action) => action.nextStatus !== primaryAction.nextStatus)
     : statusActions
-  const retryVisible = ['Ready', 'Failed'].includes(application.status) && application.resolution === 'ACTIVE'
-  const isTailoring = application.status === 'Tailoring'
+  const retryVisible = ['READY', 'FAILED'].includes(application.status) && application.resolution === 'ACTIVE'
+  const isTailoring = application.status === 'TAILORING'
   const statusDescription = (() => {
     if (application.resolution === 'JOB_CLOSED') {
       return 'This application was stopped because the job was marked closed.'
@@ -486,23 +486,23 @@ export default function ApplicationDetailPage() {
     }
 
     switch (application.status) {
-      case 'Pending':
+      case 'PENDING':
         return 'Application created. Materials have not started generating yet.'
-      case 'Ready':
+      case 'READY':
         return 'Materials are ready. Review them, apply externally, then mark as applied.'
-      case 'Tailoring':
+      case 'TAILORING':
         return 'Resume and cover letter are being generated.'
-      case 'PhoneScreen':
+      case 'PHONE_SCREEN':
         return 'Phone screen in progress. Move forward when the next stage is confirmed.'
-      case 'Interviewing':
+      case 'INTERVIEWING':
         return 'Interview process in progress. Update the status after each outcome.'
-      case 'Offer':
+      case 'OFFER':
         return 'Offer received. Keep this application updated with your final decision.'
-      case 'Rejected':
+      case 'REJECTED':
         return 'Application closed as rejected.'
-      case 'Failed':
+      case 'FAILED':
         return 'Generation failed. Retry to regenerate the materials.'
-      case 'Applied':
+      case 'APPLIED':
         return 'Application submitted. Update the pipeline as responses come in.'
       default:
         return 'Review materials and continue here.'

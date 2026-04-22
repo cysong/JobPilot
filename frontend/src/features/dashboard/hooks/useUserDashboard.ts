@@ -50,9 +50,9 @@ const buildApplicationItem = (application: Application): DashboardApplicationIte
   let actionHref = detailHref
   let actionExternal = false
 
-  if (application.status === 'Failed') {
+  if (application.status === 'FAILED') {
     actionLabel = 'Review'
-  } else if (application.status === 'Pending' || application.status === 'Tailoring') {
+  } else if (application.status === 'PENDING' || application.status === 'TAILORING') {
     actionLabel = 'Check Progress'
   }
 
@@ -73,15 +73,15 @@ const buildApplicationItem = (application: Application): DashboardApplicationIte
 const getAttentionApplications = (applications: Application[]): DashboardApplicationItem[] => {
   const scoreApplication = (application: Application): number => {
     switch (application.status) {
-      case 'Ready':
+      case 'READY':
         return 500
-      case 'Failed':
+      case 'FAILED':
         return 400
-      case 'Tailoring':
+      case 'TAILORING':
         return 300
-      case 'Pending':
+      case 'PENDING':
         return 200
-      case 'Applied':
+      case 'APPLIED':
         return 100
       default:
         return 0
@@ -209,9 +209,9 @@ const buildApplicationActivity = (
         averageDaysToApply === null ? 'N/A' : `${averageDaysToApply.toFixed(1)}d`,
     },
     outcomes: {
-      phoneScreens: applications.filter((application) => application.status === 'PhoneScreen').length,
-      interviewing: applications.filter((application) => application.status === 'Interviewing').length,
-      offers: applications.filter((application) => application.status === 'Offer').length,
+      phoneScreens: applications.filter((application) => application.status === 'PHONE_SCREEN').length,
+      interviewing: applications.filter((application) => application.status === 'INTERVIEWING').length,
+      offers: applications.filter((application) => application.status === 'OFFER').length,
     },
   }
 }
@@ -292,7 +292,7 @@ const buildPriorityAction = ({
   matches: UserJobMatch[]
   resumeSummary: DashboardResumeSummary
 }): DashboardPriorityAction | null => {
-  const readyApplication = applications.find((application) => application.status === 'Ready')
+  const readyApplication = applications.find((application) => application.status === 'READY')
   if (readyApplication) {
     return {
       title: 'Review a ready application',
@@ -303,7 +303,7 @@ const buildPriorityAction = ({
     }
   }
 
-  const failedApplication = applications.find((application) => application.status === 'Failed')
+  const failedApplication = applications.find((application) => application.status === 'FAILED')
   if (failedApplication) {
     return {
       title: 'Review a failed generation',
@@ -315,7 +315,7 @@ const buildPriorityAction = ({
   }
 
   const inProgressApplication = applications.find(
-    (application) => application.status === 'Pending' || application.status === 'Tailoring'
+    (application) => application.status === 'PENDING' || application.status === 'TAILORING'
   )
   if (inProgressApplication) {
     return {

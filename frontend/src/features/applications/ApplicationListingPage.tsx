@@ -113,15 +113,15 @@ export default function ApplicationListingPage() {
                             <SelectItem value="all">All Statuses</SelectItem>
                             <SelectItem value="in_progress">In Progress</SelectItem>
                             <SelectSeparator />
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Tailoring">Tailoring</SelectItem>
-                            <SelectItem value="Ready">Ready</SelectItem>
-                            <SelectItem value="Applied">Applied</SelectItem>
-                            <SelectItem value="PhoneScreen">Phone Screen</SelectItem>
-                            <SelectItem value="Interviewing">Interviewing</SelectItem>
-                            <SelectItem value="Offer">Offer</SelectItem>
-                            <SelectItem value="Rejected">Rejected</SelectItem>
-                            <SelectItem value="Failed">Failed</SelectItem>
+                            <SelectItem value="PENDING">Pending</SelectItem>
+                            <SelectItem value="TAILORING">Tailoring</SelectItem>
+                            <SelectItem value="READY">Ready</SelectItem>
+                            <SelectItem value="APPLIED">Applied</SelectItem>
+                            <SelectItem value="PHONE_SCREEN">Phone Screen</SelectItem>
+                            <SelectItem value="INTERVIEWING">Interviewing</SelectItem>
+                            <SelectItem value="OFFER">Offer</SelectItem>
+                            <SelectItem value="REJECTED">Rejected</SelectItem>
+                            <SelectItem value="FAILED">Failed</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -239,7 +239,7 @@ export default function ApplicationListingPage() {
                                                 Error: {app.last_error}
                                                 </span>
                                             )}
-                                            {app.status === 'Failed' && app.resolution === 'ACTIVE' && (
+                                            {app.status === 'FAILED' && app.resolution === 'ACTIVE' && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"

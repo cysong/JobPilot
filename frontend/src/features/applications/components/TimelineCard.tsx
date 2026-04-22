@@ -27,19 +27,27 @@ function formatEntryTime(iso: string): string {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  PhoneScreen: 'Phone Screen',
+  PENDING: 'Pending',
+  TAILORING: 'Tailoring',
+  READY: 'Ready',
+  APPLIED: 'Applied',
+  PHONE_SCREEN: 'Phone Screen',
+  INTERVIEWING: 'Interviewing',
+  OFFER: 'Offer',
+  REJECTED: 'Rejected',
+  FAILED: 'Failed',
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  Pending: 'text-slate-500',
-  Tailoring: 'text-blue-500',
-  Ready: 'text-green-600',
-  Applied: 'text-indigo-600',
-  PhoneScreen: 'text-violet-600',
-  Interviewing: 'text-amber-600',
-  Offer: 'text-emerald-600',
-  Rejected: 'text-red-500',
-  Failed: 'text-red-600',
+  PENDING: 'text-slate-500',
+  TAILORING: 'text-blue-500',
+  READY: 'text-green-600',
+  APPLIED: 'text-indigo-600',
+  PHONE_SCREEN: 'text-violet-600',
+  INTERVIEWING: 'text-amber-600',
+  OFFER: 'text-emerald-600',
+  REJECTED: 'text-red-500',
+  FAILED: 'text-red-600',
 }
 
 // ── Single entry row ────────────────────────────────────────────────────────

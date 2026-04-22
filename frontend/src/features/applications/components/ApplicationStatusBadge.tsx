@@ -14,26 +14,24 @@ type ApplicationStatusPresentation = {
 };
 
 export function getApplicationStatusPresentation(status: ApplicationStatus): ApplicationStatusPresentation {
-    const normalized = status?.toLowerCase?.() || '';
-
-    switch (normalized) {
-        case 'pending':
+    switch (status) {
+        case 'PENDING':
             return { label: 'Pending', variant: 'secondary' };
-        case 'tailoring':
+        case 'TAILORING':
             return { label: 'Tailoring', variant: 'secondary', className: 'animate-pulse' };
-        case 'ready':
+        case 'READY':
             return { label: 'Ready', className: 'bg-green-500 hover:bg-green-600' };
-        case 'applied':
+        case 'APPLIED':
             return { label: 'Applied', variant: 'outline' };
-        case 'phonescreen':
+        case 'PHONE_SCREEN':
             return { label: 'Phone Screen', variant: 'outline' };
-        case 'interviewing':
+        case 'INTERVIEWING':
             return { label: 'Interviewing', variant: 'outline' };
-        case 'offer':
+        case 'OFFER':
             return { label: 'Offer', className: 'bg-amber-400 text-slate-900 hover:bg-amber-500' };
-        case 'rejected':
+        case 'REJECTED':
             return { label: 'Rejected', variant: 'secondary' };
-        case 'failed':
+        case 'FAILED':
             return { label: 'Failed', className: 'bg-red-500 text-white hover:bg-red-600' };
         default:
             return { label: status || 'Unknown', variant: 'secondary' };

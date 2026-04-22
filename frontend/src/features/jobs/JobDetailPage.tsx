@@ -477,14 +477,14 @@ export default function JobDetailPage() {
                         <div className="max-w-xs">
                           <p className="text-sm font-medium">Open application</p>
                         </div>
-                        {application.status === "Failed" &&
+                        {application.status === "FAILED" &&
                           application.last_error && (
                             <div className="max-w-xs">
                               <p className="font-semibold text-red-500">Error:</p>
                               <p className="text-sm">{application.last_error}</p>
                             </div>
                           )}
-                        {application.status === "Tailoring" && (
+                        {application.status === "TAILORING" && (
                           <div className="max-w-xs">
                             <p className="text-sm">
                               Customizing your resume and generating cover
@@ -492,14 +492,14 @@ export default function JobDetailPage() {
                             </p>
                           </div>
                         )}
-                        {application.status === "Pending" && (
+                        {application.status === "PENDING" && (
                           <div className="max-w-xs">
                             <p className="text-sm">
                               Waiting to start processing...
                             </p>
                           </div>
                         )}
-                        {application.status === "Ready" && (
+                        {application.status === "READY" && (
                           <div className="max-w-xs">
                             <p className="text-sm">
                               Application materials are ready!

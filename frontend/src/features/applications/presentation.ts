@@ -12,8 +12,8 @@ export const getApplicationMaterialState = (
   application: ApplicationMaterialSource,
   kind: ApplicationMaterialKind,
 ): ApplicationMaterialState => {
-  if (application.status === 'Tailoring') return 'Generating'
-  if (application.status === 'Failed') return 'Failed'
+  if (application.status === 'TAILORING') return 'Generating'
+  if (application.status === 'FAILED') return 'Failed'
 
   if (kind === 'resume') {
     return application.resume_document_id ? 'Ready' : 'Pending'
@@ -28,11 +28,11 @@ export const getApplicationMaterialEmptyMessage = (
 ): string => {
   const label = kind === 'resume' ? 'Resume' : 'Cover letter'
 
-  if (status === 'Failed') {
+  if (status === 'FAILED') {
     return `${label} generation failed. Use Retry Generation in Operations to try again.`
   }
 
-  if (status === 'Tailoring') {
+  if (status === 'TAILORING') {
     return kind === 'resume'
       ? 'Resume is currently being tailored for this application.'
       : 'Cover letter is currently being generated for this application.'

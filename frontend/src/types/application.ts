@@ -1,13 +1,13 @@
 export type ApplicationStatus =
-    | 'Pending'
-    | 'Tailoring'
-    | 'Ready'
-    | 'Applied'
-    | 'PhoneScreen'
-    | 'Interviewing'
-    | 'Offer'
-    | 'Rejected'
-    | 'Failed';
+    | 'PENDING'
+    | 'TAILORING'
+    | 'READY'
+    | 'APPLIED'
+    | 'PHONE_SCREEN'
+    | 'INTERVIEWING'
+    | 'OFFER'
+    | 'REJECTED'
+    | 'FAILED';
 
 export type ApplicationResolution =
     | 'ACTIVE'
