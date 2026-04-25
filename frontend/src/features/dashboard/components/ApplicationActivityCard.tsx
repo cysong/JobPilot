@@ -161,7 +161,7 @@ export function ApplicationActivityCard({
           </div>
 
           <div className="mt-5 h-64 rounded-2xl border border-slate-200/80 bg-white/85 px-2 py-3 sm:h-72 sm:px-4">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={data.points}
                 margin={{ top: 12, right: 8, bottom: 6, left: -20 }}

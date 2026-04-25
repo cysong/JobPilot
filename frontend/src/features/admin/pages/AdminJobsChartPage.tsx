@@ -447,7 +447,7 @@ export default function AdminJobsChartPage() {
           {!trendQuery.isLoading && !trendQuery.isError && data && series.length > 0 && (
             <div className="space-y-4">
               <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <LineChart
                     data={chartData}
                     margin={{ top: 12, right: 20, bottom: 6, left: 0 }}
@@ -593,7 +593,7 @@ export default function AdminJobsChartPage() {
           {!scatterQuery.isLoading && !scatterQuery.isError && scatterData && scatterPoints.length > 0 && (
             <div className="space-y-4">
               <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <ScatterChart margin={{ top: 12, right: 20, bottom: 6, left: 0 }}>
                     <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                     <XAxis
