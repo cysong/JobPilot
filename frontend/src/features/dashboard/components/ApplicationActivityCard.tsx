@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DashboardApplicationActivity } from '@/features/dashboard/types'
+import { useChartReady } from '@/lib/useChartReady'
 
 interface ApplicationActivityCardProps {
   data: DashboardApplicationActivity
@@ -94,6 +95,8 @@ export function ApplicationActivityCard({
   isLoading,
   hasError,
 }: ApplicationActivityCardProps) {
+  const [chartRef, chartReady] = useChartReady<HTMLDivElement>()
+
   if (isLoading) {
     return <Skeleton className="h-[34rem] w-full rounded-3xl" />
   }
@@ -160,8 +163,12 @@ export function ApplicationActivityCard({
             <div className="text-xs text-slate-500">Hover bars to compare daily volume.</div>
           </div>
 
-          <div className="mt-5 h-64 rounded-2xl border border-slate-200/80 bg-white/85 px-2 py-3 sm:h-72 sm:px-4">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <div
+            ref={chartRef}
+            className="mt-5 h-64 rounded-2xl border border-slate-200/80 bg-white/85 px-2 py-3 sm:h-72 sm:px-4"
+          >
+            {chartReady && (
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.points}
                 margin={{ top: 12, right: 8, bottom: 6, left: -20 }}
@@ -220,6 +227,7 @@ export function ApplicationActivityCard({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </div>
         </div>
 

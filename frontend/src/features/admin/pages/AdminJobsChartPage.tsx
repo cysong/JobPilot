@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useChartReady } from '@/lib/useChartReady'
 import { getSourceMetaByKey, useSourceMetaStore } from '@/store/sourceMetaStore'
 import { useJobsDailyTrend } from '../hooks/useJobsDailyTrend'
 import { useJobsTimeScatter } from '../hooks/useJobsTimeScatter'
@@ -250,6 +251,8 @@ export default function AdminJobsChartPage() {
   const data = trendQuery.data
   const scatterData = scatterQuery.data
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({})
+  const [trendChartRef, trendChartReady] = useChartReady<HTMLDivElement>()
+  const [scatterChartRef, scatterChartReady] = useChartReady<HTMLDivElement>()
 
   // Subscribe to the source-meta store so chart colors re-render once the
   // async fetch resolves (pickSeriesColor reads brand_color synchronously).
@@ -446,8 +449,12 @@ export default function AdminJobsChartPage() {
           )}
           {!trendQuery.isLoading && !trendQuery.isError && data && series.length > 0 && (
             <div className="space-y-4">
-              <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <div
+                ref={trendChartRef}
+                className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4"
+              >
+                {trendChartReady && (
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
                     margin={{ top: 12, right: 20, bottom: 6, left: 0 }}
@@ -517,6 +524,7 @@ export default function AdminJobsChartPage() {
                     })}
                   </LineChart>
                 </ResponsiveContainer>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -592,8 +600,12 @@ export default function AdminJobsChartPage() {
           )}
           {!scatterQuery.isLoading && !scatterQuery.isError && scatterData && scatterPoints.length > 0 && (
             <div className="space-y-4">
-              <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <div
+                ref={scatterChartRef}
+                className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4"
+              >
+                {scatterChartReady && (
+                <ResponsiveContainer width="100%" height="100%">
                   <ScatterChart margin={{ top: 12, right: 20, bottom: 6, left: 0 }}>
                     <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                     <XAxis
@@ -671,6 +683,7 @@ export default function AdminJobsChartPage() {
                     ))}
                   </ScatterChart>
                 </ResponsiveContainer>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">

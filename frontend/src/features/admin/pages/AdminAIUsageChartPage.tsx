@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useChartReady } from '@/lib/useChartReady'
 import { useAICostDailyTrend } from '../hooks/useAICostDailyTrend'
 import { useAITokensDailyTrend } from '../hooks/useAITokensDailyTrend'
 import type { AIUsageDailyTrendResponse, AIUsageDailyTrendSeries } from '../types'
@@ -153,6 +154,7 @@ function AITrendCard({
   const series = data?.series ?? []
   const chartData = useMemo(() => buildChartData(series), [series])
   const modelColorNames = useMemo(() => [...(data?.models ?? [])].sort(), [data?.models])
+  const [chartRef, chartReady] = useChartReady<HTMLDivElement>()
 
   return (
     <Card id={id} className="scroll-mt-24 border-slate-200 shadow-sm">
@@ -176,8 +178,12 @@ function AITrendCard({
         {!isLoading && (!data || series.length === 0) && <ChartStateBox message="No data." />}
         {!isLoading && data && series.length > 0 && (
           <div className="space-y-4">
-            <div className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <div
+              ref={chartRef}
+              className="h-[24rem] rounded-2xl border border-slate-200 bg-slate-50/70 p-2 sm:p-4"
+            >
+              {chartReady && (
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 12, right: 20, bottom: 6, left: 0 }}>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis
@@ -214,6 +220,7 @@ function AITrendCard({
                   })}
                 </LineChart>
               </ResponsiveContainer>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
