@@ -5,7 +5,7 @@ from app.core.custom_route import CustomAPIRoute
 
 # Import module routers
 from app.modules.admin.router import router as admin_router
-from app.modules.api_keys.router import router as api_keys_router
+from app.modules.auth.api_key_router import router as api_keys_router
 from app.modules.auth.router import router as auth_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.resumes.router import router as resumes_router

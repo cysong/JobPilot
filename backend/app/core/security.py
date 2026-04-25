@@ -73,8 +73,7 @@ async def _resolve_jwt_user(db: AsyncSession, token: str):
 
 async def _resolve_api_key_user(db: AsyncSession, token: str):
     """Resolve a User from an API key bearer token."""
-    from app.modules.api_keys.service import verify_api_key
-    from app.modules.auth.service import get_user_by_id
+    from app.modules.auth.service import get_user_by_id, verify_api_key
 
     record = await verify_api_key(db, token)
     user = await get_user_by_id(db, user_id=record.user_id)
@@ -84,7 +83,7 @@ async def _resolve_api_key_user(db: AsyncSession, token: str):
 
 
 def _is_api_key(token: str) -> bool:
-    from app.modules.api_keys.models import API_KEY_PREFIX
+    from app.modules.auth.models import API_KEY_PREFIX
 
     return token.startswith(API_KEY_PREFIX)
 

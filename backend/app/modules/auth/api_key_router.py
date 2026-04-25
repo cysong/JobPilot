@@ -1,4 +1,4 @@
-"""API key management endpoints."""
+"""API key management endpoints (lives under the auth module)."""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import require_jwt_only
-from app.modules.api_keys import service
-from app.modules.api_keys.schemas import (
+from app.modules.auth import service
+from app.modules.auth.models import User
+from app.modules.auth.schemas import (
     ApiKeyCreate,
     ApiKeyCreatedResponse,
     ApiKeyResponse,
 )
-from app.modules.auth.models import User
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
 
