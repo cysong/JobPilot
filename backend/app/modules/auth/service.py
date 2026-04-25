@@ -1,11 +1,14 @@
 """Authentication and account-security service layer."""
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import select
+from fastapi_cache import FastAPICache
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -288,8 +291,63 @@ async def revoke_api_key(db: AsyncSession, *, user_id: int, key_id: str) -> None
     await db.commit()
 
 
+# Throttle window for last_used_at writes. UI shows relative time ("2h ago"),
+# so minute-grain accuracy is plenty.
+_API_KEY_LAST_USED_THROTTLE_SECONDS = 60
+_API_KEY_LAST_USED_REDIS_KEY = "jobpilot:api_key_last_used:"
+
+# Per-process fallback when Redis is unreachable. Bounded to avoid unbounded
+# growth from forgotten or revoked keys still cached in memory.
+_API_KEY_LAST_USED_LOCAL_CAP = 10_000
+_api_key_last_used_local: dict[str, datetime] = {}
+_api_key_last_used_lock = Lock()
+_logger = logging.getLogger(__name__)
+
+
+async def _should_persist_api_key_last_used(api_key_id: str) -> bool:
+    """Return True if last_used_at should be flushed to the DB right now.
+
+    Redis SET NX EX gives a single-roundtrip cross-process throttle; if Redis
+    is unreachable, fall back to a per-process bounded map so we still skip
+    redundant writes within one worker.
+    """
+    try:
+        redis = FastAPICache.get_backend().redis  # type: ignore[attr-defined]
+        won = await redis.set(
+            f"{_API_KEY_LAST_USED_REDIS_KEY}{api_key_id}",
+            b"1",
+            nx=True,
+            ex=_API_KEY_LAST_USED_THROTTLE_SECONDS,
+        )
+        return bool(won)
+    except Exception as exc:
+        _logger.debug("api_key last_used redis throttle unavailable: %s", exc)
+        return _local_should_persist_api_key_last_used(api_key_id)
+
+
+def _local_should_persist_api_key_last_used(api_key_id: str) -> bool:
+    now = datetime.now(timezone.utc)
+    with _api_key_last_used_lock:
+        previous = _api_key_last_used_local.get(api_key_id)
+        if previous and (now - previous).total_seconds() < _API_KEY_LAST_USED_THROTTLE_SECONDS:
+            return False
+        if (
+            len(_api_key_last_used_local) >= _API_KEY_LAST_USED_LOCAL_CAP
+            and api_key_id not in _api_key_last_used_local
+        ):
+            oldest_key = min(_api_key_last_used_local, key=_api_key_last_used_local.get)
+            _api_key_last_used_local.pop(oldest_key, None)
+        _api_key_last_used_local[api_key_id] = now
+        return True
+
+
 async def verify_api_key(db: AsyncSession, plaintext: str) -> ApiKey:
-    """Validate an API key and update last_used_at. Raises UnauthorizedError on any failure."""
+    """Validate an API key. Raises UnauthorizedError on any failure.
+
+    last_used_at is throttled (see _should_persist_api_key_last_used) so a
+    single key under sustained load only writes the column at most once per
+    minute across the whole fleet.
+    """
     if not plaintext.startswith(API_KEY_PREFIX):
         raise UnauthorizedError("Invalid credentials")
 
@@ -310,6 +368,10 @@ async def verify_api_key(db: AsyncSession, plaintext: str) -> ApiKey:
     ):
         raise UnauthorizedError("Invalid credentials")
 
-    record.last_used_at = now
-    await db.commit()
+    if await _should_persist_api_key_last_used(record.id):
+        await db.execute(
+            update(ApiKey).where(ApiKey.id == record.id).values(last_used_at=now)
+        )
+        await db.commit()
+
     return record
