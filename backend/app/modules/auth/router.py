@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenError, UnauthorizedError
-from app.core.security import create_access_token, get_current_user
+from app.core.security import create_access_token, get_current_user, require_jwt_only
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     ChangeEmailRequest,
@@ -97,7 +97,7 @@ async def verify_email_route(
 @router.post("/resend-verification-email", response_model=MessageResponse)
 async def resend_verification_email_route(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_jwt_only),
 ):
     """Re-send the email verification message."""
     await resend_verification_email(db, current_user)
@@ -110,7 +110,7 @@ async def resend_verification_email_route(
 async def change_password_route(
     payload: ChangePasswordRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_jwt_only),
 ):
     """Change password for the authenticated user."""
     await change_password(db, current_user, payload)
@@ -121,7 +121,7 @@ async def change_password_route(
 async def change_email_request_route(
     payload: ChangeEmailRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_jwt_only),
 ):
     """Request a change of the current email address."""
     await request_email_change(db, current_user, payload)
