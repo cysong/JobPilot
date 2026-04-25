@@ -15,6 +15,7 @@ import SettingsLayout from '@/features/settings/SettingsLayout'
 import SettingsProfilePage from '@/features/settings/ProfilePage'
 import SettingsAccountPage from '@/features/settings/AccountPage'
 import SettingsJobPreferencesPage from '@/features/settings/JobPreferencesPage'
+import SettingsApiKeysPage from '@/features/settings/ApiKeysPage'
 import UserDashboardPage from '@/features/dashboard/UserDashboardPage'
 import JobListingPage from '@/features/jobs/JobListingPage'
 import JobDetailPage from '@/features/jobs/JobDetailPage'
@@ -75,6 +76,7 @@ function App() {
               <Route index element={<Navigate to="profile" replace />} />
               <Route path="profile" element={<SettingsProfilePage />} />
               <Route path="account" element={<SettingsAccountPage />} />
+              <Route path="api-keys" element={<SettingsApiKeysPage />} />
               <Route path="preferences" element={<SettingsJobPreferencesPage />} />
               <Route path="security" element={<Navigate to="../account" replace />} />
             </Route>

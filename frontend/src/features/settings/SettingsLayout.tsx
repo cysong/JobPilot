@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Briefcase, KeyRound, UserRound } from 'lucide-react'
+import { Briefcase, Key, KeyRound, UserRound } from 'lucide-react'
 
 const navItems = [
   { to: '/settings/profile', label: 'Profile', icon: UserRound },
   { to: '/settings/account', label: 'Account', icon: KeyRound },
+  { to: '/settings/api-keys', label: 'API Keys', icon: Key },
   { to: '/settings/preferences', label: 'Job Preferences', icon: Briefcase },
 ] as const
 
