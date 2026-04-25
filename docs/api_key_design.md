@@ -97,13 +97,12 @@ async def require_jwt_only(credentials, db):
 |---|---|---|
 | `auth/router.py` | `POST /auth/change-password` | 改密码 |
 | `auth/router.py` | `POST /auth/change-email/request` | 改邮箱 = 接管账户 |
-| `auth/router.py` | `POST /auth/change-email/confirm` | 同上 |
 | `auth/router.py` | `POST /auth/resend-verification-email` | 防被借用作邮件骚扰 |
 | `users/profile_router.py` | `PATCH /users/profile` | 改姓名/头像（身份字段） |
 | `api_keys/router.py` | 全部 3 个端点 | 防 key 自我繁殖与撤销绕过 |
 | `admin/dependencies.py::require_admin` | 所有挂 admin 链路 | 管理员能力不能用 API key 触发 |
 
-> `forgot-password` / `reset-password` / `verify-email` / `register` / `login` 不依赖认证，无需处理。
+> `forgot-password` / `reset-password` / `verify-email` / `change-email/confirm` / `register` / `login` 不依赖 `Authorization` header（用一次性 token 或纯凭证），天然不会被 API key 滥用，无需处理。
 > `GET /auth/me` 可放行（信息无害）。
 
 ## 6. 管理端点
