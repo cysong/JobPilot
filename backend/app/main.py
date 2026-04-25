@@ -51,6 +51,9 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+    # Disable trailing-slash redirects: 307 responses drop Authorization
+    # headers in most HTTP clients, breaking API key callers.
+    redirect_slashes=False,
 )
 
 # Apply custom route class globally (includes health endpoint)

@@ -146,7 +146,7 @@ async def get_my_match_detail(
     )
 
 
-@router.get("/", response_model=JobListResponse)
+@router.get("", response_model=JobListResponse)
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],

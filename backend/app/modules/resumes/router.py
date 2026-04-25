@@ -32,7 +32,7 @@ from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
 
-@router.post("/", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
 async def create_resume(
     resume_data: ResumeCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -56,7 +56,7 @@ async def get_resume_for_edit(
     return doc
 
 
-@router.get("/", response_model=ResumeListResponse)
+@router.get("", response_model=ResumeListResponse)
 async def list_resumes(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],

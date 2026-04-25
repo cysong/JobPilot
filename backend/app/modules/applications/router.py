@@ -32,7 +32,7 @@ from app.shared.enums import ApplicationResolution, ApplicationStatus
 router = APIRouter(prefix="/applications", tags=["applications"])
 
 
-@router.get("/", response_model=ApplicationListResponse)
+@router.get("", response_model=ApplicationListResponse)
 async def list_applications(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -57,7 +57,7 @@ async def list_applications(
     )
 
 
-@router.post("/", response_model=ApplicationDetail, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApplicationDetail, status_code=status.HTTP_201_CREATED)
 async def create_application(
     payload: ApplicationCreateRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
