@@ -29,3 +29,39 @@ sources:
     brand_color: "#27AE60"
     external_apply: true
     enabled: true
+
+  - key: glassdoor
+    label: Glassdoor
+    brand_color: "#0CAA41"
+    external_apply: true
+    enabled: true
+
+  - key: workable
+    label: Workable
+    brand_color: "#5462E2"
+    external_apply: true
+    enabled: true
+
+  - key: smartrecruiters
+    label: SmartRecruiters
+    brand_color: "#0093D0"
+    external_apply: true
+    enabled: true
+
+  - key: successfactors_csb
+    label: SuccessFactors CSB
+    brand_color: "#0FAAFF"
+    external_apply: true
+    enabled: true
+
+  - key: pageup_jobtools
+    label: PageUp JobTools
+    brand_color: "#3090E8"
+    external_apply: true
+    enabled: true
+
+  - key: workday
+    label: Workday
+    brand_color: "#F38B00"
+    external_apply: true
+    enabled: true
