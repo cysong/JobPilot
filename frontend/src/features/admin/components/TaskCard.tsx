@@ -14,7 +14,9 @@ interface TaskCardProps {
 }
 
 function formatElapsedDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const safeMs = Math.max(0, Math.round(ms))
+  if (safeMs < 1000) return `${safeMs}ms`
+  const totalSeconds = Math.floor(safeMs / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
