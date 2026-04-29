@@ -441,7 +441,11 @@ class ApplicationService:
         db: AsyncSession, user: User, payload: ApplicationCreateRequest
     ) -> Application:
         """Create application, working resume copy, and trigger sequential workflow."""
-        if not await JobRepository.exists(db, payload.job_id):
+        # Load brief job row (no `content`, no JobAnalysis) — we need the
+        # instance later to attach to `application.job` and avoid a lazy-load
+        # during response serialization.
+        job = await JobRepository.get_brief(db, payload.job_id)
+        if job is None:
             raise NotFoundError("Job not found")
 
         resume_template = await ResumeService.get_resume_by_id(
