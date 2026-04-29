@@ -1,20 +1,36 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * Returns `[ref, ready]`. `ready` flips to true once the observed element has
  * non-zero width and height. Use it to gate <ResponsiveContainer> so recharts
  * never sees a 0×0 parent on first mount — that's what triggers the
  * "width(-1) and height(-1)" console warning.
+ *
+ * Uses a callback ref so the observer is attached the moment the element
+ * mounts, even if the element is rendered conditionally after the hook
+ * itself has already mounted (e.g. behind an isLoading early return).
  */
-export function useChartReady<T extends HTMLElement>(): [RefObject<T | null>, boolean] {
-  const ref = useRef<T>(null)
+export function useChartReady<T extends HTMLElement>(): [
+  (node: T | null) => void,
+  boolean,
+] {
   const [ready, setReady] = useState(false)
+  const observerRef = useRef<ResizeObserver | null>(null)
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
+    return () => {
+      observerRef.current?.disconnect()
+      observerRef.current = null
+    }
+  }, [])
 
-    if (el.clientWidth > 0 && el.clientHeight > 0) {
+  const refCallback = useCallback((node: T | null) => {
+    observerRef.current?.disconnect()
+    observerRef.current = null
+
+    if (!node) return
+
+    if (node.clientWidth > 0 && node.clientHeight > 0) {
       setReady(true)
       return
     }
@@ -24,11 +40,12 @@ export function useChartReady<T extends HTMLElement>(): [RefObject<T | null>, bo
       if (width > 0 && height > 0) {
         setReady(true)
         ro.disconnect()
+        observerRef.current = null
       }
     })
-    ro.observe(el)
-    return () => ro.disconnect()
+    ro.observe(node)
+    observerRef.current = ro
   }, [])
 
-  return [ref, ready]
+  return [refCallback, ready]
 }
