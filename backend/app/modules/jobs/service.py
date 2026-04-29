@@ -219,13 +219,14 @@ class JobService:
         Returns:
             JobFiltersOptions with available values
         """
-        # Get distinct location cities
+        # Get distinct location cities (NZ only)
         cities_query = (
             select(distinct(SeekJob.location_city))
             .where(
                 and_(
                     SeekJob.location_city.isnot(None),
                     SeekJob.location_city != "",
+                    SeekJob.country_code == "NZ",
                 )
             )
             .order_by(SeekJob.location_city)
