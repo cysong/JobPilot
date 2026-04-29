@@ -99,12 +99,16 @@ class JobService:
             ]
             query = query.where(or_(*work_type_conditions))
 
-        # Apply company filter
+        # Apply company filter (case-insensitive: dropdown shows a casefold-
+        # deduped option per company, so the list query must match all case
+        # variants too — otherwise selecting "fuel50" misses rows stored as
+        # "Fuel50" from another scraper).
         if filters.companies:
+            normalized_companies = [c.lower() for c in filters.companies]
             query = query.where(
                 or_(
-                    SeekJob.advertiser_name.in_(filters.companies),
-                    SeekJob.company_name.in_(filters.companies)
+                    func.lower(SeekJob.advertiser_name).in_(normalized_companies),
+                    func.lower(SeekJob.company_name).in_(normalized_companies),
                 )
             )
 
