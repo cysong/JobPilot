@@ -18,6 +18,11 @@ export function useTasks(params: TaskQueryParams) {
     queryKey: ['admin', 'tasks', params],
     queryFn: () => adminApi.getTasks(params),
     placeholderData: keepPreviousData,
-    refetchInterval: 10 * 1000,
+    // Refresh every 30s while the admin tab is in the foreground; pause
+    // when the tab is hidden; force-refresh as soon as the user comes back.
+    // (Overrides the global refetchOnWindowFocus:false in App.tsx.)
+    refetchInterval: 30 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   })
 }
