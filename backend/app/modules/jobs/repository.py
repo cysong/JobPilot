@@ -188,6 +188,10 @@ class JobRepository:
         """
         Get jobs that have no Job Analysis task record.
 
+        Returns SeekJob ORM instances loaded with only ``id`` populated — the
+        sole field consumed by the only caller (``poll_unanalyzed_jobs``).
+        Adding more reads on the result requires extending ``load_only`` here.
+
         Args:
             db: Database session
             limit: Maximum number of jobs to return
@@ -197,6 +201,7 @@ class JobRepository:
         """
         result = await db.execute(
             select(SeekJob)
+            .options(load_only(SeekJob.id))
             .outerjoin(
                 TaskExecution,
                 and_(
@@ -286,6 +291,11 @@ class JobAnalysisRepository:
         """
         Get job analyses marked for re-analysis.
 
+        Returns instances loaded with only ``id`` / ``job_id`` /
+        ``needs_reanalysis`` — the fields read or written by the sole
+        caller (``poll_unanalyzed_jobs``: reads job_id, clears the flag).
+        Adding more reads on the result requires extending ``load_only``.
+
         Args:
             db: Database session
             limit: Maximum number of records to return
@@ -295,6 +305,13 @@ class JobAnalysisRepository:
         """
         result = await db.execute(
             select(JobAnalysis)
+            .options(
+                load_only(
+                    JobAnalysis.id,
+                    JobAnalysis.job_id,
+                    JobAnalysis.needs_reanalysis,
+                )
+            )
             .where(JobAnalysis.needs_reanalysis.is_(True))
             .order_by(JobAnalysis.updated_at.asc())
             .limit(limit)
@@ -308,9 +325,16 @@ class JobAnalysisRepository:
         since: datetime.datetime,
         limit: int = 500
     ) -> list[JobAnalysis]:
-        """Get job analyses updated since a timestamp."""
+        """Get job analyses updated since a timestamp.
+
+        Returns instances loaded with only ``id`` / ``job_id`` — the sole
+        caller (``pull_unmatched_jobs``) only references those for queue
+        dispatch. ``get_recent_job_analyses`` is a thin wrapper with no
+        live callers. Adding more reads requires extending ``load_only``.
+        """
         result = await db.execute(
             select(JobAnalysis)
+            .options(load_only(JobAnalysis.id, JobAnalysis.job_id))
             .where(JobAnalysis.updated_at >= since)
             .order_by(JobAnalysis.updated_at.desc())
             .limit(limit)

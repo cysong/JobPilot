@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.modules.jobs.models import JobAnalysis, SeekJob
 from app.modules.jobs.repository import JobAnalysisRepository
@@ -170,10 +171,27 @@ async def get_recent_job_analyses(db: AsyncSession, *, hours: int = 24) -> list[
 
 
 async def get_recent_jobs_with_analysis(db: AsyncSession, *, days: int = 30) -> list[JobAnalysis]:
-    """Jobs listed in last N days that already have analysis."""
+    """Jobs listed in last N days that already have analysis.
+
+    Returns instances loaded with only the columns consumed by the sole
+    caller (``_match_user`` in matching/tasks.py): ``job_id``,
+    ``normalized_job_title``, and the three skill JSON fields fed into
+    ``calculate_skill_match_score``. Adding more reads downstream
+    requires extending ``load_only`` here.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     stmt = (
         select(JobAnalysis)
+        .options(
+            load_only(
+                JobAnalysis.id,
+                JobAnalysis.job_id,
+                JobAnalysis.normalized_job_title,
+                JobAnalysis.required_skills,
+                JobAnalysis.preferred_skills,
+                JobAnalysis.soft_skills,
+            )
+        )
         .join(SeekJob, SeekJob.id == JobAnalysis.job_id)
         .where(SeekJob.listed_at >= cutoff)
         .order_by(JobAnalysis.updated_at.desc())
