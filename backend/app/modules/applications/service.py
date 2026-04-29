@@ -15,6 +15,7 @@ from app.modules.applications.repositories.application_repo import ApplicationRe
 from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
 from app.modules.applications.schemas import ApplicationCreateRequest, ApplicationRetryRequest
 from app.modules.auth.models import User
+from app.modules.jobs.repository import JobRepository
 from app.modules.jobs.service import JobService
 from app.modules.resumes.models import Document, Resume
 from app.modules.resumes.repository import DocumentRepository
@@ -440,8 +441,7 @@ class ApplicationService:
         db: AsyncSession, user: User, payload: ApplicationCreateRequest
     ) -> Application:
         """Create application, working resume copy, and trigger sequential workflow."""
-        job = await JobService.get_job_by_id(db, payload.job_id)
-        if not job:
+        if not await JobRepository.exists(db, payload.job_id):
             raise NotFoundError("Job not found")
 
         resume_template = await ResumeService.get_resume_by_id(

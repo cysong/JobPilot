@@ -11,6 +11,7 @@ from uuid import uuid4
 from celery import chain
 from sqlalchemy import and_, or_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.core.config import settings
 from app.core.exceptions import BadRequestError, JobPilotException, NotFoundError
@@ -413,7 +414,18 @@ class TaskService:
         base_query = select(TaskExecution).where(and_(*filters)) if filters else select(TaskExecution)
         total = await db.scalar(select(func.count()).select_from(base_query.subquery()))
 
-        stmt = base_query.order_by(TaskExecution.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+        # The list endpoint is polled frequently by the admin task-monitor
+        # page. ``input_data`` / ``output_data`` are JSON columns that can be
+        # large and are NOT surfaced by ``TaskListItem`` — defer them so they
+        # don't ride along on every poll. The detail endpoint loads the full
+        # row separately.
+        stmt = (
+            base_query
+            .options(defer(TaskExecution.input_data), defer(TaskExecution.output_data))
+            .order_by(TaskExecution.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         rows = (await db.execute(stmt)).scalars().all()
         task_ids = [t.id for t in rows]
 
@@ -747,18 +759,4 @@ class TaskService:
             if today_failure_rate > failure_rate + 2:
                 trend = "up"
             elif today_failure_rate < failure_rate - 2:
-                trend = "down"
-
-            items.append(
-                TaskTypeStats(
-                    task_type=task_type_key,
-                    avg_duration_ms=row.avg_duration,
-                    failure_rate_pct=failure_rate,
-                    today_failure_rate_pct=today_failure_rate,
-                    trend=trend,
-                    daily_cost=cost_map.get(task_type_key, 0.0),
-                    total_count=total_count,
-                )
-            )
-
-        return TaskStatisticsResponse(task_type_stats=items)
+                trend 

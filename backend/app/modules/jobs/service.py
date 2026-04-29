@@ -6,10 +6,15 @@ from typing import Optional
 
 from sqlalchemy import select, func, or_, and_, distinct, exists
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from app.modules.jobs.models import SeekJob, UserJobView
-from app.modules.jobs.repository import JobRepository, SavedJobRepository, UserJobViewRepository
+from app.modules.jobs.repository import (
+    _BRIEF_COLUMNS,
+    JobRepository,
+    SavedJobRepository,
+    UserJobViewRepository,
+)
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.jobs.schemas import (
@@ -58,10 +63,17 @@ class JobService:
             )
         ).label("has_application")
 
-        # Base query
-        query = select(SeekJob, has_application_expr)
+        # Base query — list responses materialize JobBase, which never reads
+        # ``content``. Apply load_only so the heavy column doesn't ride along.
+        query = (
+            select(SeekJob, has_application_expr)
+            .options(load_only(*_BRIEF_COLUMNS))
+        )
 
-        # Apply keyword search (title + abstract + content + company names)
+        # Apply keyword search (title + abstract + content + company names).
+        # The ilike on content stays in the WHERE clause for behavior parity
+        # — load_only above only narrows the SELECT column list, it doesn't
+        # affect what columns the filter can reference.
         if filters.keyword:
             search_pattern = f"%{filters.keyword}%"
             query = query.where(
@@ -383,14 +395,17 @@ class JobService:
         Returns:
             List of similar SeekJob instances
         """
-        # First, get the current job to know company and classification
-        current_job = await JobService.get_job_by_id(db, job_id)
+        # Only need company_name / advertiser_name / classification on the
+        # current job; use the brief loader to avoid pulling content/analysis.
+        current_job = await JobRepository.get_brief(db, job_id)
         if not current_job:
             return []
 
-        # Build query for similar jobs
+        # Similar-jobs result feeds JobBase on the frontend, so brief columns
+        # are sufficient — apply load_only here too.
         query = (
             select(SeekJob)
+            .options(load_only(*_BRIEF_COLUMNS))
             .where(
                 and_(
                     SeekJob.id != job_id,  # Exclude current job
@@ -415,8 +430,7 @@ class JobService:
         user: User,
         job_id: int,
     ) -> SavedJobStatus:
-        job = await JobRepository.get_by_id(db, job_id)
-        if not job:
+        if not await JobRepository.exists(db, job_id):
             raise NotFoundError("Job not found")
 
         saved = await SavedJobRepository.get_by_user_and_job(db, user.id, job_id)
@@ -431,8 +445,7 @@ class JobService:
         user: User,
         job_id: int,
     ) -> JobViewedStatus:
-        job = await JobRepository.get_by_id(db, job_id)
-        if not job:
+        if not await JobRepository.exists(db, job_id):
             raise NotFoundError("Job not found")
 
         viewed = await UserJobViewRepository.get_by_user_and_job(db, user.id, job_id)
@@ -457,8 +470,7 @@ class JobService:
         user: User,
         job_id: int,
     ) -> JobViewedStatus:
-        job = await JobRepository.get_by_id(db, job_id)
-        if not job:
+        if not await JobRepository.exists(db, job_id):
             raise NotFoundError("Job not found")
 
         viewed = await UserJobViewRepository.mark_viewed(db, user.id, job_id)
@@ -476,8 +488,7 @@ class JobService:
         user: User,
         job_id: int,
     ) -> SavedJobStatus:
-        job = await JobRepository.get_by_id(db, job_id)
-        if not job:
+        if not await JobRepository.exists(db, job_id):
             raise NotFoundError("Job not found")
 
         saved = await SavedJobRepository.get_by_user_and_job(db, user.id, job_id)
@@ -493,8 +504,7 @@ class JobService:
         user: User,
         job_id: int,
     ) -> SavedJobStatus:
-        job = await JobRepository.get_by_id(db, job_id)
-        if not job:
+        if not await JobRepository.exists(db, job_id):
             raise NotFoundError("Job not found")
 
         deleted = await SavedJobRepository.delete_by_user_and_job(db, user.id, job_id)
@@ -563,21 +573,4 @@ class JobService:
             job.manual_expired = True
             job.manual_expired_by = user.id
             job.manual_expired_at = datetime.now(timezone.utc)
-            job.manual_expired_note = note
-        else:
-            job.manual_expired = False
-            job.manual_expired_by = None
-            job.manual_expired_at = None
-            job.manual_expired_note = None
-
-        await db.commit()
-        await db.refresh(job)
-
-        return JobExpirationStatus(
-            job_id=job.id,
-            is_expired=job.effective_is_expired,
-            manual_expired=bool(job.manual_expired),
-            manual_expired_by=job.manual_expired_by,
-            manual_expired_at=job.manual_expired_at,
-            manual_expired_note=job.manual_expired_note,
-        )
+            job.manual_expired_note 

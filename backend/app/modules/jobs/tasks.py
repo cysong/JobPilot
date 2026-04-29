@@ -27,7 +27,9 @@ async def analyze_job_task(
     task_id: str,
 ) -> dict:
     """Analyze a job using job_analyzer agent."""
-    job = await JobRepository.get_by_id(self.db, job_id)
+    # Only `content` and `abstract` are needed; skip the full row + analysis
+    # relationship that ``get_by_id`` would pull in.
+    job = await JobRepository.get_content(self.db, job_id)
     if not job:
         raise ValueError(f"Job {job_id} not found")
 

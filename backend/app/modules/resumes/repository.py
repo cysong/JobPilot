@@ -87,6 +87,22 @@ class ResumeRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_ids_map(
+        db: AsyncSession,
+        resume_ids: list[str],
+    ) -> dict[str, Resume]:
+        """Batch fetch resumes by id, returns ``{resume_id: Resume}``.
+
+        Use this to avoid N+1 queries when materializing a match list.
+        """
+        if not resume_ids:
+            return {}
+        result = await db.execute(
+            select(Resume).where(Resume.id.in_(resume_ids))
+        )
+        return {resume.id: resume for resume in result.scalars().all()}
+
+    @staticmethod
     async def get_with_document(db: AsyncSession, resume_id: str) -> Optional[Resume]:
         """Fetch resume with its linked document eager-loaded."""
         result = await db.execute(

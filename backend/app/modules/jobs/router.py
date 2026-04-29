@@ -61,25 +61,33 @@ async def list_my_matches(
         offset=offset,
     )
 
+    job_ids = [match.job_id for match in matches]
+
     view_map = await UserJobViewRepository.get_view_map(
         db=db,
         user_id=current_user.id,
-        job_ids=[match.job_id for match in matches],
+        job_ids=job_ids,
     )
     application_job_ids = await ApplicationRepository.get_job_id_set_by_user(
         db=db,
         user_id=current_user.id,
-        job_ids=[match.job_id for match in matches],
+        job_ids=job_ids,
     )
+
+    # Batch-load all jobs in one query (brief columns only — no `content`,
+    # no JobAnalysis selectinload). Replaces the previous N+1 loop.
+    job_map = await JobRepository.get_brief_map(db, job_ids)
+
+    # Batch-load all recommended resumes in one query.
+    resume_ids = [m.recommended_resume_id for m in matches if m.recommended_resume_id]
+    resume_map = await ResumeRepository.get_by_ids_map(db, resume_ids) if resume_ids else {}
 
     results: list[UserJobMatchResponse] = []
     for match in matches:
-        job = await JobRepository.get_by_id(db, match.job_id)
+        job = job_map.get(match.job_id)
         if not job:
             continue
-        resume = None
-        if match.recommended_resume_id:
-            resume = await ResumeRepository.get_by_id(db, match.recommended_resume_id)
+        resume = resume_map.get(match.recommended_resume_id) if match.recommended_resume_id else None
 
         job_info = JobBriefInfo.model_validate(job)
         viewed = view_map.get(match.job_id)
@@ -368,8 +376,7 @@ async def trigger_job_analysis(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Manually trigger job analysis (test/debug only)."""
-    job = await JobRepository.get_by_id(db, job_id)
-    if not job:
+    if not await JobRepository.exists(db, job_id):
         raise NotFoundError("Job not found")
 
     task = await TaskService.submit_task(

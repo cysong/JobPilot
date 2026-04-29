@@ -48,7 +48,9 @@ async def _calculate(db: AsyncSession, *, task_id: str, job_analysis_id: int) ->
     total_after_skill = 0
     ai_submitted = 0
 
-    job = await JobRepository.get_by_id(db, analysis.job_id)
+    # Only `normalised_role_title` is used below; brief load avoids pulling
+    # content + the JobAnalysis relationship on every matching task run.
+    job = await JobRepository.get_brief(db, analysis.job_id)
 
     for job_analysis in analyses:
         job_title = job_analysis.normalized_job_title or job.normalised_role_title
@@ -132,7 +134,8 @@ async def analyze_match_with_ai_task(
     """Run AI review for a match."""
     try:
         job_analysis = await JobAnalysisRepository.get_by_job_id(self.db, job_id)
-        job = await JobRepository.get_by_id(self.db, job_id)
+        # Only title / advertiser_name / location_label are used below.
+        job = await JobRepository.get_brief(self.db, job_id)
         resume = await ResumeRepository.get_by_id(self.db, resume_id)
         user_skills = await UserSkillRepository.get_by_user_id(self.db, user_id=user_id)
 

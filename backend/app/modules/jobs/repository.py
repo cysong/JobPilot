@@ -2,15 +2,51 @@
 import datetime
 from typing import Optional
 
-from sqlalchemy import and_, select, String, func
+from sqlalchemy import and_, literal, select, String, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob, UserJobView
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskType
 from app.shared.utils import sanitize_nested_text_for_storage
+
+
+# Columns required to materialize JobBase / JobBriefInfo schemas plus a few
+# fields used by service-layer logic (saved-list logo fallback, matching tasks).
+# Excludes the heavy `content` column and the relationship to JobAnalysis.
+# Keep this list in sync with JobBase / JobBriefInfo Pydantic schemas; if the
+# schema gains a new field, add the column here too.
+_BRIEF_COLUMNS = (
+    SeekJob.id,
+    SeekJob.source,
+    SeekJob.source_id,
+    SeekJob.title,
+    SeekJob.abstract,
+    SeekJob.salary_label,
+    SeekJob.work_types_label,
+    SeekJob.location_label,
+    SeekJob.location_city,
+    SeekJob.country,
+    SeekJob.advertiser_name,
+    SeekJob.company_name,
+    SeekJob.company_logo,
+    SeekJob.branding_logo_url,
+    SeekJob.classification,
+    SeekJob.sub_classification,
+    SeekJob.listed_at,
+    SeekJob.expires_at,
+    # `effective_is_expired` hybrid_property reads both of these:
+    SeekJob.is_expired,
+    SeekJob.manual_expired,
+    SeekJob.manual_expired_by,
+    SeekJob.manual_expired_at,
+    SeekJob.manual_expired_note,
+    SeekJob.status,
+    SeekJob.share_link,
+    SeekJob.normalised_role_title,
+)
 
 
 class JobRepository:
@@ -19,7 +55,12 @@ class JobRepository:
     @staticmethod
     async def get_by_id(db: AsyncSession, job_id: int) -> Optional[SeekJob]:
         """
-        Get job by ID.
+        Get job by ID with its analysis eager-loaded.
+
+        Use this for the job detail page or wherever the full row + analysis
+        (including ``content`` and ``cn_content``) is genuinely needed.
+        For existence checks, use :py:meth:`exists`. For list/card data,
+        use :py:meth:`get_brief` / :py:meth:`get_brief_map`.
 
         Args:
             db: Database session
@@ -31,6 +72,76 @@ class JobRepository:
         result = await db.execute(
             select(SeekJob)
             .options(selectinload(SeekJob.analysis))
+            .where(SeekJob.id == job_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def exists(db: AsyncSession, job_id: int) -> bool:
+        """
+        Lightweight existence check (no row data fetched).
+
+        Use this whenever the caller only needs to validate that a job exists
+        before performing some other action (e.g. raising NotFoundError).
+        """
+        result = await db.scalar(
+            select(literal(True)).where(SeekJob.id == job_id)
+        )
+        return result is True
+
+    @staticmethod
+    async def get_brief(db: AsyncSession, job_id: int) -> Optional[SeekJob]:
+        """
+        Load a SeekJob with only the columns required for list/card display.
+
+        Excludes the heavy ``content`` column (and other detail-only columns
+        like ``company_description``, branding image URLs, etc.) and does
+        **not** trigger the JobAnalysis relationship.
+
+        Returns the same SeekJob ORM instance type as :py:meth:`get_by_id`,
+        so existing ``JobBase.model_validate(job)`` / ``JobBriefInfo.model_validate(job)``
+        callers continue to work and the ``effective_is_expired`` hybrid
+        property still resolves.
+        """
+        result = await db.execute(
+            select(SeekJob)
+            .options(load_only(*_BRIEF_COLUMNS))
+            .where(SeekJob.id == job_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_brief_map(
+        db: AsyncSession,
+        job_ids: list[int],
+    ) -> dict[int, SeekJob]:
+        """
+        Batch version of :py:meth:`get_brief`. Returns ``{job_id: SeekJob}``.
+
+        Use this to avoid N+1 queries when materializing a list of matches
+        / saved jobs / etc. Order of the input is not preserved—look up
+        by ID after the call.
+        """
+        if not job_ids:
+            return {}
+        result = await db.execute(
+            select(SeekJob)
+            .options(load_only(*_BRIEF_COLUMNS))
+            .where(SeekJob.id.in_(job_ids))
+        )
+        return {job.id: job for job in result.scalars().all()}
+
+    @staticmethod
+    async def get_content(db: AsyncSession, job_id: int) -> Optional[SeekJob]:
+        """
+        Load only ``id``, ``content``, ``abstract`` for the analyze pipeline.
+
+        The job_analyzer agent only needs these three fields. Avoids
+        ``selectinload(SeekJob.analysis)`` and skips ~70 other columns.
+        """
+        result = await db.execute(
+            select(SeekJob)
+            .options(load_only(SeekJob.id, SeekJob.content, SeekJob.abstract))
             .where(SeekJob.id == job_id)
         )
         return result.scalar_one_or_none()
@@ -401,9 +512,12 @@ class SavedJobRepository:
         )
         total = count_result.scalar_one()
 
+        # Saved-jobs list feeds JobBase on the frontend, so use load_only
+        # to skip ``content`` and other detail-only columns.
         result = await db.execute(
             select(UserSavedJob, SeekJob)
             .join(SeekJob, SeekJob.id == UserSavedJob.job_id)
+            .options(load_only(*_BRIEF_COLUMNS))
             .where(UserSavedJob.user_id == user_id)
             .order_by(UserSavedJob.created_at.desc())
             .offset(offset)
