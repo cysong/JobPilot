@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = ""  # Preferred for DeepSeek via OpenRouter
     OPENROUTER_API_BASE: str = "https://openrouter.ai/api/v1"
 
+    # Celery Beat
+    DISABLE_BEAT_TASKS: bool = False  # When True, beat starts with an empty schedule and dispatches nothing
+
     # Job Analysis
     JOB_ANALYSIS_INTERVAL_HOURS: int = 1  # Run job analysis every N hours
     JOB_ANALYSIS_LOOKBACK_DAYS: int = 7  # Only auto-enqueue analysis for jobs listed within past N days (poll_unanalyzed_jobs)

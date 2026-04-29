@@ -50,8 +50,12 @@ celery_app.autodiscover_tasks([
     "app.modules.users",  # User skill aggregation tasks
 ])
 
-# Configure Celery Beat periodic tasks
-celery_app.conf.beat_schedule = {
+# Configure Celery Beat periodic tasks.
+# When `DISABLE_BEAT_TASKS=true` is set in the environment, beat is started
+# with an empty schedule — the process stays alive but never dispatches
+# anything. Toggling requires a beat restart (the schedule is read at
+# startup, not per tick).
+_DEFAULT_BEAT_SCHEDULE = {
     'poll-unanalyzed-jobs': {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
@@ -63,6 +67,15 @@ celery_app.conf.beat_schedule = {
     #     'schedule': crontab(minute='*/5'),
     # },
 }
+
+celery_app.conf.beat_schedule = (
+    {} if settings.DISABLE_BEAT_TASKS else _DEFAULT_BEAT_SCHEDULE
+)
+if settings.DISABLE_BEAT_TASKS:
+    logger.warning(
+        "Celery beat schedule disabled via DISABLE_BEAT_TASKS=true; "
+        "no periodic tasks will be dispatched."
+    )
 
 
 # ===== Task Monitoring Signals =====
