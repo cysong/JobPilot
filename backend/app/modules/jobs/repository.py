@@ -18,7 +18,7 @@ from app.shared.utils import sanitize_nested_text_for_storage
 # Excludes the heavy `content` column and the relationship to JobAnalysis.
 # Keep this list in sync with JobBase / JobBriefInfo Pydantic schemas; if the
 # schema gains a new field, add the column here too.
-_BRIEF_COLUMNS = (
+BRIEF_COLUMNS = (
     SeekJob.id,
     SeekJob.source,
     SeekJob.source_id,
@@ -105,7 +105,7 @@ class JobRepository:
         """
         result = await db.execute(
             select(SeekJob)
-            .options(load_only(*_BRIEF_COLUMNS))
+            .options(load_only(*BRIEF_COLUMNS))
             .where(SeekJob.id == job_id)
         )
         return result.scalar_one_or_none()
@@ -126,7 +126,7 @@ class JobRepository:
             return {}
         result = await db.execute(
             select(SeekJob)
-            .options(load_only(*_BRIEF_COLUMNS))
+            .options(load_only(*BRIEF_COLUMNS))
             .where(SeekJob.id.in_(job_ids))
         )
         return {job.id: job for job in result.scalars().all()}
@@ -517,7 +517,7 @@ class SavedJobRepository:
         result = await db.execute(
             select(UserSavedJob, SeekJob)
             .join(SeekJob, SeekJob.id == UserSavedJob.job_id)
-            .options(load_only(*_BRIEF_COLUMNS))
+            .options(load_only(*BRIEF_COLUMNS))
             .where(UserSavedJob.user_id == user_id)
             .order_by(UserSavedJob.created_at.desc())
             .offset(offset)

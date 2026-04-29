@@ -80,14 +80,14 @@ async def list_my_matches(
 
     # Batch-load all recommended resumes in one query.
     resume_ids = [m.recommended_resume_id for m in matches if m.recommended_resume_id]
-    resume_map = await ResumeRepository.get_by_ids_map(db, resume_ids) if resume_ids else {}
+    resume_map = await ResumeRepository.get_by_ids_map(db, resume_ids)
 
     results: list[UserJobMatchResponse] = []
     for match in matches:
         job = job_map.get(match.job_id)
         if not job:
             continue
-        resume = resume_map.get(match.recommended_resume_id) if match.recommended_resume_id else None
+        resume = resume_map.get(match.recommended_resume_id)
 
         job_info = JobBriefInfo.model_validate(job)
         viewed = view_map.get(match.job_id)

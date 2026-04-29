@@ -51,6 +51,8 @@ async def _calculate(db: AsyncSession, *, task_id: str, job_analysis_id: int) ->
     # Only `normalised_role_title` is used below; brief load avoids pulling
     # content + the JobAnalysis relationship on every matching task run.
     job = await JobRepository.get_brief(db, analysis.job_id)
+    if job is None:
+        return {"status": "job_not_found", "job_id": analysis.job_id}
 
     for job_analysis in analyses:
         job_title = job_analysis.normalized_job_title or job.normalised_role_title

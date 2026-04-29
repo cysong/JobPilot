@@ -10,7 +10,7 @@ from sqlalchemy.orm import load_only, selectinload
 
 from app.modules.jobs.models import SeekJob, UserJobView
 from app.modules.jobs.repository import (
-    _BRIEF_COLUMNS,
+    BRIEF_COLUMNS,
     JobRepository,
     SavedJobRepository,
     UserJobViewRepository,
@@ -67,7 +67,7 @@ class JobService:
         # ``content``. Apply load_only so the heavy column doesn't ride along.
         query = (
             select(SeekJob, has_application_expr)
-            .options(load_only(*_BRIEF_COLUMNS))
+            .options(load_only(*BRIEF_COLUMNS))
         )
 
         # Apply keyword search (title + abstract + content + company names).
@@ -405,7 +405,7 @@ class JobService:
         # are sufficient — apply load_only here too.
         query = (
             select(SeekJob)
-            .options(load_only(*_BRIEF_COLUMNS))
+            .options(load_only(*BRIEF_COLUMNS))
             .where(
                 and_(
                     SeekJob.id != job_id,  # Exclude current job
@@ -573,4 +573,21 @@ class JobService:
             job.manual_expired = True
             job.manual_expired_by = user.id
             job.manual_expired_at = datetime.now(timezone.utc)
-            job.manual_expired_note 
+            job.manual_expired_note = note
+        else:
+            job.manual_expired = False
+            job.manual_expired_by = None
+            job.manual_expired_at = None
+            job.manual_expired_note = None
+
+        await db.commit()
+        await db.refresh(job)
+
+        return JobExpirationStatus(
+            job_id=job.id,
+            is_expired=job.effective_is_expired,
+            manual_expired=bool(job.manual_expired),
+            manual_expired_by=job.manual_expired_by,
+            manual_expired_at=job.manual_expired_at,
+            manual_expired_note=job.manual_expired_note,
+        )

@@ -759,4 +759,18 @@ class TaskService:
             if today_failure_rate > failure_rate + 2:
                 trend = "up"
             elif today_failure_rate < failure_rate - 2:
-                trend 
+                trend = "down"
+
+            items.append(
+                TaskTypeStats(
+                    task_type=task_type_key,
+                    avg_duration_ms=row.avg_duration,
+                    failure_rate_pct=failure_rate,
+                    today_failure_rate_pct=today_failure_rate,
+                    trend=trend,
+                    daily_cost=cost_map.get(task_type_key, 0.0),
+                    total_count=total_count,
+                )
+            )
+
+        return TaskStatisticsResponse(task_type_stats=items)
