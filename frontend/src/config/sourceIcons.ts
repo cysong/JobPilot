@@ -12,11 +12,23 @@
 import linkedinIcon from '@/assets/source-icons/linkedin.svg'
 import seekIcon from '@/assets/source-icons/seek.ico'
 import greenhouseIcon from '@/assets/source-icons/greenhouse.svg'
+import glassdoorIcon from '@/assets/source-icons/glassdoor.png'
+import workableIcon from '@/assets/source-icons/workable.png'
+import smartrecruitersIcon from '@/assets/source-icons/smartrecruiters.png'
+import successfactorsCsbIcon from '@/assets/source-icons/successfactors_csb.png'
+import pageupJobtoolsIcon from '@/assets/source-icons/pageup_jobtools.png'
+import workdayIcon from '@/assets/source-icons/workday.png'
 
 export const SOURCE_ICONS: Record<string, string> = {
   linkedin: linkedinIcon,
   seek: seekIcon,
   greenhouse: greenhouseIcon,
+  glassdoor: glassdoorIcon,
+  workable: workableIcon,
+  smartrecruiters: smartrecruitersIcon,
+  successfactors_csb: successfactorsCsbIcon,
+  pageup_jobtools: pageupJobtoolsIcon,
+  workday: workdayIcon,
 }
 
 export const getSourceIcon = (source: string | null | undefined): string | undefined => {
