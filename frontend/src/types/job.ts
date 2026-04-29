@@ -227,6 +227,7 @@ export interface JobBriefInfo {
   source: string | null
   title: string
   advertiser_name: string | null
+  company_name: string | null
   location_label: string | null
   work_types_label: string | null
   salary_label: string | null

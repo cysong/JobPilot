@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
  * never sees a 0×0 parent on first mount — that's what triggers the
  * "width(-1) and height(-1)" console warning.
  */
-export function useChartReady<T extends HTMLElement>(): [RefObject<T>, boolean] {
+export function useChartReady<T extends HTMLElement>(): [RefObject<T | null>, boolean] {
   const ref = useRef<T>(null)
   const [ready, setReady] = useState(false)
 
