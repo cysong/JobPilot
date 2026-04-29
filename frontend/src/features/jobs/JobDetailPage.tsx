@@ -15,6 +15,7 @@ import {
   Users,
   Code2,
   Zap,
+  Tag,
 } from "lucide-react";
 
 import {
@@ -404,7 +405,10 @@ export default function JobDetailPage() {
 
               <div className="mt-6 flex flex-wrap gap-2">
                 {categoryText && (
-                  <span className="text-xs text-slate-500">{categoryText}</span>
+                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                    <Tag className="h-3.5 w-3.5" />
+                    {categoryText}
+                  </span>
                 )}
                 <span className="text-xs text-slate-400 flex items-center ml-auto whitespace-nowrap">
                   Posted{" "}
