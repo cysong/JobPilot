@@ -3,6 +3,12 @@ import { useEffect, type ReactNode } from "react";
 
 import { getSourceIcon } from "@/config/sourceIcons";
 import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * UI-ready rendering info for a job source. Label / brand color come from
@@ -113,20 +119,35 @@ export function JobSourceCompanyLine({
   const sourceMeta = useSourceDisplay(source);
   const SourceIcon = sourceMeta.icon;
   const companyDisplay = getCompanyDisplayName(companyName, advertiserName);
+  const iconSize = iconClassName ?? "h-5 w-5";
+
+  const iconNode = sourceMeta.iconSrc ? (
+    <img
+      src={sourceMeta.iconSrc}
+      alt={`${sourceMeta.label} icon`}
+      className={`${iconSize} rounded-sm object-contain`.trim()}
+    />
+  ) : SourceIcon ? (
+    <SourceIcon className={iconSize} />
+  ) : null;
 
   return (
     <div className={`flex items-center gap-2 text-slate-600 ${className ?? ""}`.trim()}>
-      {sourceMeta.iconSrc ? (
-        <img
-          src={sourceMeta.iconSrc}
-          alt={`${sourceMeta.label} icon`}
-          className={`${iconClassName ?? "h-5 w-5"} rounded-sm object-contain`.trim()}
-        />
-      ) : (
-        SourceIcon && <SourceIcon className={iconClassName ?? "h-5 w-5"} />
+      {iconNode && (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="inline-flex cursor-default"
+                aria-label={sourceMeta.label}
+              >
+                {iconNode}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{sourceMeta.label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
-      <span className="text-slate-500">{sourceMeta.label}</span>
-      <span className="text-slate-300">|</span>
       <span className="font-medium">{companyDisplay}</span>
     </div>
   );

@@ -296,26 +296,33 @@ export default function JobDetailPage() {
 	                </Button>
 	              )}
 	              {job.share_link && (
-	                <Button variant="outline" size="sm" asChild>
-	                  <a
-	                    href={job.share_link}
-	                    target="_blank"
-	                    rel="noopener noreferrer"
-	                    aria-label="Open Original Posting"
-	                    className="inline-flex items-center gap-2"
-	                  >
-	                    <span>Open on</span>
-	                    {sourceMeta.iconSrc ? (
-	                      <img
-	                        src={sourceMeta.iconSrc}
-	                        alt={`${sourceMeta.label} icon`}
-	                        className="h-4 w-4 rounded-sm object-contain"
-	                      />
-	                    ) : SourceIcon ? (
-	                      <SourceIcon className="h-4 w-4" />
-	                    ) : null}
-	                  </a>
-	                </Button>
+	                <TooltipProvider delayDuration={200}>
+	                  <Tooltip>
+	                    <TooltipTrigger asChild>
+	                      <Button variant="outline" size="sm" asChild>
+	                        <a
+	                          href={job.share_link}
+	                          target="_blank"
+	                          rel="noopener noreferrer"
+	                          aria-label={`Open on ${sourceMeta.label}`}
+	                          className="inline-flex items-center gap-2"
+	                        >
+	                          <span>Open on</span>
+	                          {sourceMeta.iconSrc ? (
+	                            <img
+	                              src={sourceMeta.iconSrc}
+	                              alt={`${sourceMeta.label} icon`}
+	                              className="h-4 w-4 rounded-sm object-contain"
+	                            />
+	                          ) : SourceIcon ? (
+	                            <SourceIcon className="h-4 w-4" />
+	                          ) : null}
+	                        </a>
+	                      </Button>
+	                    </TooltipTrigger>
+	                    <TooltipContent>{`Open on ${sourceMeta.label}`}</TooltipContent>
+	                  </Tooltip>
+	                </TooltipProvider>
 	              )}
 	              <Button variant="outline" size="sm">
 	                <Share2 className="h-4 w-4 mr-2" />

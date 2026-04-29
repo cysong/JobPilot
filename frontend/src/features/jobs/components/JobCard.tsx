@@ -18,7 +18,7 @@ import {
 import {
   formatJobCategory,
   JobSalaryDisplay,
-  useSourceDisplay,
+  JobSourceCompanyLine,
 } from '@/components/job/jobDisplay'
 
 interface JobCardProps {
@@ -31,8 +31,6 @@ interface JobCardProps {
 
 export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
-    const sourceMeta = useSourceDisplay(job.source)
-    const SourceIcon = sourceMeta.icon
     const categoryText = formatJobCategory(job)
 
     // Preserve current search params when navigating to detail page
@@ -92,20 +90,12 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
                 />
               )}
             </div>
-            <div className="flex items-center gap-2 text-lg text-slate-600">
-              {sourceMeta.iconSrc ? (
-                <img
-                  src={sourceMeta.iconSrc}
-                  alt={`${sourceMeta.label} icon`}
-                  className="h-5 w-5 rounded-sm object-contain"
-                />
-              ) : (
-                SourceIcon && <SourceIcon className="h-5 w-5" />
-              )}
-              <span className="text-slate-500">{sourceMeta.label}</span>
-              <span className="text-slate-300">|</span>
-              <span className="font-medium">{job.advertiser_name}</span>
-            </div>
+            <JobSourceCompanyLine
+              source={job.source}
+              companyName={job.company_name}
+              advertiserName={job.advertiser_name}
+              className="text-lg"
+            />
           </div>
         </CardHeader>
         <CardContent className="p-4 pt-2 space-y-3">

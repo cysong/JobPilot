@@ -603,35 +603,42 @@ export default function ApplicationDetailPage() {
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                asChild={Boolean(application.job?.share_link)}
-                disabled={!application.job?.share_link}
-              >
-                {application.job?.share_link ? (
-                  <a
-                    href={application.job.share_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Apply on ${sourceMeta.label}`}
-                    className="inline-flex items-center gap-2"
-                  >
-                    <span>Apply on</span>
-                    {sourceMeta.iconSrc ? (
-                      <img
-                        src={sourceMeta.iconSrc}
-                        alt={`${sourceMeta.label} icon`}
-                        className="h-4 w-4 rounded-sm object-contain"
-                      />
-                    ) : SourceIcon ? (
-                      <SourceIcon className="h-4 w-4" />
-                    ) : null}
-                  </a>
-                ) : (
-                  <span>Apply on Source Site</span>
-                )}
-              </Button>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      asChild={Boolean(application.job?.share_link)}
+                      disabled={!application.job?.share_link}
+                    >
+                      {application.job?.share_link ? (
+                        <a
+                          href={application.job.share_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Apply on ${sourceMeta.label}`}
+                          className="inline-flex items-center gap-2"
+                        >
+                          <span>Apply on</span>
+                          {sourceMeta.iconSrc ? (
+                            <img
+                              src={sourceMeta.iconSrc}
+                              alt={`${sourceMeta.label} icon`}
+                              className="h-4 w-4 rounded-sm object-contain"
+                            />
+                          ) : SourceIcon ? (
+                            <SourceIcon className="h-4 w-4" />
+                          ) : null}
+                        </a>
+                      ) : (
+                        <span>Apply on Source Site</span>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{`Apply on ${sourceMeta.label}`}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </div>
