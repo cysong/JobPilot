@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
+from app.core.config import settings
 from app.modules.jobs.models import SeekJob, JobAnalysis, UserSavedJob, UserJobView
 from app.modules.workflow.models import TaskExecution
 from app.shared.enums import TaskType
@@ -208,7 +209,10 @@ class JobRepository:
             .where(SeekJob.effective_is_expired.is_(False))  # Only active jobs
             .where(
                 SeekJob.listed_at
-                > (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30))
+                > (
+                    datetime.datetime.now(datetime.timezone.utc)
+                    - datetime.timedelta(days=settings.JOB_ANALYSIS_LOOKBACK_DAYS)
+                )
             )
             .order_by(SeekJob.created_at.desc())
             .limit(limit)
