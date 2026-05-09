@@ -304,3 +304,15 @@ export interface JobExpirationStatusResponse {
   manual_expired_at: string | null
   manual_expired_note: string | null
 }
+
+export interface EnqueueJobRequest {
+  url: string
+}
+
+export interface EnqueueJobResponse {
+  enqueued: boolean
+  source?: string | null
+  source_id?: string | null
+  reason?: string | null
+  existing_job_id?: number | null
+}

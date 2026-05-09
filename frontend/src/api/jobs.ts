@@ -17,6 +17,7 @@ import type {
   SavedJobsRequest,
   JobExpirationUpdateRequest,
   JobExpirationStatusResponse,
+  EnqueueJobResponse,
 } from '@/types/job'
 
 export const jobsApi = {
@@ -110,6 +111,18 @@ export const jobsApi = {
 
   markJobViewed: async (jobId: number): Promise<JobViewedStatusResponse> => {
     const result = await apiClient.post<JobViewedStatusResponse, JobViewedStatusResponse>(`/jobs/${jobId}/viewed`)
+    return result
+  },
+
+  /**
+   * Manually submit a job URL to the AWS scraper. Any logged-in user
+   * can call this — backend holds the X-API-Key.
+   */
+  enqueueJobUrl: async (url: string): Promise<EnqueueJobResponse> => {
+    const result = await apiClient.post<EnqueueJobResponse, EnqueueJobResponse>(
+      '/jobs/enqueue',
+      { url },
+    )
     return result
   },
 
