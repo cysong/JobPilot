@@ -1,9 +1,11 @@
 """
 Job service layer - business logic for job operations.
 """
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 from sqlalchemy import select, func, or_, and_, distinct, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
@@ -21,6 +23,7 @@ from app.modules.jobs.schemas import (
     JobFiltersRequest,
     JobFiltersOptions,
     JobBase,
+    JobEnqueueResponse,
     SavedJobItem,
     SavedJobListResponse,
     SavedJobStatus,
@@ -28,8 +31,12 @@ from app.modules.jobs.schemas import (
     JobExpirationStatus,
 )
 from app.modules.auth.models import User
-from app.core.exceptions import NotFoundError
+from app.core.config import settings
+from app.core.exceptions import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.shared.pagination import PaginationParams
+
+
+logger = logging.getLogger(__name__)
 
 
 class JobService:
@@ -596,3 +603,76 @@ class JobService:
             manual_expired_at=job.manual_expired_at,
             manual_expired_note=job.manual_expired_note,
         )
+
+    @staticmethod
+    async def enqueue_job_url(db: AsyncSession, url: str) -> JobEnqueueResponse:
+        """Forward `url` to the AWS Function URL and shape the response.
+
+        Mapping (see docs/manual_job_enqueue_design.md):
+        - 200 enqueued=true               -> return as-is
+        - 200 enqueued=false already_in_db -> resolve existing_job_id
+        - 400 (any AWS error)             -> BadRequestError(error_text)
+        - 401 / 500 / network / timeout   -> ServiceUnavailableError
+        - missing config                  -> ServiceUnavailableError
+        """
+        api_url = settings.ENQUEUE_API_URL
+        api_key = settings.ENQUEUE_API_KEY
+        if not api_url or not api_key:
+            logger.warning("ENQUEUE_API_URL/KEY not configured")
+            raise ServiceUnavailableError("Manual enqueue is not configured")
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(
+                    api_url,
+                    headers={
+                        "X-API-Key": api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={"url": url},
+                )
+        except httpx.HTTPError as exc:
+            logger.warning("Enqueue API network error: %s", exc)
+            raise ServiceUnavailableError("Enqueue service unavailable") from exc
+
+        # Try to parse JSON; tolerate empty/non-JSON 5xx responses.
+        try:
+            body = resp.json()
+        except ValueError:
+            body = {}
+
+        if resp.status_code == 200:
+            enqueued = bool(body.get("enqueued"))
+            source = body.get("source")
+            source_id = body.get("source_id")
+            reason = body.get("reason")
+            existing_job_id: int | None = None
+
+            if not enqueued and reason == "already_in_db" and source and source_id:
+                existing = await JobRepository.get_by_source_and_source_id(
+                    db, source, source_id
+                )
+                if existing is not None:
+                    existing_job_id = existing.id
+
+            return JobEnqueueResponse(
+                enqueued=enqueued,
+                source=source,
+                source_id=source_id,
+                reason=reason,
+                existing_job_id=existing_job_id,
+            )
+
+        if resp.status_code == 400:
+            error_text = str(body.get("error") or "Bad request")
+            raise BadRequestError(error_text)
+
+        # 401, 500, anything else: hide upstream specifics.
+        request_id = body.get("request_id")
+        logger.warning(
+            "Enqueue API non-200: status=%s body=%s request_id=%s",
+            resp.status_code,
+            body,
+            request_id,
+        )
+        raise ServiceUnavailableError("Enqueue service unavailable")
