@@ -192,3 +192,37 @@ async def test_enqueue_missing_config_raises_service_unavailable(monkeypatch):
 
     with pytest.raises(ServiceUnavailableError):
         await JobService.enqueue_job_url(db=AsyncMock(), url="https://www.seek.co.nz/job/1")
+
+
+@pytest.mark.asyncio
+async def test_enqueue_aws_200_non_dict_body_raises_service_unavailable(monkeypatch):
+    """Defensive: upstream returning a JSON list/scalar shouldn't 500 us."""
+    _patch_settings(monkeypatch)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[1, 2, 3])
+
+    monkeypatch.setattr(job_service_module.httpx, "AsyncClient", _client_factory(handler))
+
+    # Non-dict body is treated like an empty body: enqueued defaults to False
+    # and we don't try to resolve existing_job_id.
+    result = await JobService.enqueue_job_url(db=AsyncMock(), url="https://www.seek.co.nz/job/1")
+    assert result.enqueued is False
+    assert result.source is None
+    assert result.source_id is None
+    assert result.reason is None
+    assert result.existing_job_id is None
+
+
+@pytest.mark.asyncio
+async def test_enqueue_aws_500_non_dict_body_raises_service_unavailable(monkeypatch):
+    """Same defensive coercion for non-200 paths."""
+    _patch_settings(monkeypatch)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json="boom")
+
+    monkeypatch.setattr(job_service_module.httpx, "AsyncClient", _client_factory(handler))
+
+    with pytest.raises(ServiceUnavailableError):
+        await JobService.enqueue_job_url(db=AsyncMock(), url="https://www.seek.co.nz/job/1")

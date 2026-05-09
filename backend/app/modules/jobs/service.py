@@ -640,6 +640,8 @@ class JobService:
             body = resp.json()
         except ValueError:
             body = {}
+        if not isinstance(body, dict):
+            body = {}
 
         if resp.status_code == 200:
             enqueued = bool(body.get("enqueued"))
