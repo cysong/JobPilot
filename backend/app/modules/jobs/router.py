@@ -18,6 +18,8 @@ from app.modules.jobs.schemas import (
     JobBase,
     JobBriefInfo,
     JobDetail,
+    JobEnqueueRequest,
+    JobEnqueueResponse,
     JobExpirationStatus,
     JobExpirationUpdateRequest,
     JobFiltersOptions,
@@ -253,6 +255,20 @@ async def get_source_metas(
     and memoized per-process (restart the API to pick up changes).
     """
     return load_source_metas()
+
+
+@router.post("/enqueue", response_model=JobEnqueueResponse)
+async def enqueue_job_url(
+    payload: JobEnqueueRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Manually submit a job URL to the external AWS scraper.
+
+    Any logged-in user may call this. The actual scrape happens
+    asynchronously on AWS; this endpoint only reports enqueue status.
+    """
+    return await service.JobService.enqueue_job_url(db, payload.url)
 
 
 @router.get("/{job_id}/saved", response_model=SavedJobStatus)
