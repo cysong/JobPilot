@@ -354,3 +354,24 @@ class UserJobMatchDetailResponse(BaseModel):
     ai_analysis: Optional[dict]
     calculated_at: datetime
     ai_analyzed_at: Optional[datetime]
+
+
+class JobEnqueueRequest(BaseModel):
+    """Body for POST /jobs/enqueue — single URL to push to AWS scraper."""
+
+    url: str = Field(..., description="Job listing URL")
+
+
+class JobEnqueueResponse(BaseModel):
+    """Result of a manual enqueue attempt.
+
+    `existing_job_id` is populated only when the upstream API reports
+    `already_in_db` AND we successfully resolve the matching SeekJob
+    by (source, source_id).
+    """
+
+    enqueued: bool
+    source: Optional[str] = None
+    source_id: Optional[str] = None
+    reason: Optional[str] = None
+    existing_job_id: Optional[int] = None
