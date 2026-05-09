@@ -78,6 +78,26 @@ class JobRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_source_and_source_id(
+        db: AsyncSession,
+        source: str,
+        source_id: str,
+    ) -> Optional[SeekJob]:
+        """Resolve a SeekJob by its (source, source_id) unique pair.
+
+        Used by the manual-enqueue flow to fill `existing_job_id` when the
+        AWS enqueue API reports `already_in_db`. Hits the
+        `uq_seek_jobs_source_source_id` unique index.
+        """
+        result = await db.execute(
+            select(SeekJob).where(
+                SeekJob.source == source,
+                SeekJob.source_id == source_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def exists(db: AsyncSession, job_id: int) -> bool:
         """
         Lightweight existence check (no row data fetched).
