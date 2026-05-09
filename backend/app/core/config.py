@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     # Default PDF template for all document types
     EXPORT_DEFAULT_TEMPLATE: str = "modern"
 
+    # External job enqueue API (AWS Function URL).
+    # Empty string disables the manual-enqueue endpoint (returns 503).
+    ENQUEUE_API_URL: str = ""
+    ENQUEUE_API_KEY: str = ""
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
