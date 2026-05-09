@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
   Briefcase,
@@ -6,6 +6,7 @@ import {
   ChevronUp,
   X,
   Star,
+  Plus,
 } from "lucide-react";
 
 import {
@@ -27,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
+import { EnqueueJobDialog } from "@/features/jobs/components/EnqueueJobDialog";
 
 export default function JobListingPage() {
   const {
@@ -55,6 +57,8 @@ export default function JobListingPage() {
     handleClearAllFilters,
     handleResetAllJobsSearch,
   } = useJobListState();
+
+  const [enqueueOpen, setEnqueueOpen] = useState(false);
 
   // Fetch filter options
   const { data: filterOptions } = useJobFilterOptions();
@@ -164,8 +168,8 @@ export default function JobListingPage() {
       {/* Header with Tabs and Search */}
       <div className="px-6">
         <div className="bg-white border-b rounded-lg shadow-sm border-slate-200 sticky top-[65px] z-30 px-6 py-4">
-          {/* View Mode Tabs - at the top */}
-          <div className="">
+          {/* View Mode Tabs + Add-by-URL button */}
+          <div className="flex items-center justify-between gap-4">
             <Tabs value={viewMode} onValueChange={handleViewChange}>
               <TabsList className="grid w-full max-w-lg grid-cols-3">
                 <TabsTrigger value="recommended" className="gap-2">
@@ -182,6 +186,14 @@ export default function JobListingPage() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setEnqueueOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Job by URL</span>
+            </Button>
           </div>
 
           {/* Search Bar - only show in 'all' view */}
@@ -443,6 +455,7 @@ export default function JobListingPage() {
           </div>
         </div>
       </div>
+      <EnqueueJobDialog open={enqueueOpen} onOpenChange={setEnqueueOpen} />
     </div>
   );
 }
