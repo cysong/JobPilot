@@ -94,3 +94,14 @@ class BusinessError(JobPilotException):
             status_code=status_code,
             response_code=response_code,
         )
+
+
+class ServiceUnavailableError(JobPilotException):
+    """Upstream / dependency unavailable (HTTP 503)."""
+
+    def __init__(self, message: str = "Service unavailable"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            response_code=ResponseCode.INTERNAL_ERROR,
+        )
