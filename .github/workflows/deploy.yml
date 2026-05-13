@@ -133,6 +133,7 @@ jobs:
           scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/datasources/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/datasources/prometheus.yml"
           scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/dashboards/dashboard.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/dashboards/dashboard.yml"
           scp -P "${VPS_PORT:-22}" deploy/grafana/dashboards/jobpilot.json "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/dashboards/jobpilot.json"
+          scp -P "${VPS_PORT:-22}" deploy/grafana/dashboards/jobpilot-business.json "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/dashboards/jobpilot-business.json"
 
       - name: Deploy on VPS
         run: |

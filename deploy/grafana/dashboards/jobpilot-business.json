@@ -1,0 +1,350 @@
+{
+  "title": "JobPilot Business Detail",
+  "uid": "jobpilot-business",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "task_name",
+        "label": "Task",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(jobpilot_celery_task_total, task_name)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "agent_id",
+        "label": "Agent",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(jobpilot_llm_call_total, agent_id)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Celery Tasks",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "id": 1,
+      "title": "Task Events / sec",
+      "type": "timeseries",
+      "description": "Task lifecycle events stacked by outcome. Sustained 'failure' or 'retry' bars are the first signal of trouble.",
+      "gridPos": { "x": 0, "y": 1, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (event) (rate(jobpilot_celery_task_total{task_name=~\"$task_name\"}[$__rate_interval]))",
+          "legendFormat": "{{ event }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "failure" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "retry" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 2,
+      "title": "Celery Queue Length",
+      "type": "timeseries",
+      "description": "Pending messages in the broker. Sustained > 100 fires CeleryQueueBacklog.",
+      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "jobpilot_celery_queue_length",
+          "legendFormat": "{{ queue_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Task Duration by Name (avg)",
+      "type": "timeseries",
+      "description": "Per-task average duration. Use $__range so low-traffic windows still produce stable numbers.",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (task_name) (rate(jobpilot_celery_task_duration_seconds_sum{task_name=~\"$task_name\"}[$__rate_interval])) / sum by (task_name) (rate(jobpilot_celery_task_duration_seconds_count{task_name=~\"$task_name\"}[$__rate_interval]))",
+          "legendFormat": "{{ task_name }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 4,
+      "title": "Task Volume over Range",
+      "type": "stat",
+      "description": "Cumulative event count over the visible time range.",
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (event) (increase(jobpilot_celery_task_total{task_name=~\"$task_name\"}[$__range]))",
+          "legendFormat": "{{ event }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "failure" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "retry" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] }
+        ]
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "background", "graphMode": "area", "textMode": "auto" }
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "LLM Agent Calls",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 1 }
+    },
+    {
+      "id": 5,
+      "title": "LLM Call Rate by Outcome",
+      "type": "timeseries",
+      "description": "Stacked by outcome (ok / ratelimit / timeout / auth_error / max_turns / error). Non-ok bars are the first signal of upstream issues.",
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(jobpilot_llm_call_total{agent_id=~\"$agent_id\"}[$__rate_interval]))",
+          "legendFormat": "{{ outcome }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "ok" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byRegexp", "options": "ratelimit|timeout|auth_error|max_turns|error" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 6,
+      "title": "LLM Latency (avg + p95)",
+      "type": "timeseries",
+      "description": "Average is robust on sparse traffic; p95 is computed over the visible time range so even a single call window has enough samples.",
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(increase(jobpilot_llm_call_duration_seconds_sum{agent_id=~\"$agent_id\"}[$__range])) / sum(increase(jobpilot_llm_call_duration_seconds_count{agent_id=~\"$agent_id\"}[$__range]))",
+          "legendFormat": "avg"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (increase(jobpilot_llm_call_duration_seconds_bucket{agent_id=~\"$agent_id\"}[$__range])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 7,
+      "title": "Token Throughput by Model",
+      "type": "timeseries",
+      "description": "Tokens per second, split by direction (input / output). Useful for spotting prompt bloat.",
+      "gridPos": { "x": 0, "y": 26, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (model, kind) (rate(jobpilot_llm_tokens_total{agent_id=~\"$agent_id\"}[$__rate_interval]))",
+          "legendFormat": "{{ model }} / {{ kind }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 8,
+      "title": "Total Tokens over Range",
+      "type": "stat",
+      "description": "Cumulative input + output tokens per model over the visible time range. The closest proxy to LLM spend the dashboard has.",
+      "gridPos": { "x": 12, "y": 26, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (model, kind) (increase(jobpilot_llm_tokens_total{agent_id=~\"$agent_id\"}[$__range]))",
+          "legendFormat": "{{ model }} / {{ kind }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "value", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "API Business Errors",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 34, "w": 24, "h": 1 }
+    },
+    {
+      "id": 9,
+      "title": "Error Rate by Code",
+      "type": "timeseries",
+      "description": "Application-level error codes from JobPilotException + fallback Exception. Distinct from instrumentator's HTTP status counters.",
+      "gridPos": { "x": 0, "y": 35, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (code) (rate(jobpilot_api_error_total[$__rate_interval]))",
+          "legendFormat": "code {{ code }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 10,
+      "title": "Top Failing Endpoints",
+      "type": "bargauge",
+      "description": "Endpoints with the most errors over the visible time range. Labels are FastAPI route patterns; cardinality is bounded by design.",
+      "gridPos": { "x": 12, "y": 35, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (endpoint) (increase(jobpilot_api_error_total[$__range])))",
+          "legendFormat": "{{ endpoint }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true }
+    },
+    {
+      "id": 11,
+      "title": "Exception Types",
+      "type": "stat",
+      "description": "Count by Python exception class over the visible time range.",
+      "gridPos": { "x": 0, "y": 43, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (exception_type) (increase(jobpilot_api_error_total[$__range]))",
+          "legendFormat": "{{ exception_type }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "Email & Job Ingest",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 1 }
+    },
+    {
+      "id": 12,
+      "title": "Resend Email Outcome",
+      "type": "timeseries",
+      "description": "Stacked by SDK exception class — validation_error usually means a code bug, the others mean Resend is unhealthy.",
+      "gridPos": { "x": 0, "y": 50, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (kind, outcome) (rate(jobpilot_resend_email_total[$__rate_interval]))",
+          "legendFormat": "{{ kind }} / {{ outcome }}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 13,
+      "title": "Resend Success Rate",
+      "type": "stat",
+      "description": "% of delivery attempts with outcome=ok over the visible time range. Validation errors are excluded from the denominator since they're our bug, not Resend's.",
+      "gridPos": { "x": 12, "y": 50, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(increase(jobpilot_resend_email_total{outcome=\"ok\"}[$__range])) / sum(increase(jobpilot_resend_email_total{outcome!=\"validation_error\"}[$__range])) * 100",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "value", "graphMode": "area", "textMode": "auto" }
+    },
+    {
+      "id": 14,
+      "title": "Job Ingest Outcome",
+      "type": "timeseries",
+      "description": "Manual URL ingest results. ok = handed off to AWS ingestor; bad_request = upstream rejected; timeout / error / unavailable = upstream or network problem.",
+      "gridPos": { "x": 0, "y": 58, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(jobpilot_job_ingest_total[$__rate_interval]))",
+          "legendFormat": "{{ outcome }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "ok" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "title": "Job Ingest Success Rate",
+      "type": "stat",
+      "description": "% of ingest attempts that returned ok. bad_request counts as failure here — the user got an error.",
+      "gridPos": { "x": 12, "y": 58, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(increase(jobpilot_job_ingest_total{outcome=\"ok\"}[$__range])) / sum(increase(jobpilot_job_ingest_total[$__range])) * 100",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "value", "graphMode": "area", "textMode": "auto" }
+    }
+  ]
+}

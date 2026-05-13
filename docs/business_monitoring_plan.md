@@ -315,7 +315,8 @@ inhibit_rules:
 | **P2 告警规则补充** | 1h | 更新 `alert_rules.yml`（10 条规则合并版） | Prometheus UI Alerts 页面看到 10 条 inactive |
 | **P3 Alertmanager 部署** | 半天 | docker-compose 加 service + `alertmanager.yml` | 制造 5xx → Resend 邮件到达 |
 | **P4 SLO Dashboard** | 半天 | `jobpilot-slo.json` | Grafana 自动加载，三个 SLO Stat 数字合理 |
-| **P5 Business Detail + Runbook** | 1 天 | `jobpilot-business.json` + 10 份 runbook | 简历级成品 |
+| **P5a Business Detail Dashboard** | 半天 | `jobpilot-business.json`（4 rows × 15 panels：Celery / LLM / API errors / Email & Ingest） | ✅ 已完成 |
+| **P5b Runbook** | 半天 | 10 份 runbook (`docs/runbooks/<alert>.md`) | 真出事再补 |
 
 **总计**：约 3 个工作日，可分散落地。
 
