@@ -101,6 +101,9 @@ class AgentGateway:
                 error_message=str(exc),
                 context=context,
             )
+            exc.add_note(
+                f"provider={getattr(agent, 'provider', 'unknown')}, agent_id={agent_id}"
+            )
             raise
 
     async def _execute_agent(
