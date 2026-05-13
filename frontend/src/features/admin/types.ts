@@ -202,3 +202,45 @@ export interface TaskTypeStats {
 export interface TaskStatisticsResponse {
   taskTypeStats: TaskTypeStats[]
 }
+
+// ===== Tasks Analytics =====
+export interface TasksDailyTrendPoint {
+  date: string
+  count: number
+  failed: number
+  failureRate: number | null
+}
+
+export interface TasksDailyTrendSeries {
+  name: string
+  points: TasksDailyTrendPoint[]
+}
+
+export interface TasksDailyTrendResponse {
+  timezone: string
+  startDate: string
+  endDate: string
+  taskTypes: string[]
+  series: TasksDailyTrendSeries[]
+}
+
+export interface TasksExecutionTimePoint {
+  date: string
+  avgMs: number
+  p50Ms: number
+  p95Ms: number
+  sampleCount: number
+}
+
+export interface TasksExecutionTimeSeries {
+  name: string
+  points: TasksExecutionTimePoint[]
+}
+
+export interface TasksExecutionTimeResponse {
+  timezone: string
+  startDate: string
+  endDate: string
+  taskTypes: string[]
+  series: TasksExecutionTimeSeries[]
+}
