@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import cast, Date, func, select
+from sqlalchemy import case, cast, Date, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -21,6 +21,12 @@ from app.modules.admin.schemas import (
     JobsTimeScatterResponse,
     MetricCount,
     TaskMetric,
+    TasksDailyTrendPoint,
+    TasksDailyTrendResponse,
+    TasksDailyTrendSeries,
+    TasksExecutionTimePoint,
+    TasksExecutionTimeResponse,
+    TasksExecutionTimeSeries,
 )
 from app.modules.applications.models import Application
 from app.modules.auth.models import User
@@ -384,3 +390,103 @@ class AdminService:
     ) -> AIUsageDailyTrendResponse:
         """Return daily estimated USD cost totals and per-model series."""
         return await AdminService._get_ai_usage_daily_trend(db, days, AICall.estimated_cost)
+
+    @staticmethod
+    @jcache("admin:tasks:daily-trend:{days}", ttl=300)
+    async def get_tasks_daily_trend(db: AsyncSession, days: int = 30) -> TasksDailyTrendResponse:
+        """Return daily task counts and failed counts per task_name, plus a Total series.
+
+        Buckets by user's app timezone. ``failure_rate`` is ``None`` when count is 0
+        so the frontend can break failure-rate lines at empty days. The ``Total``
+        series sums across all task types and exposes the overall failure rate.
+        """
+        days = max(7, min(days, 90))
+
+        app_tz, tz_name = AdminService._app_timezone()
+
+        today_local = datetime.now(app_tz).date()
+        start_date = today_local - timedelta(days=days - 1)
+        end_date = today_local
+
+        start_local_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=app_tz)
+        end_exclusive_local_dt = datetime.combine(
+            end_date + timedelta(days=1), datetime.min.time(), tzinfo=app_tz
+        )
+
+        start_utc = start_local_dt.astimezone(timezone.utc)
+        end_exclusive_utc = end_exclusive_local_dt.astimezone(timezone.utc)
+
+        local_date = cast(func.timezone(tz_name, TaskExecution.created_at), Date)
+        failed_expr = case((TaskExecution.status == TaskStatus.FAILED, 1), else_=0)
+
+        rows = (
+            await db.execute(
+                select(
+                    local_date.label("local_date"),
+                    TaskExecution.task_name.label("task_name"),
+                    func.count(TaskExecution.id).label("task_count"),
+                    func.coalesce(func.sum(failed_expr), 0).label("failed_count"),
+                )
+                .where(
+                    TaskExecution.created_at.isnot(None),
+                    TaskExecution.created_at >= start_utc,
+                    TaskExecution.created_at < end_exclusive_utc,
+                )
+                .group_by("local_date", "task_name")
+                .order_by("local_date", "task_name")
+            )
+        ).all()
+
+        # by_type[task_name][date] -> (count, failed)
+        by_type: dict[str, dict[date, tuple[int, int]]] = {}
+        all_types: set[str] = set()
+
+        for local_day, task_name, task_count, failed_count in rows:
+            if local_day is None or not task_name:
+                continue
+            name = str(task_name)
+            all_types.add(name)
+            by_type.setdefault(name, {})[local_day] = (
+                int(task_count or 0),
+                int(failed_count or 0),
+            )
+
+        sorted_types = sorted(all_types)
+        dates = [start_date + timedelta(days=i) for i in range(days)]
+
+        def make_point(count: int, failed: int, day: date) -> TasksDailyTrendPoint:
+            rate = (failed / count) if count > 0 else None
+            return TasksDailyTrendPoint(
+                date=day.isoformat(),
+                count=count,
+                failed=failed,
+                failure_rate=rate,
+            )
+
+        series: list[TasksDailyTrendSeries] = []
+
+        total_points: list[TasksDailyTrendPoint] = []
+        for day in dates:
+            day_count = 0
+            day_failed = 0
+            for name in sorted_types:
+                count, failed = by_type.get(name, {}).get(day, (0, 0))
+                day_count += count
+                day_failed += failed
+            total_points.append(make_point(day_count, day_failed, day))
+        series.append(TasksDailyTrendSeries(name="Total", points=total_points))
+
+        for name in sorted_types:
+            points = []
+            for day in dates:
+                count, failed = by_type.get(name, {}).get(day, (0, 0))
+                points.append(make_point(count, failed, day))
+            series.append(TasksDailyTrendSeries(name=name, points=points))
+
+        return TasksDailyTrendResponse(
+            timezone=tz_name,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            task_types=sorted_types,
+            series=series,
+        )
