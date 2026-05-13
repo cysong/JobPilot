@@ -18,6 +18,8 @@ from app.modules.admin.schemas import (
     TaskListResponse,
     TaskRetryResponse,
     TaskStatisticsResponse,
+    TasksDailyTrendResponse,
+    TasksExecutionTimeResponse,
     WorkerMonitorResponse,
 )
 from app.modules.admin.service import AdminService
@@ -70,6 +72,24 @@ async def get_ai_cost_daily_trend(
 ):
     """Daily estimated cost totals and per-model series."""
     return await AdminService.get_ai_cost_daily_trend(db, days=days)
+
+
+@router.get("/tasks/daily-trend", response_model=TasksDailyTrendResponse)
+async def get_tasks_daily_trend(
+    days: int = Query(30, ge=7, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily task counts and failure rates per task_name (with Total series)."""
+    return await AdminService.get_tasks_daily_trend(db, days=days)
+
+
+@router.get("/tasks/execution-time", response_model=TasksExecutionTimeResponse)
+async def get_tasks_execution_time(
+    days: int = Query(30, ge=7, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily avg / p50 / p95 task execution time per task_name (successful tasks only)."""
+    return await AdminService.get_tasks_execution_time(db, days=days)
 
 
 @router.get("/workers", response_model=WorkerMonitorResponse)
