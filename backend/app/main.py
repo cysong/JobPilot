@@ -1,4 +1,5 @@
 """FastAPI application entry point"""
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -16,10 +17,25 @@ from app.core.config import settings
 from app.core.custom_route import CustomAPIRoute
 from app.core.exceptions import JobPilotException
 from app.core.logging_config import configure_logging
+from app.core.metrics import api_error_total
+from app.core.queue_observer import observe_queue_lengths
 from app.core.response_codes import ResponseCode
 from fastapi_cache import FastAPICache
 
 configure_logging("api")
+
+
+def _endpoint_label(request: Request) -> str:
+    """Resolve the route pattern (e.g. ``/api/v1/jobs/{job_id}``) for metric labels.
+
+    Unmatched paths (404s, middleware errors, bot scans for /.env etc.) collapse
+    to the literal "<unresolved>" — without this clamp every probed URL would
+    add a new time series and blow up Prometheus memory.
+    """
+    route = request.scope.get("route")
+    if route is not None and getattr(route, "path", None):
+        return route.path
+    return "<unresolved>"
 
 
 @asynccontextmanager
@@ -37,10 +53,18 @@ async def lifespan(app: FastAPI):
         FastAPICache.init(RedisBackend(redis), prefix="jobpilot:cache")
         print("Cache initialized with Redis backend")
 
+    # Start Celery queue-length observer for Prometheus gauge
+    queue_observer_task = asyncio.create_task(observe_queue_lengths())
+
     yield
 
     # Shutdown
     print("JobPilot API is shutting down...")
+    queue_observer_task.cancel()
+    try:
+        await queue_observer_task
+    except asyncio.CancelledError:
+        pass
 
 
 # Create FastAPI application
@@ -82,6 +106,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Global exception handler for JobPilot exceptions
 @app.exception_handler(JobPilotException)
 async def jobpilot_exception_handler(request: Request, exc: JobPilotException):
+    api_error_total.labels(
+        endpoint=_endpoint_label(request),
+        code=str(int(exc.response_code)),
+        exception_type=type(exc).__name__,
+    ).inc()
     return JSONResponse(
         status_code=exc.status_code,
         content={"code": int(exc.response_code), "message": exc.message, "data": None},
@@ -91,6 +120,11 @@ async def jobpilot_exception_handler(request: Request, exc: JobPilotException):
 # Fallback exception handler
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    api_error_total.labels(
+        endpoint=_endpoint_label(request),
+        code=str(int(ResponseCode.INTERNAL_ERROR)),
+        exception_type=type(exc).__name__,
+    ).inc()
     if settings.ENVIRONMENT == "development":
         import traceback
 
