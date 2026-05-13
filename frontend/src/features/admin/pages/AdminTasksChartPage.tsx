@@ -11,6 +11,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type {
+  NameType,
+  ValueType,
+} from 'recharts/types/component/DefaultTooltipContent'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useChartReady } from '@/lib/useChartReady'
@@ -254,14 +258,20 @@ export default function AdminTasksChartPage() {
                         tickFormatter={(v: number) => `${Math.round(v)}%`}
                       />
                       <Tooltip
-                        formatter={(value: number | string | null, name: string) => {
+                        formatter={(value: ValueType | undefined, name: NameType | undefined) => {
                           if (typeof name === 'string' && name.endsWith(' %')) {
+                            const numeric =
+                              typeof value === 'number' || typeof value === 'string'
+                                ? Number(value)
+                                : null
                             return [
-                              value === null ? '—' : `${Number(value).toFixed(1)}%`,
+                              numeric === null || Number.isNaN(numeric)
+                                ? '—'
+                                : `${numeric.toFixed(1)}%`,
                               name,
                             ]
                           }
-                          return [value, name]
+                          return [value ?? '—', name]
                         }}
                       />
 
@@ -455,10 +465,18 @@ export default function AdminTasksChartPage() {
                         tickFormatter={(v: number) => `${v.toFixed(v < 10 ? 1 : 0)} ${durationUnit}`}
                       />
                       <Tooltip
-                        formatter={(value: number | null, name: string) => [
-                          value === null ? '—' : `${Number(value).toFixed(2)} ${durationUnit}`,
-                          name,
-                        ]}
+                        formatter={(value: ValueType | undefined, name: NameType | undefined) => {
+                          const numeric =
+                            typeof value === 'number' || typeof value === 'string'
+                              ? Number(value)
+                              : null
+                          return [
+                            numeric === null || Number.isNaN(numeric)
+                              ? '—'
+                              : `${numeric.toFixed(2)} ${durationUnit}`,
+                            name,
+                          ]
+                        }}
                       />
 
                       {sortedDurationTaskNames.map((name) =>
