@@ -110,6 +110,7 @@ docker compose -f "${COMPOSE_FILE}" up -d \
   jobpilot-worker \
   jobpilot-beat \
   jobpilot-prometheus \
+  jobpilot-alertmanager \
   jobpilot-grafana \
   jobpilot-redis-exporter \
   jobpilot-cadvisor
