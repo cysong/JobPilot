@@ -330,34 +330,38 @@ export default function AdminTasksChartPage() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {taskSeries.map((s) => {
-                  const hidden = !!countHidden[s.name]
-                  const color = pickTaskColor(s.name, sortedTaskNames)
-                  return (
-                    <button
-                      key={s.name}
-                      onClick={() => toggleTaskInCountChart(s.name)}
-                      className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
-                        hidden ? 'border-slate-200 text-slate-400' : 'border-slate-300 text-slate-700'
-                      }`}
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                      <span>{s.name}</span>
-                    </button>
-                  )
-                })}
-                <button
-                  onClick={() => setShowPerTypeFailureRate((v) => !v)}
-                  className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
-                    showPerTypeFailureRate
-                      ? 'border-rose-300 text-rose-700 bg-rose-50'
-                      : 'border-slate-300 text-slate-700'
-                  }`}
-                >
-                  <span className="h-2.5 w-0.5" style={{ borderTop: '2px dashed #dc2626', width: '12px' }} />
-                  <span>{showPerTypeFailureRate ? 'Hide' : 'Show'} per-type failure rate</span>
-                </button>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {taskSeries.map((s) => {
+                    const hidden = !!countHidden[s.name]
+                    const color = pickTaskColor(s.name, sortedTaskNames)
+                    return (
+                      <button
+                        key={s.name}
+                        onClick={() => toggleTaskInCountChart(s.name)}
+                        className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
+                          hidden ? 'border-slate-200 text-slate-400' : 'border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                        <span>{s.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div>
+                  <button
+                    onClick={() => setShowPerTypeFailureRate((v) => !v)}
+                    className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
+                      showPerTypeFailureRate
+                        ? 'border-rose-300 text-rose-700 bg-rose-50'
+                        : 'border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span className="h-2.5 w-0.5" style={{ borderTop: '2px dashed #dc2626', width: '12px' }} />
+                    <span>{showPerTypeFailureRate ? 'Hide' : 'Show'} per-type failure rate</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
