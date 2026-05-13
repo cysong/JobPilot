@@ -30,6 +30,7 @@ import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
 import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
 import AdminJobsChartPage from '@/features/admin/pages/AdminJobsChartPage'
 import AdminAIUsageChartPage from '@/features/admin/pages/AdminAIUsageChartPage'
+import AdminTasksChartPage from '@/features/admin/pages/AdminTasksChartPage'
 import { Role } from '@/types/auth'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -95,6 +96,7 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/jobs/chart" element={<AdminJobsChartPage />} />
             <Route path="/admin/ai/charts" element={<AdminAIUsageChartPage />} />
+            <Route path="/admin/tasks/chart" element={<AdminTasksChartPage />} />
             <Route path="/admin/tasks" element={<TaskMonitorPage />} />
             {/* Admin-scoped fallback: keeps bare /admin and /admin/<unknown>
                 inside the admin area instead of falling through to the global
