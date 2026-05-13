@@ -215,9 +215,10 @@ export default function AdminTasksChartPage() {
     if (!durationData) {
       return { durationChartRows: [], durationUnit: 'ms' as const }
     }
-    // Low-sample handling (v1 fallback per spec): skip points with sampleCount < 3.
-    // The downstream gap (lookup miss -> null) naturally breaks the line at those days.
-    const MIN_SAMPLE = 3
+    // Render every backend-emitted point (backend only emits days with
+    // sampleCount > 0). Gaps in the line happen only when a task had zero
+    // successful samples on that day.
+
     // Union of all dates appearing in any series, sorted.
     const allDates = new Set<string>()
     for (const s of durationData.series) {
@@ -230,18 +231,16 @@ export default function AdminTasksChartPage() {
     for (const s of durationData.series) {
       const inner = new Map<string, number>()
       for (const p of s.points) {
-        if (p.sampleCount < MIN_SAMPLE) continue
         inner.set(p.date, p[durationMetric])
       }
       lookup.set(s.name, inner)
     }
 
-    // Decide unit based on max value seen across visible, sufficiently-sampled series.
+    // Decide unit based on max value seen across visible series.
     let maxMs = 0
     for (const s of durationData.series) {
       if (durationHidden[s.name]) continue
       for (const p of s.points) {
-        if (p.sampleCount < MIN_SAMPLE) continue
         if (p[durationMetric] > maxMs) maxMs = p[durationMetric]
       }
     }
