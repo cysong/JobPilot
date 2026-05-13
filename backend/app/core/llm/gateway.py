@@ -15,6 +15,11 @@ from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
 from app.core.llm.providers import build_provider_runtime
 from app.core.llm.types import GatewayContext
+from app.core.metrics import (
+    llm_call_duration_seconds,
+    llm_call_total,
+    llm_tokens_total,
+)
 from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
 
@@ -172,6 +177,26 @@ class AgentGateway:
             getattr(usage, "output_tokens", 0) or 0,
         )
 
+        provider = getattr(agent, "provider", None) or "unknown"
+        model = getattr(agent, "model", None) or "unknown"
+        input_tokens = getattr(usage, "input_tokens", 0) or 0
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
+
+        llm_call_total.labels(
+            agent_id=agent_id, provider=provider, model=model, outcome="ok"
+        ).inc()
+        llm_call_duration_seconds.labels(
+            agent_id=agent_id, provider=provider, model=model
+        ).observe(latency_ms / 1000.0)
+        # Always touch both kinds so the label combinations are discoverable in
+        # PromQL even for tool-only calls that produce zero tokens.
+        llm_tokens_total.labels(
+            agent_id=agent_id, provider=provider, model=model, kind="input"
+        ).inc(input_tokens)
+        llm_tokens_total.labels(
+            agent_id=agent_id, provider=provider, model=model, kind="output"
+        ).inc(output_tokens)
+
         logger.info(
             "agent_call_completed",
             agent_id=agent_id,
@@ -198,6 +223,16 @@ class AgentGateway:
         context: GatewayContext,
     ) -> None:
         """Log failed agent call."""
+        provider = getattr(agent, "provider", None) or "unknown"
+        model = getattr(agent, "model", None) or "unknown"
+
+        llm_call_total.labels(
+            agent_id=agent_id, provider=provider, model=model, outcome=error_type
+        ).inc()
+        llm_call_duration_seconds.labels(
+            agent_id=agent_id, provider=provider, model=model
+        ).observe(latency_ms / 1000.0)
+
         error_details = self._extract_error_details(error)
         logger.error(
             "agent_call_failed",
