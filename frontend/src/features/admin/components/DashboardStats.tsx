@@ -68,6 +68,7 @@ const cards: DashboardCardConfig[] = [
   {
     key: 'tasks',
     label: 'Tasks',
+    href: '/admin/tasks/chart',
     theme: {
       border: 'border-amber-300',
       tint: 'from-amber-100 via-white to-stone-50',
