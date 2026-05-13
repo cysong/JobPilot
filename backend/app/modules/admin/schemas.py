@@ -222,3 +222,46 @@ class TaskTypeStats(AdminBase):
 
 class TaskStatisticsResponse(AdminBase):
     task_type_stats: List[TaskTypeStats] = Field(..., alias="taskTypeStats")
+
+
+# ===== Tasks Analytics — daily count + failure rate =====
+class TasksDailyTrendPoint(AdminBase):
+    date: str
+    count: int
+    failed: int
+    failure_rate: Optional[float] = Field(None, alias="failureRate")
+
+
+class TasksDailyTrendSeries(AdminBase):
+    name: str
+    points: List[TasksDailyTrendPoint]
+
+
+class TasksDailyTrendResponse(AdminBase):
+    timezone: str
+    start_date: str = Field(..., alias="startDate")
+    end_date: str = Field(..., alias="endDate")
+    task_types: List[str] = Field(..., alias="taskTypes")
+    series: List[TasksDailyTrendSeries]
+
+
+# ===== Tasks Analytics — execution time percentiles =====
+class TasksExecutionTimePoint(AdminBase):
+    date: str
+    avg_ms: float = Field(..., alias="avgMs")
+    p50_ms: float = Field(..., alias="p50Ms")
+    p95_ms: float = Field(..., alias="p95Ms")
+    sample_count: int = Field(..., alias="sampleCount")
+
+
+class TasksExecutionTimeSeries(AdminBase):
+    name: str
+    points: List[TasksExecutionTimePoint]
+
+
+class TasksExecutionTimeResponse(AdminBase):
+    timezone: str
+    start_date: str = Field(..., alias="startDate")
+    end_date: str = Field(..., alias="endDate")
+    task_types: List[str] = Field(..., alias="taskTypes")
+    series: List[TasksExecutionTimeSeries]
