@@ -3,12 +3,17 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import threading
 from typing import Any
 
-from celery.signals import worker_process_init, worker_process_shutdown
+from celery.signals import worker_process_init, worker_process_shutdown, worker_ready
 
+from app.core.config import settings
 from app.core.database import engine
+
+logger = logging.getLogger(__name__)
+_metrics_server_started = False
 
 _loop: asyncio.AbstractEventLoop | None = None
 _loop_thread: threading.Thread | None = None
@@ -73,6 +78,34 @@ def run_coroutine_sync(coro: Any) -> Any:
 def _init_worker_process(**kwargs: object) -> None:
     """Create the worker event loop early in the process lifecycle."""
     _ensure_worker_loop()
+
+
+@worker_ready.connect
+def _start_metrics_server(**kwargs: object) -> None:
+    """Expose Prometheus metrics from the worker process on a dedicated port.
+
+    Worker-side metrics (Celery task signals, LLM gateway counters) accumulate
+    in the worker's local registry. Without this server they would never be
+    scraped. Solo pool only — multi-process pools need ``prometheus_client``
+    multiprocess mode.
+    """
+    global _metrics_server_started
+    if _metrics_server_started or settings.CELERY_METRICS_PORT <= 0:
+        return
+    try:
+        from prometheus_client import start_http_server
+
+        start_http_server(settings.CELERY_METRICS_PORT)
+        _metrics_server_started = True
+        logger.info(
+            "celery_metrics_server_started port=%s", settings.CELERY_METRICS_PORT
+        )
+    except OSError as exc:
+        logger.warning(
+            "celery_metrics_server_start_failed port=%s err=%s",
+            settings.CELERY_METRICS_PORT,
+            exc,
+        )
 
 
 @worker_process_shutdown.connect

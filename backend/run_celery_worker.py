@@ -16,6 +16,7 @@ configure_logging("celery_worker")
 
 # Now import and run Celery
 from app.core.celery_app import celery_app
+from app.core import celery_lifecycle  # noqa: F401  # Register worker-only signal handlers (metrics HTTP server, async loop)
 
 
 def _parse_args() -> argparse.Namespace:

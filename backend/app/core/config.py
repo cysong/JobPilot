@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     # Cache
     CACHE_ENABLED: bool = True
 
+    # Observability: Celery worker exposes Prometheus metrics on this port when
+    # value is > 0. Default 9101; set to 0 to disable.
+    CELERY_METRICS_PORT: int = 9101
+
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100

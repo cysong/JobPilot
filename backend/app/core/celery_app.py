@@ -1,9 +1,17 @@
 """Celery application configuration for JobPilot"""
 import logging
+import time
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import task_retry, task_failure, task_success
+from celery.signals import (
+    task_failure,
+    task_postrun,
+    task_prerun,
+    task_retry,
+    task_success,
+)
 
+from app.core import metrics
 from app.core.config import settings
 from app import models  # noqa: F401  # Ensure all ORM models are registered before Celery tasks load
 
@@ -80,14 +88,38 @@ if settings.DISABLE_BEAT_TASKS:
 
 # ===== Task Monitoring Signals =====
 
+# Per-task start timestamps for duration measurement. prerun adds, postrun pops.
+# Bounded by concurrent in-flight tasks per worker process (typically <100).
+_task_start_times: dict[str, float] = {}
+
+
+@task_prerun.connect
+def on_task_prerun_signal(task_id=None, task=None, **kwargs):
+    """Record task start time for duration measurement."""
+    if task_id:
+        _task_start_times[task_id] = time.monotonic()
+
+
+@task_postrun.connect
+def on_task_postrun_signal(task_id=None, task=None, **kwargs):
+    """Observe task duration when execution finishes (success or failure)."""
+    start = _task_start_times.pop(task_id, None) if task_id else None
+    if start is None or task is None:
+        return
+    duration = time.monotonic() - start
+    metrics.celery_task_duration_seconds.labels(task_name=task.name).observe(duration)
+
+
 @task_retry.connect
 def on_task_retry_signal(sender=None, task_id=None, exception=None, **kwargs):
     """
     Global signal handler for task retries.
-    Logs all retry attempts for monitoring and debugging.
+    Logs all retry attempts and emits a Prometheus counter.
     """
     task_name = sender.name if sender else "Unknown"
     retries = sender.request.retries if sender and hasattr(sender, "request") else 0
+
+    metrics.celery_task_total.labels(task_name=task_name, event="retry").inc()
 
     logger.warning(
         f"Task retry triggered: {task_name}",
@@ -111,6 +143,8 @@ def on_task_failure_signal(sender=None, task_id=None, exception=None, **kwargs):
     task_name = sender.name if sender else "Unknown"
     retries = sender.request.retries if sender and hasattr(sender, "request") else 0
 
+    metrics.celery_task_total.labels(task_name=task_name, event="failure").inc()
+
     logger.error(
         f"Task failed permanently: {task_name}",
         extra={
@@ -132,6 +166,8 @@ def on_task_success_signal(sender=None, **kwargs):
     """
     task_name = sender.name if sender else "Unknown"
     task_id = sender.request.id if sender and hasattr(sender, "request") else None
+
+    metrics.celery_task_total.labels(task_name=task_name, event="success").inc()
 
     logger.info(
         f"Task succeeded: {task_name}",
