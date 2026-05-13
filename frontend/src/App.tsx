@@ -96,6 +96,10 @@ function App() {
             <Route path="/admin/jobs/chart" element={<AdminJobsChartPage />} />
             <Route path="/admin/ai/charts" element={<AdminAIUsageChartPage />} />
             <Route path="/admin/tasks" element={<TaskMonitorPage />} />
+            {/* Admin-scoped fallback: keeps bare /admin and /admin/<unknown>
+                inside the admin area instead of falling through to the global
+                catch-all which sends users to / and then to /dashboard. */}
+            <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
 
           {/* Catch-all redirect */}
