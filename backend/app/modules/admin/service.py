@@ -554,9 +554,9 @@ class AdminService:
             by_type.setdefault(name, []).append(
                 TasksExecutionTimePoint(
                     date=local_day.isoformat(),
-                    avg_ms=float(avg_ms or 0.0),
-                    p50_ms=float(p50_ms or 0.0),
-                    p95_ms=float(p95_ms or 0.0),
+                    avg_ms=float(avg_ms),
+                    p50_ms=float(p50_ms),
+                    p95_ms=float(p95_ms),
                     sample_count=int(sample_count or 0),
                 )
             )
