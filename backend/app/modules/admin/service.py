@@ -490,3 +490,88 @@ class AdminService:
             task_types=sorted_types,
             series=series,
         )
+
+    @staticmethod
+    @jcache("admin:tasks:execution-time:{days}", ttl=300)
+    async def get_tasks_execution_time(db: AsyncSession, days: int = 30) -> TasksExecutionTimeResponse:
+        """Return per-day avg/p50/p95 execution_time_ms grouped by task_name.
+
+        Only ``status = SUCCESS`` rows contribute; failed tasks have unreliable
+        durations. A ``(date, task_name)`` cell with no successful samples is
+        omitted from that series' points — the frontend uses ``connectNulls=false``
+        to break the line at the gap.
+        """
+        days = max(7, min(days, 90))
+
+        app_tz, tz_name = AdminService._app_timezone()
+
+        today_local = datetime.now(app_tz).date()
+        start_date = today_local - timedelta(days=days - 1)
+        end_date = today_local
+
+        start_local_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=app_tz)
+        end_exclusive_local_dt = datetime.combine(
+            end_date + timedelta(days=1), datetime.min.time(), tzinfo=app_tz
+        )
+
+        start_utc = start_local_dt.astimezone(timezone.utc)
+        end_exclusive_utc = end_exclusive_local_dt.astimezone(timezone.utc)
+
+        local_date = cast(func.timezone(tz_name, TaskExecution.created_at), Date)
+        duration = TaskExecution.execution_time_ms
+
+        rows = (
+            await db.execute(
+                select(
+                    local_date.label("local_date"),
+                    TaskExecution.task_name.label("task_name"),
+                    func.avg(duration).label("avg_ms"),
+                    func.percentile_cont(0.5).within_group(duration.asc()).label("p50_ms"),
+                    func.percentile_cont(0.95).within_group(duration.asc()).label("p95_ms"),
+                    func.count(TaskExecution.id).label("sample_count"),
+                )
+                .where(
+                    TaskExecution.created_at.isnot(None),
+                    TaskExecution.created_at >= start_utc,
+                    TaskExecution.created_at < end_exclusive_utc,
+                    TaskExecution.status == TaskStatus.SUCCESS,
+                    TaskExecution.execution_time_ms.isnot(None),
+                )
+                .group_by("local_date", "task_name")
+                .order_by("local_date", "task_name")
+            )
+        ).all()
+
+        # by_type[task_name] -> list of points (chronological)
+        by_type: dict[str, list[TasksExecutionTimePoint]] = {}
+        all_types: set[str] = set()
+
+        for local_day, task_name, avg_ms, p50_ms, p95_ms, sample_count in rows:
+            if local_day is None or not task_name:
+                continue
+            name = str(task_name)
+            all_types.add(name)
+            by_type.setdefault(name, []).append(
+                TasksExecutionTimePoint(
+                    date=local_day.isoformat(),
+                    avg_ms=float(avg_ms or 0.0),
+                    p50_ms=float(p50_ms or 0.0),
+                    p95_ms=float(p95_ms or 0.0),
+                    sample_count=int(sample_count or 0),
+                )
+            )
+
+        sorted_types = sorted(all_types)
+
+        series: list[TasksExecutionTimeSeries] = [
+            TasksExecutionTimeSeries(name=name, points=by_type.get(name, []))
+            for name in sorted_types
+        ]
+
+        return TasksExecutionTimeResponse(
+            timezone=tz_name,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            task_types=sorted_types,
+            series=series,
+        )
