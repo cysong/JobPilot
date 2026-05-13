@@ -13,14 +13,22 @@ groups:
           summary: "HTTP 5xx error rate exceeded 5%"
           description: "Error rate is {{ $value | humanizePercentage }} over the last 5m."
 
-      - alert: APIHighLatency
-        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+      # Average latency, not P95 — single-user low-traffic systems don't have
+      # enough samples in any short window to make `histogram_quantile` stable
+      # (it returns bucket boundaries on sparse data). _sum / _count gives a
+      # meaningful average even with 1-2 requests per window. NaN when idle so
+      # the alert silently sleeps.
+      - alert: APISlowRequests
+        expr: |
+          sum(rate(http_request_duration_seconds_sum[10m]))
+          / sum(rate(http_request_duration_seconds_count[10m]))
+          > 1
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "API P95 latency exceeded 2s"
-          description: "P95 latency is {{ $value | humanizeDuration }}."
+          summary: "Average API request time exceeded 1s"
+          description: "10m rolling average is {{ $value | humanizeDuration }}."
 
       - alert: CeleryTaskFailureRate
         expr: |
@@ -99,7 +107,12 @@ groups:
           description: "Scrape target {{ $labels.instance }} ({{ $labels.job }}) has been down for >5m."
 
       - alert: HighRedisMemory
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        # Guarded against `redis_memory_max_bytes = 0` (unlimited Redis) which
+        # would otherwise make `used / 0 = +Inf` and fire continuously. The
+        # `and` clause silences the alert when maxmemory is not configured.
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+          and redis_memory_max_bytes > 0
         for: 10m
         labels:
           severity: warning

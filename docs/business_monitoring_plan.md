@@ -156,8 +156,11 @@ inhibit_rules:
   for: 5m
   labels: { severity: critical }
 
-- alert: APIHighLatency
-  expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+- alert: APISlowRequests
+  # avg, not p95 — single-user low-traffic systems don't have enough samples for stable quantiles.
+  expr: |
+    sum(rate(http_request_duration_seconds_sum[10m]))
+    / sum(rate(http_request_duration_seconds_count[10m])) > 1
   for: 10m
   labels: { severity: warning }
 

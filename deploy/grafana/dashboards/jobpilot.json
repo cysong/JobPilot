@@ -2,7 +2,7 @@
   "title": "JobPilot Overview",
   "uid": "jobpilot-overview",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 3,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
@@ -13,7 +13,7 @@
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total[5m])) by (handler)",
+          "expr": "sum(rate(http_requests_total[$__rate_interval])) by (handler)",
           "legendFormat": "{{ handler }}"
         }
       ],
@@ -23,13 +23,18 @@
     },
     {
       "id": 2,
-      "title": "API P95 Latency (s)",
+      "title": "API Latency (avg + p95)",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "description": "Average is stable on low traffic; p95 is computed as an accumulating quantile over the visible time range (via $__range + increase) so even sparse traffic gathers enough samples to be meaningful. Per-handler breakdown lives in the future Business Detail dashboard.",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler))",
-          "legendFormat": "p95 {{ handler }}"
+          "expr": "sum(increase(http_request_duration_seconds_sum[$__range])) / sum(increase(http_request_duration_seconds_count[$__range]))",
+          "legendFormat": "avg"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (increase(http_request_duration_seconds_bucket[$__range])))",
+          "legendFormat": "p95"
         }
       ],
       "fieldConfig": {
@@ -53,7 +58,7 @@
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[$__rate_interval])) / sum(rate(http_requests_total[$__rate_interval])) * 100",
           "legendFormat": "5xx error rate"
         }
       ],
@@ -73,26 +78,27 @@
     },
     {
       "id": 4,
-      "title": "Redis Memory Usage (%)",
+      "title": "Redis Memory Used",
       "type": "gauge",
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "description": "Resident memory of jobpilot-redis. Max axis matches the container's configured maxmemory (128 MiB).",
       "targets": [
         {
-          "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
-          "legendFormat": "Redis memory"
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "Used"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "bytes",
           "min": 0,
-          "max": 100,
+          "max": 134217728,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 60 },
-              { "color": "red", "value": 80 }
+              { "color": "yellow", "value": 83886080 },
+              { "color": "red", "value": 107374182 }
             ]
           }
         }
