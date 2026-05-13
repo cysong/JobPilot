@@ -11,10 +11,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type {
-  NameType,
-  ValueType,
-} from 'recharts/types/component/DefaultTooltipContent'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useChartReady } from '@/lib/useChartReady'
@@ -41,6 +37,111 @@ function ChartStateBox({ message }: { message: string }) {
   return (
     <div className="flex h-[24rem] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
       {message}
+    </div>
+  )
+}
+
+interface CountTooltipEntry {
+  name?: string
+  value?: number | string | null
+  color?: string
+  dataKey?: string
+}
+
+interface CountTooltipProps {
+  active?: boolean
+  payload?: CountTooltipEntry[]
+  label?: string
+}
+
+// Custom tooltip for Chart 1. Rate entries (overall + per-type) render as
+// percentages; stacked count entries render as integers. Rate rows sort
+// to the bottom so the stack composition reads first.
+function CountTooltip({ active, payload, label }: CountTooltipProps) {
+  if (!active || !payload?.length) return null
+
+  const isRateKey = (key?: string) =>
+    key === 'overallFailureRate' || (typeof key === 'string' && key.endsWith('__rate'))
+
+  const rows = [...payload].sort((left, right) => {
+    const leftIsRate = isRateKey(left.dataKey) ? 1 : 0
+    const rightIsRate = isRateKey(right.dataKey) ? 1 : 0
+    if (leftIsRate !== rightIsRate) return leftIsRate - rightIsRate
+    return Number(right.value ?? 0) - Number(left.value ?? 0)
+  })
+
+  return (
+    <div className="min-w-44 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl">
+      <div className="text-sm font-semibold text-slate-950">{label}</div>
+      <div className="mt-2 space-y-1 text-xs text-slate-600">
+        {rows.map((entry) => {
+          const rate = isRateKey(entry.dataKey)
+          const value = entry.value
+          const display =
+            value === null || value === undefined
+              ? '—'
+              : rate
+                ? `${Number(value).toFixed(1)}%`
+                : Number(value).toLocaleString('en-US')
+          return (
+            <div key={entry.dataKey ?? entry.name} className="flex items-center justify-between gap-6">
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                {entry.name}
+              </span>
+              <span className="font-medium text-slate-900">{display}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+interface DurationTooltipEntry {
+  name?: string
+  value?: number | string | null
+  color?: string
+  dataKey?: string
+}
+
+interface DurationTooltipProps {
+  active?: boolean
+  payload?: DurationTooltipEntry[]
+  label?: string
+  unit?: 'ms' | 's' | 'm'
+}
+
+// Custom tooltip for Chart 2. Values are already unit-converted in the
+// chart data; we just append the unit suffix. Rows sort by value desc.
+function DurationTooltip({ active, payload, label, unit = 'ms' }: DurationTooltipProps) {
+  if (!active || !payload?.length) return null
+
+  const rows = [...payload].sort(
+    (left, right) => Number(right.value ?? 0) - Number(left.value ?? 0),
+  )
+
+  return (
+    <div className="min-w-44 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl">
+      <div className="text-sm font-semibold text-slate-950">{label}</div>
+      <div className="mt-2 space-y-1 text-xs text-slate-600">
+        {rows.map((entry) => {
+          const value = entry.value
+          const display =
+            value === null || value === undefined
+              ? '—'
+              : `${Number(value).toFixed(2)} ${unit}`
+          return (
+            <div key={entry.dataKey ?? entry.name} className="flex items-center justify-between gap-6">
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                {entry.name}
+              </span>
+              <span className="font-medium text-slate-900">{display}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -99,7 +200,6 @@ export default function AdminTasksChartPage() {
 
   // Chart 2 state
   const [durationMetric, setDurationMetric] = useState<'avgMs' | 'p50Ms' | 'p95Ms'>('p50Ms')
-  const [durationScale, setDurationScale] = useState<'linear' | 'log'>('linear')
   const [durationHidden, setDurationHidden] = useState<Record<string, boolean>>({})
   const [durationChartRef, durationChartReady] = useChartReady<HTMLDivElement>()
 
@@ -257,23 +357,7 @@ export default function AdminTasksChartPage() {
                         tick={{ fill: '#94a3b8', fontSize: 11 }}
                         tickFormatter={(v: number) => `${Math.round(v)}%`}
                       />
-                      <Tooltip
-                        formatter={(value: ValueType | undefined, name: NameType | undefined) => {
-                          if (typeof name === 'string' && name.endsWith(' %')) {
-                            const numeric =
-                              typeof value === 'number' || typeof value === 'string'
-                                ? Number(value)
-                                : null
-                            return [
-                              numeric === null || Number.isNaN(numeric)
-                                ? '—'
-                                : `${numeric.toFixed(1)}%`,
-                              name,
-                            ]
-                          }
-                          return [value ?? '—', name]
-                        }}
-                      />
+                      <Tooltip content={<CountTooltip />} />
 
                       {countMode === 'bar'
                         ? taskSeries.map((s) =>
@@ -408,13 +492,6 @@ export default function AdminTasksChartPage() {
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setDurationScale((s) => (s === 'linear' ? 'log' : 'linear'))}
-                aria-pressed={durationScale === 'log'}
-                className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-              >
-                {durationScale === 'linear' ? 'linear' : 'log'}
-              </button>
               {[7, 30, 60].map((d) => (
                 <Button
                   key={d}
@@ -456,28 +533,13 @@ export default function AdminTasksChartPage() {
                         tick={{ fill: '#64748b', fontSize: 11 }}
                       />
                       <YAxis
-                        scale={durationScale}
-                        domain={durationScale === 'log' ? [0.01, 'auto'] : [0, 'auto']}
-                        allowDataOverflow={durationScale === 'log'}
+                        domain={[0, 'auto']}
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 11 }}
                         tickFormatter={(v: number) => `${v.toFixed(v < 10 ? 1 : 0)} ${durationUnit}`}
                       />
-                      <Tooltip
-                        formatter={(value: ValueType | undefined, name: NameType | undefined) => {
-                          const numeric =
-                            typeof value === 'number' || typeof value === 'string'
-                              ? Number(value)
-                              : null
-                          return [
-                            numeric === null || Number.isNaN(numeric)
-                              ? '—'
-                              : `${numeric.toFixed(2)} ${durationUnit}`,
-                            name,
-                          ]
-                        }}
-                      />
+                      <Tooltip content={<DurationTooltip unit={durationUnit} />} />
 
                       {sortedDurationTaskNames.map((name) =>
                         durationHidden[name] ? null : (

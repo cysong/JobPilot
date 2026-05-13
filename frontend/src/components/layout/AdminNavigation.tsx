@@ -45,7 +45,7 @@ export function AdminNavigation() {
                 to={link.href}
                 className={cn(
                   'transition-colors hover:text-indigo-600',
-                  location.pathname.startsWith(link.href)
+                  location.pathname === link.href
                     ? 'text-indigo-600 font-semibold'
                     : 'text-slate-600'
                 )}

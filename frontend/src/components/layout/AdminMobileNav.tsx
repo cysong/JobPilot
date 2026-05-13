@@ -70,7 +70,7 @@ export function AdminMobileNav() {
         <div className="flex flex-col space-y-3 mt-8">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = location.pathname.startsWith(item.href)
+            const isActive = location.pathname === item.href
             return (
               <Link
                 key={item.href}
