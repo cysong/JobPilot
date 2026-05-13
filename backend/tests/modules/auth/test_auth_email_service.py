@@ -29,6 +29,7 @@ async def test_send_includes_reply_to_when_configured(monkeypatch):
         to_email="user@example.com",
         subject="Subject",
         html="<p>Hello</p>",
+        kind="verification",
     )
 
     assert fake_resend.api_key == "test-api-key"
@@ -63,6 +64,7 @@ async def test_send_omits_reply_to_when_not_configured(monkeypatch):
         to_email="user@example.com",
         subject="Subject",
         html="<p>Hello</p>",
+        kind="verification",
     )
 
     assert fake_resend.api_key == "test-api-key"

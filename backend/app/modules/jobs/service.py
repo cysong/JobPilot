@@ -33,6 +33,7 @@ from app.modules.jobs.schemas import (
 from app.modules.auth.models import User
 from app.core.config import settings
 from app.core.exceptions import BadRequestError, NotFoundError, ServiceUnavailableError
+from app.core.metrics import job_ingest_total
 from app.shared.pagination import PaginationParams
 
 
@@ -619,6 +620,7 @@ class JobService:
         api_key = settings.ENQUEUE_API_KEY
         if not api_url or not api_key:
             logger.warning("ENQUEUE_API_URL/KEY not configured")
+            job_ingest_total.labels(source="manual_url", outcome="unavailable").inc()
             raise ServiceUnavailableError("Manual enqueue is not configured")
 
         try:
@@ -631,8 +633,13 @@ class JobService:
                     },
                     json={"url": url},
                 )
+        except httpx.TimeoutException as exc:
+            logger.warning("Enqueue API timeout: %s", exc)
+            job_ingest_total.labels(source="manual_url", outcome="timeout").inc()
+            raise ServiceUnavailableError("Enqueue service unavailable") from exc
         except httpx.HTTPError as exc:
             logger.warning("Enqueue API network error: %s", exc)
+            job_ingest_total.labels(source="manual_url", outcome="error").inc()
             raise ServiceUnavailableError("Enqueue service unavailable") from exc
 
         # Try to parse JSON; tolerate empty/non-JSON 5xx responses.
@@ -657,6 +664,7 @@ class JobService:
                 if existing is not None:
                     existing_job_id = existing.id
 
+            job_ingest_total.labels(source="manual_url", outcome="ok").inc()
             return JobEnqueueResponse(
                 enqueued=enqueued,
                 source=source,
@@ -667,6 +675,7 @@ class JobService:
 
         if resp.status_code == 400:
             error_text = str(body.get("error") or "Bad request")
+            job_ingest_total.labels(source="manual_url", outcome="bad_request").inc()
             raise BadRequestError(error_text)
 
         # 401, 500, anything else: hide upstream specifics.
@@ -677,4 +686,5 @@ class JobService:
             body,
             request_id,
         )
+        job_ingest_total.labels(source="manual_url", outcome="error").inc()
         raise ServiceUnavailableError("Enqueue service unavailable")

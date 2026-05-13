@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.core.config import settings
+from app.core.metrics import resend_email_total
 
 
 class AuthEmailService:
@@ -19,8 +20,27 @@ class AuthEmailService:
         if not settings.RESEND_FROM_EMAIL:
             raise RuntimeError("RESEND_FROM_EMAIL is not configured")
 
+    @staticmethod
+    def _classify_send_error(exc: BaseException) -> str:
+        """Map a Resend SDK exception to a bounded outcome label."""
+        from resend import exceptions as rex
+
+        if isinstance(exc, (rex.InvalidApiKeyError, rex.MissingApiKeyError)):
+            return "auth_error"
+        if isinstance(exc, rex.RateLimitError):
+            return "rate_limit"
+        if isinstance(
+            exc, (rex.MissingRequiredFieldsError, rex.ValidationError, rex.NoContentError)
+        ):
+            return "validation_error"
+        if isinstance(exc, rex.ApplicationError):
+            return "application_error"
+        return "error"
+
     @classmethod
-    async def _send(cls, *, to_email: str, subject: str, html: str) -> None:
+    async def _send(
+        cls, *, to_email: str, subject: str, html: str, kind: str
+    ) -> None:
         cls._ensure_email_config()
 
         import resend
@@ -35,7 +55,13 @@ class AuthEmailService:
         if settings.RESEND_REPLY_TO_EMAIL:
             payload["reply_to"] = settings.RESEND_REPLY_TO_EMAIL
 
-        resend.Emails.send(payload)
+        try:
+            resend.Emails.send(payload)
+        except Exception as exc:
+            outcome = cls._classify_send_error(exc)
+            resend_email_total.labels(kind=kind, outcome=outcome).inc()
+            raise
+        resend_email_total.labels(kind=kind, outcome="ok").inc()
 
     @classmethod
     async def send_verification_email(cls, to_email: str, token: str) -> None:
@@ -46,7 +72,12 @@ class AuthEmailService:
             "<p>This link expires in 24 hours. If you did not create this account, you can ignore this email.</p>"
             f"<p>{verification_url}</p>"
         )
-        await cls._send(to_email=to_email, subject="Verify your JobPilot email", html=html)
+        await cls._send(
+            to_email=to_email,
+            subject="Verify your JobPilot email",
+            html=html,
+            kind="verification",
+        )
 
     @classmethod
     async def send_password_reset_email(cls, to_email: str, token: str) -> None:
@@ -57,7 +88,12 @@ class AuthEmailService:
             "<p>This link expires in 1 hour. If you did not request this, you can ignore this email.</p>"
             f"<p>{reset_url}</p>"
         )
-        await cls._send(to_email=to_email, subject="Reset your JobPilot password", html=html)
+        await cls._send(
+            to_email=to_email,
+            subject="Reset your JobPilot password",
+            html=html,
+            kind="password_reset",
+        )
 
     @classmethod
     async def send_email_change_confirmation_email(cls, to_email: str, token: str) -> None:
@@ -72,4 +108,5 @@ class AuthEmailService:
             to_email=to_email,
             subject="Confirm your new JobPilot email",
             html=html,
+            kind="email_change",
         )
