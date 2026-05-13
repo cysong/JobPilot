@@ -11,6 +11,8 @@ import type {
   AIUsageDailyTrendResponse,
   JobsDailyTrendResponse,
   JobsTimeScatterResponse,
+  TasksDailyTrendResponse,
+  TasksExecutionTimeResponse,
 } from '@/features/admin/types'
 
 export const adminApi = {
@@ -23,6 +25,10 @@ export const adminApi = {
     apiClient.get<AIUsageDailyTrendResponse>('/admin/ai/tokens-daily-trend', { params }),
   getAICostDailyTrend: (params?: { days?: number }) =>
     apiClient.get<AIUsageDailyTrendResponse>('/admin/ai/cost-daily-trend', { params }),
+  getTasksDailyTrend: (params?: { days?: number }) =>
+    apiClient.get<TasksDailyTrendResponse>('/admin/tasks/daily-trend', { params }),
+  getTasksExecutionTime: (params?: { days?: number }) =>
+    apiClient.get<TasksExecutionTimeResponse>('/admin/tasks/execution-time', { params }),
   getWorkerStatus: () => apiClient.get<WorkerMonitorResponse>('/admin/workers'),
   getTasks: (params: {
     status?: string
