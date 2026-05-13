@@ -5,7 +5,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -110,7 +109,7 @@ export default function AdminTasksChartPage() {
   // Days where a task_name had zero successful samples become null on that key.
   const { durationChartRows, durationUnit } = useMemo(() => {
     if (!durationData) {
-      return { durationChartRows: [], durationUnit: 'ms', durationUnitDivisor: 1 }
+      return { durationChartRows: [], durationUnit: 'ms' as const }
     }
     // Low-sample handling (v1 fallback per spec): skip points with sampleCount < 3.
     // The downstream gap (lookup miss -> null) naturally breaks the line at those days.
@@ -163,7 +162,7 @@ export default function AdminTasksChartPage() {
       }
       return row
     })
-    return { durationChartRows: rows, durationUnit: unit, durationUnitDivisor: divisor }
+    return { durationChartRows: rows, durationUnit: unit }
   }, [durationData, durationMetric, durationHidden, sortedDurationTaskNames])
 
   const toggleTaskInDurationChart = (name: string) => {
@@ -255,7 +254,7 @@ export default function AdminTasksChartPage() {
                         tickFormatter={(v: number) => `${Math.round(v)}%`}
                       />
                       <Tooltip
-                        formatter={(value: number | string, name: string) => {
+                        formatter={(value: number | string | null, name: string) => {
                           if (typeof name === 'string' && name.endsWith(' %')) {
                             return [
                               value === null ? '—' : `${Number(value).toFixed(1)}%`,
@@ -265,7 +264,6 @@ export default function AdminTasksChartPage() {
                           return [value, name]
                         }}
                       />
-                      <Legend wrapperStyle={{ display: 'none' }} />
 
                       {countMode === 'bar'
                         ? taskSeries.map((s) =>
@@ -339,6 +337,7 @@ export default function AdminTasksChartPage() {
                       <button
                         key={s.name}
                         onClick={() => toggleTaskInCountChart(s.name)}
+                        aria-pressed={!hidden}
                         className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
                           hidden ? 'border-slate-200 text-slate-400' : 'border-slate-300 text-slate-700'
                         }`}
@@ -352,13 +351,14 @@ export default function AdminTasksChartPage() {
                 <div>
                   <button
                     onClick={() => setShowPerTypeFailureRate((v) => !v)}
+                    aria-pressed={showPerTypeFailureRate}
                     className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
                       showPerTypeFailureRate
                         ? 'border-rose-300 text-rose-700 bg-rose-50'
                         : 'border-slate-300 text-slate-700'
                     }`}
                   >
-                    <span className="h-2.5 w-0.5" style={{ borderTop: '2px dashed #dc2626', width: '12px' }} />
+                    <span style={{ borderTop: '2px dashed #dc2626', width: '12px', height: 0 }} />
                     <span>{showPerTypeFailureRate ? 'Hide' : 'Show'} per-type failure rate</span>
                   </button>
                 </div>
@@ -387,6 +387,7 @@ export default function AdminTasksChartPage() {
                   <button
                     key={m}
                     onClick={() => setDurationMetric(m)}
+                    aria-pressed={durationMetric === m}
                     className={`rounded px-2 py-1 text-xs ${
                       durationMetric === m
                         ? 'bg-slate-900 text-white'
@@ -399,6 +400,7 @@ export default function AdminTasksChartPage() {
               </div>
               <button
                 onClick={() => setDurationScale((s) => (s === 'linear' ? 'log' : 'linear'))}
+                aria-pressed={durationScale === 'log'}
                 className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
               >
                 {durationScale === 'linear' ? 'linear' : 'log'}
@@ -458,7 +460,6 @@ export default function AdminTasksChartPage() {
                           name,
                         ]}
                       />
-                      <Legend wrapperStyle={{ display: 'none' }} />
 
                       {sortedDurationTaskNames.map((name) =>
                         durationHidden[name] ? null : (
@@ -487,6 +488,7 @@ export default function AdminTasksChartPage() {
                     <button
                       key={`duration-legend-${name}`}
                       onClick={() => toggleTaskInDurationChart(name)}
+                      aria-pressed={!hidden}
                       className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
                         hidden ? 'border-slate-200 text-slate-400' : 'border-slate-300 text-slate-700'
                       }`}
