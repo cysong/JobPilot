@@ -1,29 +1,103 @@
 groups:
+  # ===== SLO-anchored alerts =====
   - name: jobpilot_slo
     rules:
-      # API P95 latency > 2s for 5 minutes
-      - alert: HighAPILatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "API P95 latency exceeded 2s"
-          description: "P95 latency is {{ $value | humanizeDuration }}, threshold is 2s."
-
-      # HTTP 5xx error rate > 5% for 5 minutes
-      - alert: HighErrorRate
-        expr: >
-          rate(http_requests_total{status=~"5.."}[5m])
-          / rate(http_requests_total[5m]) > 0.05
+      - alert: APIHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "HTTP 5xx error rate exceeded 5%"
-          description: "Error rate is {{ $value | humanizePercentage }}."
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5m."
 
-      # Redis memory usage > 80% for 10 minutes
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API P95 latency exceeded 2s"
+          description: "P95 latency is {{ $value | humanizeDuration }}."
+
+      - alert: CeleryTaskFailureRate
+        expr: |
+          sum(rate(jobpilot_celery_task_total{event="failure"}[10m])) by (task_name)
+          / sum(rate(jobpilot_celery_task_total{event=~"success|failure"}[10m])) by (task_name)
+          > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery task {{ $labels.task_name }} failure rate > 10%"
+          description: "Failure rate is {{ $value | humanizePercentage }} over the last 10m."
+
+      - alert: LLMCallFailureRate
+        expr: |
+          sum(rate(jobpilot_llm_call_total{outcome!="ok"}[10m])) by (agent_id)
+          / sum(rate(jobpilot_llm_call_total[10m])) by (agent_id) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM agent {{ $labels.agent_id }} failure rate > 20%"
+          description: "Non-ok outcomes are {{ $value | humanizePercentage }} of all calls."
+
+  # ===== Anomaly patterns =====
+  - name: jobpilot_anomaly
+    rules:
+      - alert: CeleryRetryStorm
+        expr: sum(rate(jobpilot_celery_task_total{event="retry"}[5m])) by (task_name) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery retry storm for task {{ $labels.task_name }}"
+          description: "Retry rate is {{ $value }}/s — likely a downstream dependency issue."
+
+      - alert: CeleryQueueBacklog
+        expr: jobpilot_celery_queue_length > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery queue {{ $labels.queue_name }} backlog > 100"
+          description: "Queue length is {{ $value }} — workers cannot keep up."
+
+      - alert: ResendDeliveryFailure
+        expr: |
+          sum(rate(jobpilot_resend_email_total{outcome!~"ok|validation_error"}[10m]))
+          / sum(rate(jobpilot_resend_email_total[10m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Resend email delivery failure rate > 10%"
+          description: "Non-deliverable rate is {{ $value | humanizePercentage }} — user signup / reset flows are degraded."
+
+  # ===== Infrastructure =====
+  - name: jobpilot_infra
+    rules:
+      - alert: APIDown
+        expr: up{job="jobpilot-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "JobPilot API target is down"
+          description: "Prometheus has been unable to scrape jobpilot-api for >1m."
+
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Scrape target {{ $labels.instance }} ({{ $labels.job }}) has been down for >5m."
+
       - alert: HighRedisMemory
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
         for: 10m

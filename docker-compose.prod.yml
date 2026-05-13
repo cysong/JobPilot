@@ -27,6 +27,8 @@ services:
     env_file:
       - ./deploy/env/backend.env
     command: ["uv", "run", "python", "run_celery_worker.py"]
+    expose:
+      - "9101"  # Prometheus metrics endpoint inside the internal network
     depends_on:
       jobpilot-redis:
         condition: service_healthy
@@ -72,6 +74,46 @@ services:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./deploy/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus-data:/prometheus
+    depends_on:
+      jobpilot-alertmanager:
+        condition: service_healthy
+    networks:
+      - jobpilot-internal
+
+  jobpilot-alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: jobpilot-alertmanager
+    restart: unless-stopped
+    env_file:
+      - ./deploy/env/monitoring.env
+    # The Gmail SMTP password arrives as $GF_SMTP_PASSWORD (shared with
+    # Grafana). We write it to a file at startup so alertmanager.yml's
+    # `auth_password_file` can read it without the secret ever appearing in
+    # the config file. Alerting reuses Grafana's Gmail account by design —
+    # Resend is reserved for product email.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "$${GF_SMTP_PASSWORD:-}" ]; then
+          echo "ERROR: GF_SMTP_PASSWORD is not set in monitoring.env" >&2
+          exit 1
+        fi
+        mkdir -p /etc/alertmanager/secrets
+        printf '%s' "$${GF_SMTP_PASSWORD}" > /etc/alertmanager/secrets/smtp_password
+        chmod 600 /etc/alertmanager/secrets/smtp_password
+        exec /bin/alertmanager \
+          --config.file=/etc/alertmanager/alertmanager.yml \
+          --storage.path=/alertmanager
+    volumes:
+      - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     networks:
       - jobpilot-internal
 
@@ -121,6 +163,7 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
 
 networks:
   jobpilot-internal:

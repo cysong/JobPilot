@@ -5,11 +5,22 @@ global:
 rule_files:
   - /etc/prometheus/alert_rules.yml
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["jobpilot-alertmanager:9093"]
+
 scrape_configs:
-  # FastAPI application metrics
+  # FastAPI application metrics (instrumentator + business counters)
   - job_name: jobpilot-api
     static_configs:
       - targets: ["jobpilot-api:8000"]
+    metrics_path: /metrics
+
+  # Celery worker business metrics (Celery signals + LLM gateway counters)
+  - job_name: jobpilot-worker
+    static_configs:
+      - targets: ["jobpilot-worker:9101"]
     metrics_path: /metrics
 
   # Redis metrics via redis-exporter

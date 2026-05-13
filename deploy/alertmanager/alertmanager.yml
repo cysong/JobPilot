@@ -1,0 +1,89 @@
+# Alertmanager config for JobPilot.
+#
+# Email delivery uses Gmail SMTP (smtp.gmail.com:587), sharing the same Gmail
+# account already configured for Grafana (GF_SMTP_*). The password is sourced
+# from $GF_SMTP_PASSWORD in monitoring.env and written to a secret file by the
+# alertmanager container entrypoint; this config reads it via
+# `auth_password_file` so the secret never appears in the file.
+#
+# Resend (used by the application for user verification / password-reset
+# emails) is intentionally NOT used here — alerting and product email run on
+# independent rails so degradation of one cannot mask the other.
+#
+# Severity-based routing (single channel, throttled differently):
+#   critical → send immediately, repeat every 1h
+#   warning  → batch for 30s, repeat every 4h
+#   info     → suppressed (visible in Grafana only)
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: gmail
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: gmail
+      group_wait: 0s
+      repeat_interval: 1h
+    - matchers:
+        - severity = info
+      receiver: "null"
+
+receivers:
+  - name: "null"
+
+  - name: gmail
+    email_configs:
+      - to: yansongc@gmail.com
+        from: yansongc@gmail.com
+        smarthost: smtp.gmail.com:587
+        auth_username: yansongc@gmail.com
+        auth_identity: yansongc@gmail.com
+        auth_password_file: /etc/alertmanager/secrets/smtp_password
+        require_tls: true
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }} ({{ .GroupLabels.severity }})'
+        html: |-
+          <h3>[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}</h3>
+          <p><b>Severity:</b> {{ .GroupLabels.severity }}</p>
+          {{ if gt (len .Alerts.Firing) 0 }}
+          <h4>Firing ({{ .Alerts.Firing | len }})</h4>
+          <ul>
+          {{ range .Alerts.Firing }}
+            <li>
+              <b>{{ .Annotations.summary }}</b><br/>
+              {{ .Annotations.description }}<br/>
+              {{ if .Annotations.runbook_url }}<a href="{{ .Annotations.runbook_url }}">Runbook</a> ·{{ end }}
+              Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+            </li>
+          {{ end }}
+          </ul>
+          {{ end }}
+          {{ if gt (len .Alerts.Resolved) 0 }}
+          <h4>Resolved ({{ .Alerts.Resolved | len }})</h4>
+          <ul>
+          {{ range .Alerts.Resolved }}
+            <li>{{ .Annotations.summary }} — resolved at {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}</li>
+          {{ end }}
+          </ul>
+          {{ end }}
+
+inhibit_rules:
+  # When a critical fires, suppress the same-named warning to avoid duplicates
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: [alertname]
+
+  # When the API is down, suppress all derived business alerts
+  - source_matchers:
+      - alertname = APIDown
+    target_matchers:
+      - severity =~ "warning|critical"
