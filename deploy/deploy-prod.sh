@@ -115,6 +115,13 @@ docker compose -f "${COMPOSE_FILE}" up -d \
   jobpilot-redis-exporter \
   jobpilot-cadvisor
 
+# `up -d` only recreates containers whose compose config changed, so edits to
+# the bind-mounted prometheus.yml / alert_rules.yml / alertmanager.yml would
+# otherwise never be picked up. Both binaries reload their config on SIGHUP
+# (alertmanager is exec'd as PID 1 by its entrypoint).
+echo "Reloading Prometheus and Alertmanager config..."
+docker compose -f "${COMPOSE_FILE}" kill -s SIGHUP jobpilot-prometheus jobpilot-alertmanager
+
 echo "Waiting for API health..."
 for _ in {1..30}; do
   if curl -fsS "http://127.0.0.1:18000/health" >/dev/null; then
