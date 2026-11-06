@@ -2,10 +2,10 @@
 
 ## Current Status
 
-**Version:** v0.3.0 (Resume Management Module)
-**Next Task:** Stage 3 - Application Module
+**Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
+**Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-11-06
 
 ---
 
@@ -123,6 +123,99 @@
 - Updated the production deploy workflow to upload `backend/.env.example` directly as `deploy/env/backend.env.example` on the VPS.
 - Updated the production deploy script to auto-create `deploy/env/backend.env` from the uploaded template when the real env file is missing, then stop with an explicit fill-and-rerun message.
 - Updated deployment docs to describe the single-source template workflow.
+
+### 2026-04-08 - Cover Letter Narrative Structure
+
+- Added a narrative structure section to the cover letter writing prompt config.
+
+### 2026-04-13 - Application Status History Timeline
+
+- Added `application_status_history` model and migration, with backfill from existing applications.
+- Status changes are now written to the history table; added history API endpoints.
+- Added status history timeline UI on the application detail page.
+- Application detail job attributes now show salary (`salary_label`) instead of category.
+- Added copy button to the cover letter review panel.
+- Admin jobs chart: weekend highlight and midnight ticks on the X axis.
+
+### 2026-04-18 - Hide Expired Jobs Filter and CI Type Fixes
+
+- Added a hide-expired filter switch to the jobs listing.
+- Fixed pre-existing TypeScript compile errors that blocked CI.
+- Fixed `tailoring_progress` jsonb cast in the status history migration.
+- Cleaned up admin jobs chart code and X-axis tick display.
+
+### 2026-04-21 - Job Source Display Metadata
+
+- Source display metadata (label/icon/color) is now defined in YAML config and exposed via `GET /sources/meta`.
+- Added frontend source-meta store with lazy fetch and icon bundle; Source filter dropdown shows display labels.
+- Widened `seniority` and `experience_years` varchar columns to 200.
+
+### 2026-04-22 - Application Enums, UI Polish, Unified Settings
+
+- Added `EnumColumn` helper; application status now uses native PG ENUM with UPPER_SNAKE_CASE values (name == value), documented in README.
+- Aligned frontend `ApplicationStatus` literals with backend; fixed dashboard pipeline count casing.
+- Applications list/detail UI polish: split action button, unified `STATUS_PALETTE`, uniform timeline list.
+- Exposed application funnel counts and used them for dashboard outcomes; capped Needs Attention and Recommended Jobs at 3.
+- Unified Profile, Account and Security into a single Settings page.
+
+### 2026-04-26 - API Keys
+
+- Added API key feature (design: `docs/api_key_design.md`):
+  - `ApiKey` model, schemas, service and migration (folded into the `auth` module)
+  - `get_current_user` accepts API key alongside JWT; sensitive routes locked to JWT only
+  - management endpoints and frontend Settings → API Keys page
+  - `last_used_at` writes throttled via Redis `SET NX EX`
+- Dropped trailing-slash redirects so API key auth headers are not lost.
+- Fixed recharts `-1` dimension warning by gating `ResponsiveContainer` on real container size.
+
+### 2026-04-28 ~ 2026-04-30 - Database Egress Optimization and Job Filters
+
+- Reduced database egress: narrowed poll/match query SELECTs, added `BRIEF_COLUMNS` guard test and AST-based N+1 guard for `list_my_matches`.
+- Wired `JOB_ANALYSIS_LOOKBACK_DAYS` into the poll query; disabled the pull-unmatched-jobs beat schedule.
+- Added `DISABLE_BEAT_TASKS` env switch to pause all Celery beat schedules.
+- Admin tasks refresh interval changed to 30s; sub-second durations shown in ms.
+- Job filters: location dropdown restricted to NZ cities; company filter is case-insensitive.
+- Registered more source icons (glassdoor, workable, smartrecruiters, successfactors_csb, pageup_jobtools, workday); source label collapsed into icon tooltip.
+- Added job matching algorithm design notes (`docs/job_matching_algorithm_design.md`).
+- Fixed `create_application` job instance regression and dashboard chart rendering (`useChartReady` callback ref).
+
+### 2026-05-09 - Manual Job Enqueue by URL
+
+- Added `POST /jobs/enqueue` which proxies to an AWS Function URL (`ENQUEUE_API_URL` / `ENQUEUE_API_KEY`).
+- Added `ServiceUnavailableError` (503) and `JobRepository.get_by_source_and_source_id`.
+- Added frontend `EnqueueJobDialog` and "Add Job by URL" button on the job listing page.
+- Design and plan: `docs/manual_job_enqueue_design.md`, `docs/manual_job_enqueue_plan.md`.
+
+### 2026-05-13 - Business Monitoring (Prometheus / Grafana / Alertmanager)
+
+- Added `jobpilot_` Prometheus metrics module (plan: `docs/business_monitoring_plan.md`):
+  - Celery task metrics + worker `/metrics` server
+  - AgentGateway LLM call and token metrics (exceptions annotated with provider and agent_id)
+  - API error metrics and Celery queue gauge
+  - Resend email and job ingest metrics
+- Wired Alertmanager and worker scrape target into deploy; CI syncs `deploy/alertmanager/alertmanager.yml` to the VPS.
+- Tuned dashboard and alert thresholds for a single-user, low-traffic system.
+- Added Grafana Business Detail dashboard.
+- `/admin` and unknown `/admin/*` routes redirect to `/admin/dashboard`.
+
+### 2026-05-13 - Admin Tasks Analytics Page
+
+- Added tasks daily-trend (with failure rate) and execution-time percentile aggregation endpoints.
+- Added admin tasks analytics page with volume and execution-time charts, linked from the dashboard tasks card.
+- Design and plan: `docs/tasks_analytics_design.md`, `docs/tasks_analytics_plan.md`.
+
+### 2026-11-06 - SRE Stage 1 Wrap-up: SLO and Runbooks
+
+- Backfilled this progress log for 2026-04 ~ 2026-05 work and refreshed Current Status / Next Steps.
+- Added `docs/slo.md`: four SLIs (API availability 99.5%, API latency ≤1s 95%, Celery task success 98%, LLM call success 95%) on a rolling 14-day window (fits the 15d Prometheus retention), PromQL queries, and error budget policy.
+- Added `docs/runbooks.md` with triage and mitigation steps for all 10 alerts in `deploy/prometheus/alert_rules.yml`.
+- Added `runbook_url` annotations to every alert rule; Alertmanager email template already renders them as links.
+- Marked SRE Stage 1 complete in `docs/sre_plan.md`.
+- Validation:
+  - `promtool check rules deploy/prometheus/alert_rules.yml` (prom/prometheus:v2.51.2): `SUCCESS: 10 rules found`
+- Fixed `APIHighErrorRate` / `APISlowRequests` being diluted by synthetic traffic:
+  - both expressions now exclude `handler=~"/metrics|/health"` (Prometheus scrapes every 15s outnumbered real requests, so real 5xx could never reach 5%)
+  - added minimum-volume guards (≥3 5xx in 5m, ≥5 requests in 10m) so a single bad request on the now-tiny denominator does not page
 
 ### 2026-03-30 - Asyncpg Prepared Statement Cache Compatibility
 
@@ -1584,22 +1677,13 @@ cd backend
 
 ## Next Steps
 
-### Stage 3: Application Module
-- **Backend/Frontend**:
-  - Verify application resume/cover letter PDF downloads and cover letter template rendering
-- **Backend**:
-  - Design Application model (user_id, job_id, resume_id, status)
-  - Create API endpoints for applying to jobs
-  - Implement file upload for resumes (if not already done)
-- **Frontend**:
-  - Build "Apply Now" modal/flow
-  - Create "My Applications" page
-  - Integrate Resume upload
+### Reliability (SRE)
+- Add SLO / Error Budget panels to the Grafana dashboard (queries in `docs/slo.md`)
+- SRE Stage 2: AWS migration + Terraform IaC (`docs/sre_plan.md`)
 
-### Stage 4: User Profile & Settings
-- **Frontend**:
-  - Build User Profile page
-  - Settings page (password change, notification prefs)
+### Product (docs/plan.md v0.5 remainder)
+- Material editing with version chain and lock after Applied
+- Application notes, bulk actions, soft delete and restore
 
 ## Known Issues
 

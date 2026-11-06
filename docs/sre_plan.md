@@ -272,11 +272,11 @@ groups:
 
 ### 阶段 1：可观测性（当前 VPS，最高优先级）
 
-- [ ] 在 FastAPI 中集成 `prometheus-fastapi-instrumentator`
-- [ ] 在 docker-compose 中添加 Prometheus / Grafana / Alertmanager 服务
-- [ ] 配置 Grafana Dashboard（API 延迟 / 错误率 / Celery 队列）
-- [ ] 定义并文档化 SLO / SLI / Error Budget
-- [ ] 编写 Runbook（告警触发时的处理流程）
+- [x] 在 FastAPI 中集成 `prometheus-fastapi-instrumentator`
+- [x] 在 docker-compose 中添加 Prometheus / Grafana / Alertmanager 服务
+- [x] 配置 Grafana Dashboard（API 延迟 / 错误率 / Celery 队列）
+- [x] 定义并文档化 SLO / SLI / Error Budget（见 [slo.md](slo.md)）
+- [x] 编写 Runbook（告警触发时的处理流程，见 [runbooks.md](runbooks.md)）
 
 ### 阶段 2：迁移 AWS + Terraform IaC
 

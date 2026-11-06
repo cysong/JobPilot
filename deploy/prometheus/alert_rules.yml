@@ -2,16 +2,23 @@ groups:
   # ===== SLO-anchored alerts =====
   - name: jobpilot_slo
     rules:
+      # Prometheus scrapes (/metrics every 15s) and container healthchecks
+      # (/health) far outnumber real requests on a single-user system; they
+      # are excluded so real 5xx / slow responses are not diluted. With them
+      # gone the denominator is tiny, so each rule also requires a minimum
+      # event count to keep a single bad request from paging.
       - alert: APIHighErrorRate
         expr: |
-          sum(rate(http_requests_total{status=~"5.."}[5m]))
-          / sum(rate(http_requests_total[5m])) > 0.05
+          sum(rate(http_requests_total{handler!~"/metrics|/health", status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{handler!~"/metrics|/health"}[5m])) > 0.05
+          and sum(increase(http_requests_total{handler!~"/metrics|/health", status=~"5.."}[5m])) >= 3
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "HTTP 5xx error rate exceeded 5%"
           description: "Error rate is {{ $value | humanizePercentage }} over the last 5m."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#apihigherrorrate"
 
       # Average latency, not P95 — single-user low-traffic systems don't have
       # enough samples in any short window to make `histogram_quantile` stable
@@ -20,15 +27,17 @@ groups:
       # the alert silently sleeps.
       - alert: APISlowRequests
         expr: |
-          sum(rate(http_request_duration_seconds_sum[10m]))
-          / sum(rate(http_request_duration_seconds_count[10m]))
+          sum(rate(http_request_duration_seconds_sum{handler!~"/metrics|/health"}[10m]))
+          / sum(rate(http_request_duration_seconds_count{handler!~"/metrics|/health"}[10m]))
           > 1
+          and sum(increase(http_request_duration_seconds_count{handler!~"/metrics|/health"}[10m])) >= 5
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Average API request time exceeded 1s"
           description: "10m rolling average is {{ $value | humanizeDuration }}."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#apislowrequests"
 
       - alert: CeleryTaskFailureRate
         expr: |
@@ -41,6 +50,7 @@ groups:
         annotations:
           summary: "Celery task {{ $labels.task_name }} failure rate > 10%"
           description: "Failure rate is {{ $value | humanizePercentage }} over the last 10m."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#celerytaskfailurerate"
 
       - alert: LLMCallFailureRate
         expr: |
@@ -52,6 +62,7 @@ groups:
         annotations:
           summary: "LLM agent {{ $labels.agent_id }} failure rate > 20%"
           description: "Non-ok outcomes are {{ $value | humanizePercentage }} of all calls."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmcallfailurerate"
 
   # ===== Anomaly patterns =====
   - name: jobpilot_anomaly
@@ -64,6 +75,7 @@ groups:
         annotations:
           summary: "Celery retry storm for task {{ $labels.task_name }}"
           description: "Retry rate is {{ $value }}/s — likely a downstream dependency issue."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#celeryretrystorm"
 
       - alert: CeleryQueueBacklog
         expr: jobpilot_celery_queue_length > 100
@@ -73,6 +85,7 @@ groups:
         annotations:
           summary: "Celery queue {{ $labels.queue_name }} backlog > 100"
           description: "Queue length is {{ $value }} — workers cannot keep up."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#celeryqueuebacklog"
 
       - alert: ResendDeliveryFailure
         expr: |
@@ -84,6 +97,7 @@ groups:
         annotations:
           summary: "Resend email delivery failure rate > 10%"
           description: "Non-deliverable rate is {{ $value | humanizePercentage }} — user signup / reset flows are degraded."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#resenddeliveryfailure"
 
   # ===== Infrastructure =====
   - name: jobpilot_infra
@@ -96,6 +110,7 @@ groups:
         annotations:
           summary: "JobPilot API target is down"
           description: "Prometheus has been unable to scrape jobpilot-api for >1m."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#apidown"
 
       - alert: PrometheusTargetDown
         expr: up == 0
@@ -105,6 +120,7 @@ groups:
         annotations:
           summary: "Prometheus target {{ $labels.job }} is down"
           description: "Scrape target {{ $labels.instance }} ({{ $labels.job }}) has been down for >5m."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#prometheustargetdown"
 
       - alert: HighRedisMemory
         # Guarded against `redis_memory_max_bytes = 0` (unlimited Redis) which
@@ -119,3 +135,4 @@ groups:
         annotations:
           summary: "Redis memory usage exceeded 80%"
           description: "Redis memory is at {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#highredismemory"
