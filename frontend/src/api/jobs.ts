@@ -8,8 +8,8 @@ import type {
   JobListResponse,
   JobFiltersRequest,
   JobFiltersOptions,
-  UserJobMatch,
-  UserJobMatchDetail,
+  MatchDetail,
+  MatchListResponse,
   JobMatchFiltersRequest,
   SavedJobStatusResponse,
   JobViewedStatusResponse,
@@ -192,34 +192,21 @@ export const jobsApi = {
   },
 
   /**
-   * Get matched jobs for current user
+   * Get matching v3 results for current user (live jobs, newest first)
    */
-  getJobMatches: async (filters: JobMatchFiltersRequest): Promise<UserJobMatch[]> => {
+  getJobMatches: async (filters: JobMatchFiltersRequest): Promise<MatchListResponse> => {
     const params = new URLSearchParams()
-
-    if (filters.min_score !== undefined) {
-      params.append('min_score', filters.min_score.toString())
-    }
-    if (filters.limit !== undefined) {
-      params.append('limit', filters.limit.toString())
-    }
-    if (filters.offset !== undefined) {
-      params.append('offset', filters.offset.toString())
-    }
-
-    const result = await apiClient.get<UserJobMatch[], UserJobMatch[]>(
-      `/jobs/matches?${params.toString()}`
-    )
-    return result
+    if (filters.view) params.append('view', filters.view)
+    if (filters.tiers?.length) params.append('tiers', filters.tiers.join(','))
+    if (filters.limit !== undefined) params.append('limit', filters.limit.toString())
+    if (filters.offset !== undefined) params.append('offset', filters.offset.toString())
+    return apiClient.get<MatchListResponse, MatchListResponse>(`/jobs/matches?${params.toString()}`)
   },
 
   /**
-   * Get match detail for a specific job
+   * Get the full match judgment for a job (null when the job has no result)
    */
-  getJobMatchDetail: async (jobId: number): Promise<UserJobMatchDetail> => {
-    const result = await apiClient.get<UserJobMatchDetail, UserJobMatchDetail>(
-      `/jobs/matches/${jobId}`
-    )
-    return result
+  getJobMatchDetail: async (jobId: number): Promise<MatchDetail | null> => {
+    return apiClient.get<MatchDetail | null, MatchDetail | null>(`/jobs/matches/${jobId}`)
   },
 }

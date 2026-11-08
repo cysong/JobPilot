@@ -6,6 +6,8 @@ export interface ResumeListItem {
     updated_at: string
     document_id?: string
     target_job_titles: string[]
+    role_family?: string | null // matching v3 role family; null = not used for matching
+    role_family_source?: 'auto' | 'user' | null
 }
 
 export interface Document {

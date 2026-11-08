@@ -87,6 +87,18 @@ export const useJobMatches = (filters: JobMatchFiltersRequest, enabled = true) =
 }
 
 /**
+ * Hook to fetch the full match judgment for a job (null when there is none)
+ */
+export const useJobMatchDetail = (jobId: number | null) => {
+  return useQuery({
+    queryKey: ['job-match-detail', jobId],
+    queryFn: () => jobsApi.getJobMatchDetail(jobId!),
+    enabled: jobId !== null,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+/**
  * Hook to fetch current user's saved status for a job
  */
 export const useJobSavedStatus = (jobId: number | null) => {
@@ -297,12 +309,17 @@ export const useJobViewedMutations = () => {
       })
 
       queryClient.setQueriesData({ queryKey: ['job-matches'] }, (oldData: unknown) => {
-        const data = oldData as Array<{ job: { id: number; is_viewed?: boolean; last_viewed_at?: string | null } }> | undefined
-        if (!data) return oldData
-        return data.map((item) => ({
-          ...item,
-          job: patchJob(item.job),
-        }))
+        const data = oldData as {
+          items?: Array<{ job: { id: number; is_viewed?: boolean; last_viewed_at?: string | null } }>
+        } | undefined
+        if (!data?.items) return oldData
+        return {
+          ...data,
+          items: data.items.map((item) => ({
+            ...item,
+            job: patchJob(item.job),
+          })),
+        }
       })
     },
     onSuccess: (data, { jobId }) => {

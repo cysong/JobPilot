@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/tooltip'
 import { resumeApi } from '@/api/resumes'
 import { TargetJobTitlesEditor } from './TargetJobTitlesEditor'
+import { RoleFamilySelect } from '@/features/matching/components/RoleFamilySelect'
 
 interface ResumeCardProps {
     resume: ResumeListItem
@@ -180,6 +181,10 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                     currentTitles={resume.target_job_titles}
                 />
             </div>
+
+            {!resume.is_draft && (
+                <RoleFamilySelect resumeId={resume.id} value={resume.role_family ?? null} />
+            )}
         </article>
     )
 }

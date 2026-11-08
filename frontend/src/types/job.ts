@@ -254,34 +254,99 @@ export interface ResumeBriefInfo {
 }
 
 /**
- * User job match response from backend
+ * Matching v3 (docs/job_matching_v3_design.md §3, §7)
  */
-export interface UserJobMatch {
+export type MatchTier = 'A' | 'B' | 'C' | 'D'
+export type MatchView = 'recommended' | 'rejected'
+
+export interface MatchLabelInfo {
   id: string
-  job: JobBriefInfo
-  skill_match_score: number // 0-100
-  resume_match_score: number | null // 0-100
-  ai_match_score: number | null // 0-100
-  recommended_resume: ResumeBriefInfo | null
-  skill_match_details: Record<string, any>
-  ai_analysis: Record<string, any> | null
-  calculated_at: string
-  ai_analyzed_at: string | null
+  label: string
+  reason_tags: string[]
+  note: string | null
+  created_at: string
 }
 
-/**
- * Detailed match info for a specific job
- */
-export interface UserJobMatchDetail {
+export interface MatchSummary {
   id: string
+  status: string
+  tier: MatchTier | null
+  tier_reason: string | null
+  tech_level: 'strong' | 'partial' | 'weak' | null
+  experience_level: 'strong' | 'partial' | 'none' | null
+  family_relation: 'same' | 'adjacent'
+  location_check: 'not_applicable' | 'remote' | 'matched' | 'unknown' | 'rejected'
+  reject_code: string | null
+  reject_reason: string | null
+  reject_quote: string | null
+  judged_at: string | null
   recommended_resume: ResumeBriefInfo | null
+  application_status: string | null
+  label: MatchLabelInfo | null // admins only
+}
+
+export interface MatchListItem {
+  job: JobBriefInfo
+  match: MatchSummary
+}
+
+export interface MatchCounts {
+  A: number
+  B: number
+  C: number
+  rejected: number
+  pending: number
+}
+
+export interface MatchListResponse {
+  items: MatchListItem[]
+  total: number
+  counts: MatchCounts
+}
+
+export interface MatchEvidence {
+  job_quote: string | null
+  resume_quote: string | null
+}
+
+export interface MatchTechItem {
+  requirement: string
+  is_core: boolean
+  relation: 'same' | 'substitute' | 'missing'
+  evidence: MatchEvidence
+}
+
+export interface MatchConditionCheck {
+  requirement?: string
+  required_languages?: string[]
+  country?: string | null
+  quote: string | null
+  satisfied: boolean | null
+}
+
+export interface MatchDetail extends MatchSummary {
+  job_id: number
+  tech_items: MatchTechItem[]
+  relevant_years: number | null
+  required_years: number | null
+  experience_evidence: MatchEvidence[]
+  work_rights: MatchConditionCheck | null
+  security_clearance: MatchConditionCheck | null
+  work_location: MatchConditionCheck | null
+  languages: MatchConditionCheck | null
+  other_constraints: { requirement: string; quote: string }[]
+  seniority_mismatch: boolean | null
+  is_different_track: boolean | null
+  model: string | null
+  prompt_version: string | null
 }
 
 /**
  * Request params for job matches API
  */
 export interface JobMatchFiltersRequest {
-  min_score?: number // Minimum skill match score (0-100)
+  view?: MatchView
+  tiers?: MatchTier[]
   limit?: number
   offset?: number
 }

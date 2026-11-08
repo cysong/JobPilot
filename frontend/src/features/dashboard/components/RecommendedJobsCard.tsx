@@ -7,30 +7,31 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { UserJobMatch } from '@/types/job'
+import type { DashboardJobItem } from '@/features/dashboard/types'
+import { TierBadge } from '@/features/matching/components/MatchBadges'
 
 interface RecommendedJobsCardProps {
-  recommendedJobs: UserJobMatch[]
-  savedJobs: UserJobMatch[]
+  recommendedJobs: DashboardJobItem[]
+  savedJobs: DashboardJobItem[]
   isLoading: boolean
   hasMatchesError: boolean
   hasSavedJobsError: boolean
 }
 
-const getCompanyName = (job: UserJobMatch['job']) => job.advertiser_name || 'Unknown Company'
+const getCompanyName = (job: DashboardJobItem['job']) => job.advertiser_name || 'Unknown Company'
 
 function MatchList({
   items,
   mode,
 }: {
-  items: UserJobMatch[]
+  items: DashboardJobItem[]
   mode: 'matches' | 'saved'
 }) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
         {mode === 'matches'
-          ? 'No strong matches yet. Browse jobs and strengthen resumes or skills to improve matching.'
+          ? 'No strong (A) matches right now. Browse the Worth a try tier on the Jobs page.'
           : 'No saved jobs yet. Save interesting jobs from the listings page.'}
       </div>
     )
@@ -40,7 +41,7 @@ function MatchList({
     <div className="space-y-3">
       {items.map((item) => (
         <div
-          key={item.id}
+          key={item.key}
           className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"
         >
           <div className="min-w-0 space-y-2">
@@ -48,11 +49,7 @@ function MatchList({
               <Link to={`/jobs/${item.job.id}`} className="font-semibold text-slate-900 hover:text-indigo-600">
                 {item.job.title}
               </Link>
-              {mode === 'matches' ? (
-                <Badge className="bg-indigo-600 text-white hover:bg-indigo-700">
-                  {Math.round(item.skill_match_score)}% match
-                </Badge>
-              ) : null}
+              {item.match?.tier ? <TierBadge tier={item.match.tier} /> : null}
               {item.job.has_application ? (
                 <Badge variant="outline" className="border-emerald-200 text-emerald-700">
                   In applications
@@ -65,15 +62,17 @@ function MatchList({
               {item.job.location_label ? ` · ${item.job.location_label}` : ''}
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              {item.recommended_resume ? (
-                <span>Recommended resume: {item.recommended_resume.title}</span>
+              {item.match?.recommended_resume ? (
+                <span>Recommended resume: {item.match.recommended_resume.title}</span>
               ) : mode === 'saved' ? (
                 <span>Saved for later review</span>
               ) : null}
-              <span>
-                {mode === 'saved' ? 'Saved' : 'Matched'}{' '}
-                {formatDistanceToNow(new Date(item.calculated_at), { addSuffix: true })}
-              </span>
+              {item.at ? (
+                <span>
+                  {mode === 'saved' ? 'Saved' : 'Matched'}{' '}
+                  {formatDistanceToNow(new Date(item.at), { addSuffix: true })}
+                </span>
+              ) : null}
             </div>
           </div>
 

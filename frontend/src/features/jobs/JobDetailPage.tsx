@@ -28,6 +28,7 @@ import {
 } from "@/features/jobs/hooks/useJobs";
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
+import { MatchResultPanel } from "@/features/matching/components/MatchResultPanel";
 import { getApplicationStatusPresentation } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -452,6 +453,8 @@ export default function JobDetailPage() {
                 </span>
               </div>
             </div>
+
+            <MatchResultPanel jobId={jobIdNum} />
 
             {/* Job Description */}
             <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">

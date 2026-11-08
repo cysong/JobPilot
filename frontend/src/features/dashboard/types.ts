@@ -1,7 +1,15 @@
 import type { ApplicationStatus } from '@/types/application'
-import type { UserJobMatch } from '@/types/job'
+import type { JobBriefInfo, MatchSummary } from '@/types/job'
 import type { ResumeListItem } from '@/types/resume'
 import type { UserSkill } from '@/types/skill'
+
+/** A job row on the dashboard: an A-tier match or a saved job. */
+export interface DashboardJobItem {
+  key: string
+  job: JobBriefInfo
+  match: MatchSummary | null
+  at: string | null // judged at (matches) or saved at (saved jobs)
+}
 
 export type DashboardMetricTone = 'default' | 'success' | 'warning'
 
@@ -89,8 +97,8 @@ export interface UserDashboardData {
   priorityAction: DashboardPriorityAction | null
   applications: DashboardApplicationSnapshot
   applicationActivity: DashboardApplicationActivity
-  recommendedJobs: UserJobMatch[]
-  savedJobs: UserJobMatch[]
+  recommendedJobs: DashboardJobItem[]
+  savedJobs: DashboardJobItem[]
   resumeSummary: DashboardResumeSummary
   skillsSummary: DashboardSkillsSummary
 }

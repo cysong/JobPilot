@@ -4,11 +4,13 @@ import {
   CircleCheck,
   Tag,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 
 import { Link, useSearchParams } from 'react-router-dom'
 
-import type { Job, JobBriefInfo, UserJobMatch } from '@/types/job'
+import type { Job, JobBriefInfo, MatchSummary } from '@/types/job'
+import { MatchBadges } from '@/features/matching/components/MatchBadges'
 import { Badge } from '@/components/ui/badge'
 import {
     Card,
@@ -23,13 +25,14 @@ import {
 
 interface JobCardProps {
     job: Job | JobBriefInfo // Accept both full Job and JobBriefInfo
-    matchData?: UserJobMatch // Optional match data for recommended view
+    matchData?: MatchSummary // Optional match result for the recommended / rejected views
+    matchActions?: ReactNode // Optional admin controls shown next to the match badges
     savedAt?: string | null
     onOpenJob?: (jobId: number) => void
     highlighted?: boolean
 }
 
-export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
+export function JobCard({ job, matchData, matchActions, savedAt, onOpenJob, highlighted = false }: JobCardProps) {
     const [searchParams] = useSearchParams()
     const categoryText = formatJobCategory(job)
 
@@ -56,17 +59,28 @@ export function JobCard({ job, matchData, savedAt, onOpenJob, highlighted = fals
 
         <CardHeader className="p-4 pb-2 pr-28">
           <div className="space-y-1">
-            {/* Match score - show if available */}
+            {/* Match result - show if available */}
             {matchData && (
-              <div className="flex items-center gap-3 text-sm mb-2">
-                <span className="font-semibold text-indigo-600">
-                  {Math.round(matchData.skill_match_score)}% Match
-                </span>
-                {matchData.resume_match_score !== null && (
-                  <span className="text-slate-500 text-xs">
-                    Resume: {Math.round(matchData.resume_match_score)}%
-                  </span>
-                )}
+              <div className="mb-2 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <MatchBadges match={matchData} />
+                  {matchActions}
+                </div>
+                {matchData.status === 'rejected' ? (
+                  <p className="text-sm text-red-700 line-clamp-2">
+                    {matchData.reject_reason}
+                    {matchData.reject_quote ? (
+                      <span className="text-slate-500"> “{matchData.reject_quote}”</span>
+                    ) : null}
+                  </p>
+                ) : matchData.tier_reason ? (
+                  <p className="text-sm text-slate-700 line-clamp-2">{matchData.tier_reason}</p>
+                ) : null}
+                {matchData.recommended_resume ? (
+                  <p className="text-xs text-slate-500">
+                    Recommended resume: {matchData.recommended_resume.title}
+                  </p>
+                ) : null}
               </div>
             )}
 

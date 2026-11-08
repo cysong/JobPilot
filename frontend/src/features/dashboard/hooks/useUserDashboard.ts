@@ -10,7 +10,7 @@ import type {
   ApplicationFunnelResponse,
   ApplicationStatus,
 } from '@/types/application'
-import type { UserJobMatch } from '@/types/job'
+import type { DashboardJobItem } from '@/features/dashboard/types'
 import type { ResumeListItem } from '@/types/resume'
 import type { UserSkill } from '@/types/skill'
 import type {
@@ -294,7 +294,7 @@ const buildPriorityAction = ({
   resumeSummary,
 }: {
   applications: Application[]
-  matches: UserJobMatch[]
+  matches: DashboardJobItem[]
   resumeSummary: DashboardResumeSummary
 }): DashboardPriorityAction | null => {
   const readyApplication = applications.find((application) => application.status === 'READY')
@@ -336,7 +336,7 @@ const buildPriorityAction = ({
   if (topMatch) {
     return {
       title: 'Review your strongest job match',
-      description: `${topMatch.job.title} has a ${Math.round(topMatch.skill_match_score)}% skill match.`,
+      description: topMatch.match?.tier_reason || `${topMatch.job.title} is a strong match for your resume.`,
       ctaLabel: 'View Job',
       href: `/jobs/${topMatch.job.id}`,
       tone: 'default',
@@ -378,7 +378,7 @@ const buildHeroMessage = ({
   resumeSummary,
 }: {
   applications: DashboardApplicationSnapshot
-  matches: UserJobMatch[]
+  matches: DashboardJobItem[]
   resumeSummary: DashboardResumeSummary
 }): string => {
   if (applications.counts.READY > 0) {
@@ -439,7 +439,8 @@ export const useUserDashboard = () => {
         queryKey: ['dashboard', 'job-matches'],
         queryFn: () =>
           jobsApi.getJobMatches({
-            min_score: 50,
+            view: 'recommended',
+            tiers: ['A'],
             limit: DASHBOARD_MATCH_LIMIT,
             offset: 0,
           }),
@@ -473,22 +474,22 @@ export const useUserDashboard = () => {
   ] = results
   const applications = applicationsQuery.data || []
   const funnel = funnelQuery.data ?? null
-  const matches = matchesQuery.data || []
+  const matches =
+    matchesQuery.data?.items.map<DashboardJobItem>((item) => ({
+      key: item.match.id,
+      job: item.job,
+      match: item.match,
+      at: item.match.judged_at,
+    })) || []
   const savedJobs =
-    savedJobsQuery.data?.items.map<UserJobMatch>((item) => ({
-      id: `saved-${item.job.id}`,
+    savedJobsQuery.data?.items.map<DashboardJobItem>((item) => ({
+      key: `saved-${item.job.id}`,
       job: {
         ...item.job,
         source: item.job.source || null,
       },
-      skill_match_score: 0,
-      resume_match_score: null,
-      ai_match_score: null,
-      recommended_resume: null,
-      skill_match_details: {},
-      ai_analysis: null,
-      calculated_at: item.saved_at,
-      ai_analyzed_at: null,
+      match: null,
+      at: item.saved_at,
     })) || []
   const resumes = resumesQuery.data?.items || []
   const skills = skillsQuery.data?.items || []

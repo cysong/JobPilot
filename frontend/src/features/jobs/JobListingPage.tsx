@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
 import { EnqueueJobDialog } from "@/features/jobs/components/EnqueueJobDialog";
+import { MatchFilterBar } from "@/features/matching/components/MatchFilterBar";
 
 export default function JobListingPage() {
   const {
@@ -49,11 +50,15 @@ export default function JobListingPage() {
     hideExpired,
     isRecommendedView,
     isSavedView,
+    matchView,
+    matchTiers,
     activeFilterCount,
     handleViewChange,
     handleFilterChange,
     handleViewStatusChange,
     handleHideExpiredChange,
+    handleMatchViewChange,
+    handleMatchTierToggle,
     handleClearAllFilters,
     handleResetAllJobsSearch,
   } = useJobListState();
@@ -84,9 +89,10 @@ export default function JobListingPage() {
     [filterOptions?.sources, sourceMetaByKey],
   );
 
-  // Recommended view: fetch matched jobs
+  // Recommended view: matching v3 results (tiers or rejected jobs)
   const matchFilters = {
-    min_score: 40, // Only show jobs with skill match >= 70%
+    view: matchView,
+    tiers: matchView === "recommended" ? matchTiers : undefined,
     limit: 10,
     offset: (currentPage - 1) * 10,
   };
@@ -140,14 +146,13 @@ export default function JobListingPage() {
       ? savedError
       : jobsError;
 
-  // Calculate pagination for matches (backend returns array, not paginated response)
-  const totalMatches = matchesData?.length || 0;
-  const matchesTotal = totalMatches; // We'll use the array length as total
-  const matchesTotalPages = Math.ceil(matchesTotal / 10);
+  const totalMatches = matchesData?.total || 0;
+  const matchesTotalPages = Math.ceil(totalMatches / 10);
+  const matchCounts = matchesData?.counts;
 
   const visibleJobIds = useMemo(() => {
     if (isRecommendedView) {
-      return (matchesData || []).map((item) => item.job.id);
+      return (matchesData?.items || []).map((item) => item.job.id);
     }
     if (isSavedView) {
       return (savedData?.items || []).map((item) => item.job.id);
@@ -323,7 +328,9 @@ export default function JobListingPage() {
                 {isListLoading ? (
                   <Skeleton className="h-8 w-32" />
                 ) : isRecommendedView ? (
-                  `${totalMatches} Matched Jobs`
+                  matchView === "rejected"
+                    ? `${totalMatches} Rejected Jobs`
+                    : `${totalMatches} Matched Jobs`
                 ) : isSavedView ? (
                   `${savedData?.total || 0} Saved Jobs`
                 ) : (
@@ -331,6 +338,16 @@ export default function JobListingPage() {
                 )}
               </h2>
             </div>
+
+            {isRecommendedView && (
+              <MatchFilterBar
+                matchView={matchView}
+                matchTiers={matchTiers}
+                counts={matchCounts}
+                onViewChange={handleMatchViewChange}
+                onTierToggle={handleMatchTierToggle}
+              />
+            )}
 
             {isListLoading ? (
               // Loading Skeletons
@@ -362,10 +379,12 @@ export default function JobListingPage() {
               </div>
             ) : isRecommendedView ? (
               // Recommended view
-              matchesData && matchesData.length === 0 ? (
+              matchesData && matchesData.items.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
                   <p className="text-slate-500">
-                    No matched jobs found. Try viewing all jobs.
+                    {matchView === "rejected"
+                      ? "No rejected jobs."
+                      : "No matched jobs in these tiers yet. Try another tier or view all jobs."}
                   </p>
                   <Button
                     variant="link"
@@ -378,13 +397,13 @@ export default function JobListingPage() {
               ) : (
                 <>
                   <div className="space-y-4">
-                    {matchesData?.map((match) => (
+                    {matchesData?.items.map((item) => (
                       <JobCard
-                        key={match.id}
-                        job={match.job}
-                        matchData={match}
+                        key={item.match.id}
+                        job={item.job}
+                        matchData={item.match}
                         onOpenJob={handleOpenJob}
-                        highlighted={highlightedJobId === match.job.id}
+                        highlighted={highlightedJobId === item.job.id}
                       />
                     ))}
                   </div>

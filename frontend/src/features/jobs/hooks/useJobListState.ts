@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import type { MatchTier, MatchView } from "@/types/job";
+
 import { usePersistedListSearchParams } from "@/hooks/usePersistedListSearchParams";
 import { clearSessionStorageKeys, getListContextKey } from "@/utils/listState";
 import {
@@ -10,6 +12,9 @@ import {
 } from "@/utils/searchParams";
 
 export type ViewStatus = "all" | "viewed" | "unviewed";
+
+export const DEFAULT_MATCH_TIERS: MatchTier[] = ["A", "B"];
+const USER_MATCH_TIERS: MatchTier[] = ["A", "B", "C"];
 
 const JOB_LIST_POSITIONS_KEY = "jobs:list:positions";
 const JOB_LIST_RETURN_INTENT_KEY = "jobs:list:return-intent";
@@ -27,6 +32,8 @@ const JOB_TRACKED_SEARCH_KEYS = [
   "work_types",
   "companies",
   "sources",
+  "match_view",
+  "tiers",
 ];
 
 const clearJobListSessionState = () => {
@@ -61,6 +68,12 @@ export const useJobListState = () => {
   const hideExpired = searchParams.get("hide_expired") === "true";
   const isRecommendedView = viewMode === "recommended";
   const isSavedView = viewMode === "saved";
+  const matchView: MatchView = searchParams.get("match_view") === "rejected" ? "rejected" : "recommended";
+  const tiersParam = searchParams.get("tiers");
+  const parsedTiers = (tiersParam ?? "")
+    .split(",")
+    .filter((tier): tier is MatchTier => USER_MATCH_TIERS.includes(tier as MatchTier));
+  const matchTiers = parsedTiers.length > 0 ? parsedTiers : DEFAULT_MATCH_TIERS;
   const activeFilterCount =
     locationCities.length +
     workTypes.length +
@@ -111,6 +124,25 @@ export const useJobListState = () => {
     setSearchParams(newParams);
   };
 
+  const handleMatchViewChange = (nextView: MatchView) => {
+    const newParams = cloneSearchParams(searchParams);
+    setOptionalSearchParam(newParams, "match_view", nextView === "recommended" ? null : nextView);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  const handleMatchTierToggle = (tier: MatchTier) => {
+    const next = matchTiers.includes(tier)
+      ? matchTiers.filter((item) => item !== tier)
+      : USER_MATCH_TIERS.filter((item) => item === tier || matchTiers.includes(item));
+    if (next.length === 0) return; // keep at least one tier selected
+    const newParams = cloneSearchParams(searchParams);
+    const isDefault = next.join(",") === DEFAULT_MATCH_TIERS.join(",");
+    setOptionalSearchParam(newParams, "tiers", isDefault ? null : next.join(","));
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   const handleClearAllFilters = () => {
     clearPersistedSearchParams();
     clearJobListSessionState();
@@ -153,11 +185,15 @@ export const useJobListState = () => {
     hideExpired,
     isRecommendedView,
     isSavedView,
+    matchView,
+    matchTiers,
     activeFilterCount,
     handleViewChange,
     handleFilterChange,
     handleViewStatusChange,
     handleHideExpiredChange,
+    handleMatchViewChange,
+    handleMatchTierToggle,
     handleClearAllFilters,
     handleResetAllJobsSearch,
   };
