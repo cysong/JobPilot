@@ -19,6 +19,7 @@ from app.core.exceptions import JobPilotException
 from app.core.logging_config import configure_logging
 from app.core.metrics import api_error_total
 from app.core.queue_observer import observe_queue_lengths
+from app.modules.matching.observer import observe_match_metrics
 from app.core.response_codes import ResponseCode
 from fastapi_cache import FastAPICache
 
@@ -55,16 +56,18 @@ async def lifespan(app: FastAPI):
 
     # Start Celery queue-length observer for Prometheus gauge
     queue_observer_task = asyncio.create_task(observe_queue_lengths())
+    match_observer_task = asyncio.create_task(observe_match_metrics())
 
     yield
 
     # Shutdown
     print("JobPilot API is shutting down...")
-    queue_observer_task.cancel()
-    try:
-        await queue_observer_task
-    except asyncio.CancelledError:
-        pass
+    for task in (queue_observer_task, match_observer_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 # Create FastAPI application

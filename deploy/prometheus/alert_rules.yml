@@ -99,6 +99,47 @@ groups:
           description: "Non-deliverable rate is {{ $value | humanizePercentage }} — user signup / reset flows are degraded."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#resenddeliveryfailure"
 
+  # ===== Matching v3 =====
+  # Gauges come from job_matches via the API process, so they stay correct across
+  # worker restarts. All read 0 while MATCH_V3_ENABLED is off.
+  - name: jobpilot_matching
+    rules:
+      - alert: MatchQueueStale
+        # Backfill rows are excluded: they drain over days under the daily limit.
+        expr: jobpilot_match_queue_oldest_age_seconds > 86400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A new job has waited more than 24h to be matched"
+          description: "Oldest queued new-job match is {{ $value | humanizeDuration }} old."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#matchqueuestale"
+
+      - alert: MatchFailedFinalRatio
+        expr: |
+          sum(jobpilot_match_judged_24h{status="failed_final"}) / sum(jobpilot_match_judged_24h) > 0.05
+          and sum(jobpilot_match_judged_24h) >= 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 5% of match judgments failed for good in the last 24h"
+          description: "failed_final share is {{ $value | humanizePercentage }}."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#matchfailedfinalratio"
+
+      - alert: MatchNoATier
+        # Tier drift guard: a prompt or model regression usually shows up as A vanishing.
+        expr: |
+          sum(jobpilot_match_tier_24h{tier="A"}) == 0
+          and sum(jobpilot_match_judged_24h{status=~"rated|rejected"}) > 20
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No A-tier match among more than 20 judgments in the last 24h"
+          description: "Check the tier distribution for a prompt or model regression."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#matchnoatier"
+
   # ===== Infrastructure =====
   - name: jobpilot_infra
     rules:

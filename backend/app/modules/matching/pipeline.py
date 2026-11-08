@@ -22,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.metrics import match_judge_duration_seconds, match_judge_total, match_validation_total
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.families.classifier import register_jobs
 from app.modules.matching.families.models import JobFamilyStatus, JobRoleFamily
@@ -251,9 +252,9 @@ async def judge_queued_matches(
             if isinstance(result, BaseException):
                 # Unexpected error (DB, bug): the lease expires and the row is retried later.
                 logger.error("match_judge_unexpected_error", match_id=match_id, error=str(result))
-                stats.add("error")
-            else:
-                stats.add(result)
+                result = "error"
+            stats.add(result)
+            match_judge_total.labels(outcome=result).inc()
     return stats.as_dict()
 
 
@@ -275,12 +276,14 @@ async def _judge_one(
         user = users[match.user_id]
         override = judge_override()
         match.attempts += 1
+        started = time.monotonic()
         try:
             outcome, ctx = await judge_pair(
                 gateway, user=user, job=job, candidate_ids=match.candidate_resume_ids, model_override=override,
                 context={"operation": "match_judge", "user_id": match.user_id},
             )
         except JudgeFailure as exc:
+            match_judge_duration_seconds.observe(time.monotonic() - started)
             backoff = settings.MATCH_RETRY_BACKOFF_MINUTES
             match.error = str(exc)[:2000]
             match.judged_at = clock()
@@ -292,6 +295,8 @@ async def _judge_one(
             await db.commit()
             logger.warning("match_judge_failed", match_id=match_id, status=match.status, error=match.error)
             return match.status
+        match_judge_duration_seconds.observe(time.monotonic() - started)
+        _count_validation(outcome.validation)
         resume = next(r for r in user.resumes if r.id == outcome.resume_id)
         match.status = outcome.status
         match.resume_id = outcome.resume_id
@@ -314,3 +319,11 @@ async def _judge_one(
         match.error = None
         await db.commit()
         return outcome.status
+
+
+def _count_validation(validation: dict[str, Any]) -> None:
+    for kind, value in (("consistency_fix", len(validation.get("consistency_fixes") or [])),
+                        ("flag", len(validation.get("flags") or [])),
+                        ("unverified_quote", int(validation.get("quotes_unverified") or 0))):
+        if value:
+            match_validation_total.labels(kind=kind).inc(value)

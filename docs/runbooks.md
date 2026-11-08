@@ -185,6 +185,61 @@ sum by (kind, outcome) (increase(jobpilot_resend_email_total[1h]))
 
 ---
 
+## MatchQueueStale
+
+**含义：** 有新岗位的匹配排队超过 24 小时，持续 15 分钟（回填不计）。**warning**
+
+**影响：** 新岗位迟迟没有档位，可能在判定前就过期。
+
+**排查：**
+1. `dc logs --since 30m jobpilot-worker | grep match_judge`：看 `judge_queued_matches_task` 是否在跑、有没有报错。
+2. Grafana 匹配面板：`jobpilot_match_judge_total` 是否还在增长；`jobpilot_match_queue_depth` 是否持续上升。
+3. 日志里 `limited_users` 非空：用户已用完当日调用上限（`MATCH_DAILY_LLM_LIMIT_PER_USER`）。
+4. 大量 `failed_retryable`：多为 OpenRouter 限流、余额不足（402）或 key 失效。
+
+**处理：**
+- **worker / beat 不在运行：** `dc restart jobpilot-worker jobpilot-beat`。
+- **每日上限用尽：** 等第二天自动继续；岗位多时可临时调高上限后重建 worker。
+- **OpenRouter 余额或 key 问题：** 充值或更新 `deploy/env/backend.env` 中的 `OPENROUTER_API_KEY`，再重建 api / worker / beat。
+
+---
+
+## MatchFailedFinalRatio
+
+**含义：** 最近 24 小时最终失败的判定超过 5%（判定数至少 20）。**warning**
+
+**影响：** 这些岗位不会再判定，用户看不到结果。
+
+**排查：**
+1. 查失败原因：
+   ```sql
+   select left(error, 120) as error, count(*) from job_matches
+   where status = 'failed_final' and judged_at > now() - interval '24 hours'
+   group by 1 order by 2 desc;
+   ```
+2. `invalid output after retries`：模型输出结构异常，检查最近是否改过 prompt / schema / 模型。
+3. `gateway error`：重试 3 次仍失败，多为 provider 持续故障。
+4. `no candidate resumes`：判定前简历被删除或解绑，属正常情况。
+
+**处理：** 修复原因后，把需要重判的行改回 `queued`（`attempts = 0, next_attempt_at = null`），下一轮会重新判定。
+
+---
+
+## MatchNoATier
+
+**含义：** 最近 24 小时判定超过 20 次但没有一个 A 档，持续 1 小时。**warning**
+
+**影响：** 推荐列表空了，可能是档位标准漂移。
+
+**排查：**
+1. 看档位分布：`jobpilot_match_tier_24h`，是否全部落到 B / C。
+2. 最近是否修改了 `match_judge` prompt、`MATCH_JUDGE_MODEL` 或 `MATCH_JUDGE_PROMPT_VERSION`。
+3. 抽查几条当天的 `tier_reason`，确认是不是岗位本身就不匹配（例如新绑定的简历岗位族不对）。
+
+**处理：** prompt 或模型问题时回退到上一个版本，并在评估数据集上重跑对比后再上线。
+
+---
+
 ## APIDown
 
 **含义：** Prometheus 连续 1 分钟抓取不到 `jobpilot-api`。**critical**。触发后会抑制所有其他业务告警。

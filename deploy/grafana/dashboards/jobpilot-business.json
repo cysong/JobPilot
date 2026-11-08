@@ -345,6 +345,136 @@
         }
       },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }, "colorMode": "value", "graphMode": "area", "textMode": "auto" }
+    },
+    { "id": 500, "type": "row", "title": "Matching v3", "collapsed": false, "gridPos": { "x": 0, "y": 66, "w": 24, "h": 1 }, "panels": [] },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Match Queue",
+      "description": "Matches waiting to be judged and the age of the oldest queued new-job match (backfill excluded). Alert: MatchQueueStale at 24h.",
+      "gridPos": { "x": 0, "y": 67, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "jobpilot_match_queue_depth", "legendFormat": "depth" },
+        { "expr": "jobpilot_match_queue_oldest_age_seconds / 3600", "legendFormat": "oldest new-job age (h)" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Judgments by Outcome",
+      "description": "Judge attempts per hour by outcome (worker counter).",
+      "gridPos": { "x": 12, "y": 67, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (outcome) (increase(jobpilot_match_judge_total[1h]))", "legendFormat": "{{ outcome }}" }],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "rated" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "rejected" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed_retryable" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed_final" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "skipped_expired" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "gray" } }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Tier Distribution (last 24h)",
+      "description": "Rated matches judged in the trailing 24h by tier. A vanishing A tier usually means a prompt or model regression (alert: MatchNoATier).",
+      "gridPos": { "x": 0, "y": 75, "w": 12, "h": 8 },
+      "targets": [{ "expr": "jobpilot_match_tier_24h", "legendFormat": "{{ tier }}" }],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "stacking": { "mode": "normal" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "A" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "B" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "C" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "D" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Final Failure Share (24h)",
+      "description": "failed_final / all judge attempts in the trailing 24h. Alert at 5% with at least 20 judgments.",
+      "gridPos": { "x": 12, "y": 75, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(jobpilot_match_judged_24h{status=\"failed_final\"}) / clamp_min(sum(jobpilot_match_judged_24h), 1)",
+          "legendFormat": "failed_final"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.02 }, { "color": "red", "value": 0.05 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Judge Latency (avg)",
+      "description": "Average time per judgment including structure retries.",
+      "gridPos": { "x": 18, "y": 75, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(jobpilot_match_judge_duration_seconds_sum[$__range])) / sum(rate(jobpilot_match_judge_duration_seconds_count[$__range]))",
+          "legendFormat": "avg"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Validation Events & Role Family Classification",
+      "description": "Judge output validation events (quote not found, consistency fixes, flags) and job role family classification by method, per hour.",
+      "gridPos": { "x": 0, "y": 83, "w": 24, "h": 8 },
+      "targets": [
+        { "expr": "sum by (kind) (increase(jobpilot_match_validation_total[1h]))", "legendFormat": "validation: {{ kind }}" },
+        { "expr": "sum by (outcome) (increase(jobpilot_title_classify_total[1h]))", "legendFormat": "classify: {{ outcome }}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
     }
   ]
 }

@@ -84,3 +84,55 @@ job_ingest_total = Counter(
     "Manual job URL ingest attempts via /jobs/enqueue.",
     labelnames=("source", "outcome"),
 )
+
+
+# ===== Matching v3 =====
+# Event counters are emitted by the Celery worker (judge / classify tasks).
+# Queue and 24h result gauges are read from job_matches by the API process
+# (see app/modules/matching/observer.py) so they survive worker restarts.
+
+match_judge_total = Counter(
+    "jobpilot_match_judge_total",
+    "Match judgments by outcome (rated / rejected / failed_retryable / failed_final / skipped_expired / error).",
+    labelnames=("outcome",),
+)
+
+match_judge_duration_seconds = Histogram(
+    "jobpilot_match_judge_duration_seconds",
+    "Time to judge one job x user pair, including structure retries.",
+    buckets=(5, 10, 20, 30, 60, 90, 120, 180, 300, 600),
+)
+
+match_validation_total = Counter(
+    "jobpilot_match_validation_total",
+    "Judge output validation events (consistency_fix / flag / unverified_quote).",
+    labelnames=("kind",),
+)
+
+title_classify_total = Counter(
+    "jobpilot_title_classify_total",
+    "Job role family classification results by method (title_cache / jd_read / failed).",
+    labelnames=("outcome",),
+)
+
+match_queue_depth = Gauge(
+    "jobpilot_match_queue_depth",
+    "Matches waiting to be judged (queued or retry pending).",
+)
+
+match_queue_oldest_age_seconds = Gauge(
+    "jobpilot_match_queue_oldest_age_seconds",
+    "Age of the oldest queued new-job match (backfill excluded: it drains under the daily limit).",
+)
+
+match_judged_24h = Gauge(
+    "jobpilot_match_judged_24h",
+    "Judge attempts finished in the last 24h by status.",
+    labelnames=("status",),
+)
+
+match_tier_24h = Gauge(
+    "jobpilot_match_tier_24h",
+    "Rated matches judged in the last 24h by tier.",
+    labelnames=("tier",),
+)

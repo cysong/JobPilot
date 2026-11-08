@@ -12,6 +12,7 @@ import structlog
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import async_session_factory
+from app.core.metrics import title_classify_total
 from app.core.llm.gateway import AgentGateway
 from app.modules.matching.families.classifier import classify_missing_titles, resolve_pending_jobs
 from app.modules.matching.pipeline import discover_new_jobs, enqueue_matches, judge_queued_matches
@@ -45,6 +46,9 @@ async def classify_pending_titles_task(self) -> dict:
     gateway = AgentGateway.get()
     titles = await classify_missing_titles(self.db, gateway)
     resolved = await resolve_pending_jobs(self.db, gateway, limit=settings.MATCH_JD_READ_LIMIT)
+    for outcome, count in resolved.items():
+        if count:
+            title_classify_total.labels(outcome=outcome).inc(count)
     enqueued = await enqueue_matches(self.db)
     result = {"titles": titles, "resolved": resolved, "enqueued": enqueued,
               "elapsed_ms": int((time.perf_counter() - started) * 1000)}
