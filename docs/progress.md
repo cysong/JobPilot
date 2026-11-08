@@ -21,7 +21,8 @@
 - Prompt v2 on labeled + interviewed items (`mer_4fe56805…`, 39 pairs, $0.97): exact agreement 24/50 (v1 18/50), labeled-A recall 16/18 (v1 5/18), A precision 16/23 (v1 5/6; the 7 extra A are labeled B), A+B recall 26/29 (unchanged), interviewed jobs 10 A / 2 B / 1 C (v1 1 / 11 / 1); 3 correct new rejections (Polish required, Canada-only, San Francisco onsite); 1 regression (job 3948 labeled A → C, counted only lead years against a 10+ year requirement).
 - LLM spend so far ≈ $37 (OpenRouter).
 - Tests: 220 matching/core tests passing (incl. DB integration on local Postgres).
-- Next: decide whether v2's B→A drift is acceptable, then stage 2 (online tasks, UI, admin labeling). Set `OPENROUTER_API_KEY` on the VPS before deploying.
+- Decision (2026-11-09): prompt v2 accepted as is; a slightly generous A tier is preferred over missing good jobs.
+- Next: stage 2 (online tasks, UI, admin labeling). Set `OPENROUTER_API_KEY` on the VPS before deploying.
 
 ### 2026-11-08 - Matching v3 Stage 1 (code complete)
 
