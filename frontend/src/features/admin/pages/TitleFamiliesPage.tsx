@@ -31,7 +31,7 @@ function FamilyCell({ item, families }: { item: TitleFamilyItem; families: { key
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={AMBIGUOUS}>Ambiguous (read the description)</SelectItem>
+        <SelectItem value={AMBIGUOUS}>Ambiguous (read JD)</SelectItem>
         {families.map((family) => (
           <SelectItem key={family.key} value={family.key}>
             {family.label}

@@ -52,7 +52,7 @@ export function MatchFilterBar({ matchView, matchTiers, counts, onViewChange, on
       {counts && counts.pending > 0 ? (
         <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
           <Hourglass className="h-3.5 w-3.5" />
-          {counts.pending} jobs waiting to be matched
+          {counts.pending} {counts.pending === 1 ? 'job' : 'jobs'} waiting to be matched
         </span>
       ) : null}
     </div>

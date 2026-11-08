@@ -25,7 +25,10 @@ const formatYears = (value: number | null) => (value === null ? '—' : `${Math.
 
 function ConditionRow({ label, check }: { label: string; check: MatchConditionCheck | null }) {
   if (!check) return null
-  const stated = check.requirement !== 'none' || (check.required_languages?.length ?? 0) > 0
+  // Language checks carry required_languages; the other checks carry a requirement code.
+  const stated = check.required_languages
+    ? check.required_languages.length > 0
+    : Boolean(check.requirement) && check.requirement !== 'none'
   if (!stated) return null
   const Icon = check.satisfied === false ? XCircle : check.satisfied === true ? CheckCircle2 : CircleDashed
   const tone =
