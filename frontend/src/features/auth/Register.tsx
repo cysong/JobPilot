@@ -30,6 +30,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { formatErrorDetail } from '@/utils/errorDetail'
 import { ApiError } from '@/types/api'
 
 // Validation Schema
@@ -103,7 +104,7 @@ export default function Register() {
       const message =
         err instanceof ApiError
           ? err.message
-          : err?.response?.data?.detail || err?.message || 'Something went wrong. Please try again.'
+          : formatErrorDetail(err?.response?.data?.detail) || err?.message || 'Something went wrong. Please try again.'
       setError(message)
     } finally {
       setIsLoading(false)
