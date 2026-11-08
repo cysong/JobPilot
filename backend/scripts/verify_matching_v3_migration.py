@@ -7,7 +7,7 @@ downgrades one revision and checks everything is removed, and upgrades again.
 
 Usage (never point this at a real database; it drops tables):
     DATABASE_URL=postgresql+asyncpg://postgres:pg@localhost:55432/migtest \
-        uv run python scripts/verify_matching_v3_migration.py
+        uv run python -m scripts.verify_matching_v3_migration
 """
 from __future__ import annotations
 
