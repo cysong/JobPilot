@@ -32,6 +32,8 @@ class SkillLibraryEntry:
 class CandidateConditions:
     work_rights: str | None
     security_clearance: str | None
+    country: str = "New Zealand"
+    languages: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,8 @@ def build_judge_input(
     lines: list[str] = ["[CANDIDATE CONDITIONS]"]
     lines.append(f"work_rights: {conditions.work_rights or 'unknown'}")
     lines.append(f"security_clearance: {conditions.security_clearance or 'unknown'}")
+    lines.append(f"located_in: {conditions.country}")
+    lines.append(f"languages: {', '.join(conditions.languages) if conditions.languages else 'unknown'}")
 
     lines.append("")
     lines.append("[CANDIDATE RESUMES]")

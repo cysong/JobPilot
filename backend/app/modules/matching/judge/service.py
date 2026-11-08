@@ -110,6 +110,9 @@ async def load_user_context(db: AsyncSession, user_id: int) -> UserContext:
         conditions=CandidateConditions(
             work_rights=prefs.get("work_rights"),
             security_clearance=prefs.get("security_clearance"),
+            # The platform targets NZ: a user without a stated country is treated as NZ-based.
+            country=prefs.get("country") or settings.MATCH_DEFAULT_COUNTRY,
+            languages=tuple(prefs.get("languages") or ()),
         ),
         resumes=resumes,
         resume_refs=refs,

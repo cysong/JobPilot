@@ -45,6 +45,8 @@ def test_sections_are_ordered_for_prefix_caching():
     assert text.rstrip().endswith("- Azure")  # the job description is last
     assert "work_rights: work_visa" in text
     assert "security_clearance: unknown" in text
+    assert "located_in: New Zealand" in text
+    assert "languages: unknown" in text
     assert "=== resume_id: res_java" in text
     assert '- Azure (INTERMEDIATE). evidence: "Deployed to Azure App Service"' in text
     assert "listed_at: 2026-11-01" in text
@@ -101,3 +103,12 @@ def test_skill_library_supplement_only_returns_unmentioned_skills():
 )
 def test_work_history_years(experiences, expected):
     assert work_history_years(experiences, today=date(2026, 11, 8)) == pytest.approx(expected, abs=0.01)
+
+
+def test_conditions_include_country_and_languages():
+    text = build_judge_input(
+        conditions=CandidateConditions("work_visa", "not_eligible", country="New Zealand",
+                                       languages=("English", "Chinese")),
+        resumes=[JAVA], extra_skills=[], job=JOB,
+    )
+    assert "languages: English, Chinese" in text

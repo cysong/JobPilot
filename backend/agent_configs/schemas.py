@@ -286,8 +286,28 @@ class ClearanceCheck(BaseModel):
     satisfied: Optional[bool] = Field(..., description="Null when the candidate status is unknown")
 
 
+class WorkLocationCheck(BaseModel):
+    requirement: Literal["none", "onsite_outside_candidate_country", "resident_outside_candidate_country"]
+    country: Optional[str] = Field(..., description="Country the job requires, or null when requirement is none")
+    quote: Optional[str] = Field(..., description="Verbatim JD sentence; null when requirement is none")
+    satisfied: Optional[bool] = Field(..., description="Null when nothing is required")
+
+
+class LanguageCheck(BaseModel):
+    required_languages: list[str] = Field(
+        ..., description="Spoken/written languages the JD explicitly requires (not programming languages)"
+    )
+    quote: Optional[str] = Field(..., description="Verbatim JD sentence; null when nothing is required")
+    satisfied: Optional[bool] = Field(..., description="Null when the candidate languages are unknown")
+
+
+class OtherConstraint(BaseModel):
+    requirement: str = Field(..., description="Short description, e.g. 'Full NZ driver licence'")
+    quote: str = Field(..., description="Verbatim JD sentence")
+
+
 class JudgeRejection(BaseModel):
-    code: Literal["WORK_RIGHTS", "SECURITY_CLEARANCE"]
+    code: Literal["WORK_RIGHTS", "SECURITY_CLEARANCE", "WORK_LOCATION", "LANGUAGE"]
     reason: str = Field(..., description="One sentence")
     quote: str = Field(..., description="Verbatim JD sentence stating the requirement")
 
@@ -295,12 +315,17 @@ class JudgeRejection(BaseModel):
 class MatchJudgment(BaseModel):
     """Output of the match_judge agent. Field order is deliberate: checks before conclusions."""
 
-    __version__ = "j1"
+    __version__ = "j2"
 
     decision: Literal["rated", "rejected"]
     rejection: Optional[JudgeRejection] = Field(..., description="Required when decision is rejected, else null")
     work_rights: WorkRightsCheck
     security_clearance: ClearanceCheck
+    work_location: WorkLocationCheck
+    languages: LanguageCheck
+    other_constraints: list[OtherConstraint] = Field(
+        ..., description="Other hard requirements the candidate should know about (not used to reject)"
+    )
     best_resume_id: str = Field(..., description="One of the candidate resume ids")
     is_different_track: bool = Field(..., description="True when the job is a different career track (tier D)")
     seniority_mismatch: bool = Field(..., description="True when seniority is severely mismatched (tier C)")

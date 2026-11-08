@@ -10,6 +10,9 @@ from app.modules.matching.judge.validator import JudgmentStructureError, validat
 
 JD = (
     "Senior .NET Developer\n"
+    "This role is based in our Sydney office.\n"
+    "Fluent Japanese is required.\n"
+    "A full NZ driver licence is required.\n"
     "- 5+ years of C# and .NET\n"
     "- Experience with Microsoft Azure\n"
     "Applicants must be NZ citizens or permanent residents.\n"
@@ -24,6 +27,9 @@ BASE = {
     "work_rights": {"requirement": "pr_or_citizen",
                     "quote": "Applicants must be NZ citizens or permanent residents.", "satisfied": True},
     "security_clearance": {"requirement": "none", "quote": None, "satisfied": None},
+    "work_location": {"requirement": "none", "country": None, "quote": None, "satisfied": None},
+    "languages": {"required_languages": [], "quote": None, "satisfied": None},
+    "other_constraints": [],
     "best_resume_id": "res_1",
     "is_different_track": False,
     "seniority_mismatch": False,
@@ -44,14 +50,15 @@ BASE = {
 }
 
 
-def _validate(raw, *, wr="citizen", sc=None, years=6.5, candidates=("res_1", "res_2")):
+def _validate(raw, *, wr="citizen", sc=None, years=6.5, candidates=("res_1", "res_2"),
+              languages=("English", "Chinese")):
     return validate_judgment(
         raw,
         candidate_ids=list(candidates),
         job_text=JD,
         resume_texts={"res_1": RESUME, "res_2": "other resume"},
         skill_texts=SKILLS,
-        conditions=CandidateConditions(work_rights=wr, security_clearance=sc),
+        conditions=CandidateConditions(work_rights=wr, security_clearance=sc, languages=tuple(languages)),
         history_years={"res_1": years, "res_2": 1.0},
     )
 
@@ -154,3 +161,50 @@ def test_flag_tier_conflicts_keep_llm_tier():
 def test_structural_problems_raise_for_retry(raw):
     with pytest.raises(JudgmentStructureError):
         _validate(raw)
+
+
+def test_work_location_rejection():
+    raw = _judgment(
+        decision="rejected",
+        rejection={"code": "WORK_LOCATION", "reason": "On site in Sydney.",
+                   "quote": "This role is based in our Sydney office."},
+        work_location={"requirement": "onsite_outside_candidate_country", "country": "Australia",
+                       "quote": "This role is based in our Sydney office.", "satisfied": False},
+    )
+    out = _validate(raw)
+    assert out.status == "rejected"
+    assert out.reject_code == "WORK_LOCATION"
+
+
+def test_language_rejection_needs_known_languages():
+    raw = _judgment(
+        decision="rejected",
+        rejection={"code": "LANGUAGE", "reason": "Japanese required.", "quote": "Fluent Japanese is required."},
+        languages={"required_languages": ["Japanese"], "quote": "Fluent Japanese is required.", "satisfied": False},
+    )
+    assert _validate(raw).status == "rejected"
+    reverted = _validate(raw, languages=())
+    assert reverted.status == "rated"
+    assert "rejection_on_unknown_status" in reverted.validation["consistency_fixes"]
+
+
+def test_location_and_language_checks_need_real_quotes():
+    raw = _judgment(
+        work_location={"requirement": "resident_outside_candidate_country", "country": "USA",
+                       "quote": "Must live in the USA.", "satisfied": False},
+        languages={"required_languages": ["German"], "quote": "German is required.", "satisfied": False},
+    )
+    out = _validate(raw)
+    assert out.judgment["work_location"]["requirement"] == "none"
+    assert out.judgment["languages"]["required_languages"] == []
+    assert "constraint_quote_not_found:work_location" in out.validation["consistency_fixes"]
+    assert "constraint_quote_not_found:languages" in out.validation["consistency_fixes"]
+
+
+def test_other_constraints_keep_only_quoted():
+    raw = _judgment(other_constraints=[
+        {"requirement": "Driver licence", "quote": "A full NZ driver licence is required."},
+        {"requirement": "Police vetting", "quote": "Police vetting will be done."},
+    ])
+    out = _validate(raw)
+    assert [c["requirement"] for c in out.judgment["other_constraints"]] == ["Driver licence"]

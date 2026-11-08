@@ -69,6 +69,15 @@ def validate_judgment(
         if check["requirement"] != "none" and not quote_in(check["quote"], job_text):
             fixes.append(f"constraint_quote_not_found:{key}")
             data[key] = {"requirement": "none", "quote": None, "satisfied": None}
+    location = data["work_location"]
+    if location["requirement"] != "none" and not quote_in(location["quote"], job_text):
+        fixes.append("constraint_quote_not_found:work_location")
+        data["work_location"] = {"requirement": "none", "country": None, "quote": None, "satisfied": None}
+    languages = data["languages"]
+    if languages["required_languages"] and not quote_in(languages["quote"], job_text):
+        fixes.append("constraint_quote_not_found:languages")
+        data["languages"] = {"required_languages": [], "quote": None, "satisfied": None}
+    data["other_constraints"] = [c for c in data["other_constraints"] if quote_in(c["quote"], job_text)]
 
     # A rejection needs a real JD sentence and a known candidate status.
     if data["decision"] == "rejected":
@@ -76,6 +85,8 @@ def validate_judgment(
         status_by_code = {
             "WORK_RIGHTS": conditions.work_rights,
             "SECURITY_CLEARANCE": conditions.security_clearance,
+            "WORK_LOCATION": conditions.country,
+            "LANGUAGE": ", ".join(conditions.languages) or None,
         }
         if not quote_in(rejection["quote"], job_text):
             fixes.append("rejection_quote_not_found")
