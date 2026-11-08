@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import hashlib
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -75,7 +76,18 @@ async def run_evaluation(
     concurrency: int | None = None,
     baseline_run_id: str | None = None,
     limit: int | None = None,
+    judged_limit: int | None = None,
+    repeat_sample: int | None = None,
+    sample_seed: str = "eval",
 ) -> MatchEvalRun:
+    """Evaluate a dataset.
+
+    ``judged_limit`` keeps only that many of the pairs that reach the LLM (others
+    that would reach it are left out of the run; prefilter-only pairs stay).
+    ``repeat_sample`` limits extra repeats to that many LLM pairs. Both pick
+    pairs by a stable hash of (sample_seed, job_id), so smaller samples are
+    subsets of larger ones.
+    """
     registry = get_registry()
     override = model_override or judge_override()
     async with session_factory() as db:
@@ -97,6 +109,25 @@ async def run_evaluation(
         users = {uid: await _frozen_user_context(db, uid, dataset.config.get("resumes", {})) for uid in user_ids}
         jobs: dict[int, JobContext] = {jid: await load_job_context(db, jid) for jid in job_ids}
 
+        def reaches_llm(item: MatchEvalItem) -> bool:
+            if item.item_kind == ItemKind.RANDOM_FILTERED:
+                return True
+            family = families.get(item.job_id)
+            if family is None:
+                return False
+            plan = plan_match(job_family=family, user=users[item.user_id], job=jobs[item.job_id], registry=registry)
+            return plan.prefilter in ("same", "adjacent")
+
+        def rank(item: MatchEvalItem) -> str:
+            return hashlib.sha256(f"{sample_seed}:{item.job_id}".encode()).hexdigest()
+
+        llm_items = sorted((i for i in items if reaches_llm(i)), key=rank)
+        if judged_limit is not None:
+            dropped = {(i.user_id, i.job_id) for i in llm_items[judged_limit:]}
+            items = [i for i in items if (i.user_id, i.job_id) not in dropped]
+            llm_items = llm_items[:judged_limit]
+        repeat_items = llm_items if repeat_sample is None else llm_items[:repeat_sample]
+
         run = MatchEvalRun(
             id=generate_id("mer"),
             dataset_id=dataset.id,
@@ -108,6 +139,10 @@ async def run_evaluation(
                 "families_version": registry.version,
                 "repeats": repeats,
                 "items": len(items),
+                "llm_pairs": len(llm_items),
+                "judged_limit": judged_limit,
+                "repeat_sample": len(repeat_items) if repeats > 1 else 0,
+                "sample_seed": sample_seed,
             },
             baseline_run_id=baseline_run_id,
             status="running",
@@ -117,6 +152,7 @@ async def run_evaluation(
 
     sem = asyncio.Semaphore(concurrency or settings.MATCH_JUDGE_CONCURRENCY)
     rows: list[dict[str, Any]] = []
+    progress = {"done": 0, "total": len(llm_items) + len(repeat_items) * (repeats - 1)}
 
     async def evaluate(item: MatchEvalItem, repeat: int) -> None:
         job = jobs[item.job_id]
@@ -154,16 +190,24 @@ async def run_evaluation(
                 except JudgeFailure as exc:
                     row.update(judged=True, status="failed_final", error=str(exc)[:2000])
                     logger.warning("eval_judge_failed", job_id=item.job_id, error=str(exc))
+            progress["done"] += 1
+            if progress["done"] % 25 == 0 or progress["done"] == progress["total"]:
+                print(f"  judged {progress['done']}/{progress['total']}", flush=True)
         rows.append(row)
 
-    tasks = []
-    for item in items:
-        tasks.append(evaluate(item, 0))
+    tasks = [evaluate(item, 0) for item in items]
     # Repeats only make sense for pairs that reach the LLM; planning is deterministic.
     for repeat in range(1, repeats):
-        for item in items:
-            tasks.append(_maybe_repeat(evaluate, item, repeat, families, users, jobs, registry))
-    await asyncio.gather(*tasks)
+        tasks.extend(evaluate(item, repeat) for item in repeat_items)
+    try:
+        await asyncio.gather(*tasks)
+    except Exception as exc:
+        async with session_factory() as db:
+            failed = await db.get(MatchEvalRun, run.id)
+            failed.status, failed.error = "failed", str(exc)[:2000]
+            failed.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+        raise
 
     family_stats = {
         "jobs": len(items),
@@ -197,16 +241,6 @@ async def run_evaluation(
         run.report_md = render_report(run={"id": run.id, **run.config}, metrics=metrics, comparison=comparison)
         await db.commit()
         return run
-
-
-async def _maybe_repeat(evaluate, item, repeat, families, users, jobs, registry):
-    family = families.get(item.job_id)
-    reaches_llm = item.item_kind == ItemKind.RANDOM_FILTERED
-    if family is not None:
-        plan = plan_match(job_family=family, user=users[item.user_id], job=jobs[item.job_id], registry=registry)
-        reaches_llm = reaches_llm or plan.prefilter in ("same", "adjacent")
-    if reaches_llm:
-        await evaluate(item, repeat)
 
 
 async def load_run_rows(db: AsyncSession, run_id: str) -> list[dict[str, Any]]:

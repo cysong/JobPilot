@@ -190,3 +190,39 @@ async def test_full_stage1_pipeline(session_factory, tmp_path):
     assert "Compared pairs:" in section  # baseline comparison rendered
     # Job 1 was labeled C while judged A: off by two tiers -> severe error.
     assert 1 in {e["job_id"] for e in run2.metrics["labels"]["severe_errors"]}
+
+
+@pytest.mark.asyncio
+async def test_judged_limit_and_repeat_sample(session_factory):
+    calls: list = []
+    gateway = _gateway(calls)
+    async with session_factory() as db:
+        await _seed(db)
+        await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=5,
+                                                      filtered_sample=2, seed="t"))
+    full = await run_evaluation(session_factory, gateway, dataset_ref="main@v1")
+    llm_pairs = full.config["llm_pairs"]
+    assert llm_pairs >= 4
+
+    calls.clear()
+    run = await run_evaluation(session_factory, gateway, dataset_ref="main@v1", judged_limit=3,
+                               repeats=2, repeat_sample=2, sample_seed="s")
+    judge_calls = [c for c in calls if c[0] == "match_judge"]
+    assert len(judge_calls) == 3 + 2
+    assert run.config["llm_pairs"] == 3 and run.config["repeat_sample"] == 2
+    async with session_factory() as db:
+        preds = (await db.execute(select(MatchEvalPrediction).where(MatchEvalPrediction.run_id == run.id))).scalars().all()
+    judged_jobs = {p.job_id for p in preds if p.repeat_index == 0 and p.tier}
+    repeated_jobs = {p.job_id for p in preds if p.repeat_index == 1}
+    assert len(judged_jobs) == 3
+    assert repeated_jobs <= judged_jobs and len(repeated_jobs) == 2
+    # Pairs that never reach the LLM (location rejection, filtered) are still evaluated.
+    assert any(p.reject_code == "LOCATION" for p in preds)
+
+    # Same seed, larger limit: the smaller sample is a subset.
+    calls.clear()
+    bigger = await run_evaluation(session_factory, gateway, dataset_ref="main@v1", judged_limit=4, sample_seed="s")
+    async with session_factory() as db:
+        big_jobs = {p.job_id for p in (await db.execute(
+            select(MatchEvalPrediction).where(MatchEvalPrediction.run_id == bigger.id))).scalars() if p.tier}
+    assert judged_jobs <= big_jobs
