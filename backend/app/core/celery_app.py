@@ -63,23 +63,34 @@ celery_app.autodiscover_tasks([
 # with an empty schedule — the process stays alive but never dispatches
 # anything. Toggling requires a beat restart (the schedule is read at
 # startup, not per tick).
+# Each periodic task expires a little before its next run. When the worker is busy
+# with long LLM tasks, beat keeps enqueuing; without an expiry the copies pile up
+# behind user work (e.g. cover letters) and then run back to back for nothing.
+# The worker discards a copy that is picked up after it expired.
+_EVERY_2_MIN_EXPIRES = 110
+_EVERY_5_MIN_EXPIRES = 290
+
 _DEFAULT_BEAT_SCHEDULE = {
     'poll-unanalyzed-jobs': {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
+        'options': {'expires': _EVERY_5_MIN_EXPIRES},
     },
     # Matching v3: the tasks are no-ops unless MATCH_V3_ENABLED=true.
     'match-discover-new-jobs': {
         'task': 'app.modules.matching.tasks.discover_new_jobs_task',
         'schedule': crontab(minute='*/5'),
+        'options': {'expires': _EVERY_5_MIN_EXPIRES},
     },
     'match-classify-pending-titles': {
         'task': 'app.modules.matching.tasks.classify_pending_titles_task',
         'schedule': crontab(minute='1-59/5'),  # one minute after discover
+        'options': {'expires': _EVERY_5_MIN_EXPIRES},
     },
     'match-judge-queued': {
         'task': 'app.modules.matching.tasks.judge_queued_matches_task',
         'schedule': crontab(minute='*/2'),
+        'options': {'expires': _EVERY_2_MIN_EXPIRES},
     },
 }
 
