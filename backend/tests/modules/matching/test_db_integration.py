@@ -24,9 +24,12 @@ if LOCAL_DB:
         TitleToClassify,
         classify_missing_titles,
         classify_titles,
+        refresh_job_families,
         register_jobs,
         resolve_pending_jobs,
+        set_title_family,
     )
+    from app.modules.matching.families.registry import get_registry
     from app.modules.matching.families.models import JobRoleFamily, JobTitleFamily
     from app.modules.matching.judge.service import load_job_context, load_user_context
     from app.modules.matching.models import JobMatch
@@ -106,7 +109,7 @@ async def test_family_pipeline_title_cache_and_jd_read(session):
     assert rows[103].role_family == "qa_test"
     assert rows[103].method == "jd_read"
     assert rows[103].ai_call_id == "aic_jd"
-    assert all(r.families_version == "f1" for r in rows.values())
+    assert all(r.families_version == get_registry().version for r in rows.values())
 
 
 @pytest.mark.asyncio
@@ -123,6 +126,39 @@ async def test_admin_title_rows_are_not_overwritten(session):
     rows = {r.title_key: r for r in (await session.execute(select(JobTitleFamily))).scalars()}
     assert rows["software engineer"].role_family == "qa_test"  # admin row kept
     assert rows["data engineer"].role_family == "data_engineering"
+
+
+@pytest.mark.asyncio
+async def test_title_override_and_refresh_job_families(session):
+    await _seed(session)
+    jobs = (await session.execute(select(SeekJob.id, SeekJob.title))).all()
+    await register_jobs(session, [(j.id, j.title) for j in jobs])
+    await session.commit()
+    gateway = _title_gateway({"software engineer": "software_dev"})
+    await classify_missing_titles(session, gateway)
+    await resolve_pending_jobs(session, gateway)  # 101/102 title_cache, 103 jd_read -> qa_test
+
+    with pytest.raises(ValueError, match="unknown role family"):
+        await set_title_family(session, "Software Engineer", "nope")
+    row = await set_title_family(session, "Software Engineer (Contract)", "app_support", updated_by=1)
+    assert (row.title_key, row.source, row.status) == ("software engineer", "admin", "classified")
+    await set_title_family(session, "Automation Engineer", "devops_platform")
+    await session.commit()
+
+    counts = await refresh_job_families(session)
+    rows = {r.job_id: r for r in (await session.execute(select(JobRoleFamily))).scalars()}
+    assert rows[101].role_family == rows[102].role_family == "app_support"
+    # A JD-read job follows an admin pin of its title.
+    assert (rows[103].role_family, rows[103].method) == ("devops_platform", "title_cache")
+    assert counts == {"changed": 3, "to_pending": 0}
+
+    # Making the title ambiguous sends cache-classified jobs back to a JD read.
+    await set_title_family(session, "Software Engineer", None)
+    await session.commit()
+    assert await refresh_job_families(session) == {"changed": 0, "to_pending": 2}
+    rows = {r.job_id: r for r in (await session.execute(select(JobRoleFamily))).scalars()}
+    assert rows[101].status == "pending" and rows[101].role_family is None
+    assert await refresh_job_families(session) == {"changed": 0, "to_pending": 0}  # idempotent
 
 
 @pytest.mark.asyncio

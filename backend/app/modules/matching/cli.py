@@ -2,6 +2,9 @@
 
     uv run python -m app.modules.matching.cli families classify-titles [--all]
     uv run python -m app.modules.matching.cli families init [--days 30]
+    uv run python -m app.modules.matching.cli families reclassify FAMILY
+    uv run python -m app.modules.matching.cli families set-title "TITLE" FAMILY|ambiguous [--by USER_ID]
+    uv run python -m app.modules.matching.cli families refresh-jobs
     uv run python -m app.modules.matching.cli resumes suggest [--user ID] [--apply]
     uv run python -m app.modules.matching.cli resumes set RESUME_ID FAMILY
     uv run python -m app.modules.matching.cli dataset create --name main --user ID [--random 300] [--filtered-sample 80]
@@ -87,6 +90,48 @@ async def _families_init(args) -> None:
         print(f"registered {added} jobs, classified {titles} titles, resolved {counts}")
 
 
+async def _families_reclassify(args) -> None:
+    from app.core.database import async_session_factory
+    from app.core.llm.gateway import AgentGateway
+    from app.modules.matching.families.classifier import reclassify_family_titles, stale_family_titles
+    from app.modules.matching.families.registry import get_registry
+
+    async with async_session_factory() as db:
+        count = len((await db.execute(stale_family_titles(args.family, get_registry().version))).all())
+        batches = -(-count // settings.TITLE_CLASSIFIER_BATCH_SIZE)
+        if not _confirm(args, f"Re-classify {count} title keys in {args.family} not yet on {get_registry().version} -> {batches} calls to "
+                              f"{settings.TITLE_CLASSIFIER_MODEL}. Run families refresh-jobs afterwards."):
+            return
+        written = await reclassify_family_titles(db, AgentGateway.get(), args.family)
+        print(f"re-classified {written} title keys")
+
+
+async def _families_set_title(args) -> None:
+    from app.core.database import async_session_factory
+    from app.modules.matching.families.classifier import set_title_family
+
+    family = None if args.family == "ambiguous" else args.family
+    async with async_session_factory() as db:
+        row = await set_title_family(db, args.title, family, updated_by=args.by)
+        await db.commit()
+        print(f"{row.title_key!r} -> {row.role_family or 'ambiguous'} (admin)")
+
+
+async def _families_refresh_jobs(args) -> None:
+    from app.core.database import async_session_factory
+    from app.core.llm.gateway import AgentGateway
+    from app.modules.matching.families.classifier import refresh_job_families, resolve_pending_jobs
+    from app.modules.matching.families.models import JobFamilyStatus, JobRoleFamily
+
+    async with async_session_factory() as db:
+        counts = await refresh_job_families(db)
+        print(f"job families: {counts}")
+        pending = len((await db.execute(select(JobRoleFamily.job_id).where(
+            JobRoleFamily.status == JobFamilyStatus.PENDING))).all())
+        if pending and _confirm(args, f"{pending} pending jobs -> JD reads with {settings.TITLE_CLASSIFIER_MODEL}."):
+            print(f"resolved {await resolve_pending_jobs(db, AgentGateway.get())}")
+
+
 async def _resumes_suggest(args) -> None:
     from app.core.database import async_session_factory
     from app.core.llm.gateway import AgentGateway
@@ -143,13 +188,13 @@ async def _run(args) -> None:
     if not _confirm(args, f"Run {args.dataset} with {override.provider}/{override.model}, "
                           f"repeat={args.repeat} (sample {args.repeat_sample or 'all'}), "
                           f"judged_limit={args.judged_limit or 'all'}, limit={args.limit or 'all'}, "
-                          f"reuse={args.reuse or '-'}."):
+                          f"reuse={args.reuse or '-'}, focus={args.focus or 'all'}."):
         return
     run = await run_evaluation(
         async_session_factory, AgentGateway.get(), dataset_ref=args.dataset, model_override=override,
         repeats=args.repeat, concurrency=args.concurrency, baseline_run_id=args.baseline, limit=args.limit,
         judged_limit=args.judged_limit, repeat_sample=args.repeat_sample, sample_seed=args.sample_seed,
-        reuse_run_id=args.reuse,
+        reuse_run_id=args.reuse, focus=args.focus,
     )
     path = _write_report(run.id, run.report_md or "")
     print(f"run {run.id} {run.status}; report: {path}; cost: {run.cost}")
@@ -223,6 +268,16 @@ def build_parser() -> argparse.ArgumentParser:
     p = llm(fam.add_parser("init"))
     p.add_argument("--days", type=int, default=settings.JOB_EXPIRY_DAYS)
     p.set_defaults(func=_families_init)
+    p = llm(fam.add_parser("reclassify", help="re-run the classifier on one family's titles (after a split)"))
+    p.add_argument("family")
+    p.set_defaults(func=_families_reclassify)
+    p = fam.add_parser("set-title", help="admin override for one title")
+    p.add_argument("title")
+    p.add_argument("family", help="a family key, or 'ambiguous' to read the JD")
+    p.add_argument("--by", type=int, help="admin user id")
+    p.set_defaults(func=_families_set_title)
+    p = llm(fam.add_parser("refresh-jobs", help="re-derive job families from the title cache"))
+    p.set_defaults(func=_families_refresh_jobs)
 
     res = sub.add_parser("resumes").add_subparsers(dest="sub", required=True)
     p = res.add_parser("suggest")
@@ -255,6 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repeat-sample", type=int, help="repeat only N LLM pairs")
     p.add_argument("--sample-seed", default="eval")
     p.add_argument("--reuse", help="copy successful results from this earlier run and judge only the rest")
+    p.add_argument("--focus", choices=["labeled"], help="only labeled and interviewed items")
     p.set_defaults(func=_run)
 
     p = sub.add_parser("report")

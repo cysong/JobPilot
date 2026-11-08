@@ -65,6 +65,9 @@ async def _frozen_user_context(db: AsyncSession, user_id: int, frozen: dict[str,
     return dataclasses.replace(user, resumes=tuple(resumes), resume_refs=tuple(refs))
 
 
+FOCUS_LABELED = "labeled"
+
+
 async def run_evaluation(
     session_factory: SessionFactory,
     gateway: Gateway,
@@ -80,6 +83,7 @@ async def run_evaluation(
     repeat_sample: int | None = None,
     sample_seed: str = "eval",
     reuse_run_id: str | None = None,
+    focus: str | None = None,
 ) -> MatchEvalRun:
     """Evaluate a dataset.
 
@@ -91,6 +95,8 @@ async def run_evaluation(
     ``reuse_run_id`` copies successful LLM results (rated / rejected) from an
     earlier run of the same dataset and model, and only judges the rest; used to
     resume a run that stopped part-way (e.g. provider credit exhausted).
+    ``focus="labeled"`` keeps only items with ground truth: a human label or an
+    application that reached an interview (cheap prompt iterations).
     """
     registry = get_registry()
     override = model_override or judge_override()
@@ -99,6 +105,10 @@ async def run_evaluation(
         items = list((await db.execute(
             select(MatchEvalItem).where(MatchEvalItem.dataset_id == dataset.id).order_by(MatchEvalItem.job_id)
         )).scalars())
+        if focus == FOCUS_LABELED:
+            items = [i for i in items if i.label is not None or i.item_kind == ItemKind.INTERVIEWED]
+        elif focus is not None:
+            raise ValueError(f"unknown focus {focus!r}")
         if limit:
             items = items[:limit]
         job_ids = [i.job_id for i in items]
@@ -147,6 +157,10 @@ async def run_evaluation(
             if source.config.get("model") != override.model:
                 raise ValueError(
                     f"run {reuse_run_id} used {source.config.get('model')}, not {override.model}")
+            current_prompt = prompt_version or settings.MATCH_JUDGE_PROMPT_VERSION
+            if source.config.get("prompt_version") != current_prompt:
+                raise ValueError(f"run {reuse_run_id} used prompt {source.config.get('prompt_version')}, "
+                                 f"not {current_prompt}")
             source_users = users
             if source.dataset_id != dataset.id:
                 # Another dataset version may have a different resume snapshot: rebuild it so
@@ -183,6 +197,7 @@ async def run_evaluation(
                 "sample_seed": sample_seed,
                 "reused_from": reuse_run_id,
                 "reused_pairs": len(reused),
+                "focus": focus,
             },
             baseline_run_id=baseline_run_id,
             status="running",

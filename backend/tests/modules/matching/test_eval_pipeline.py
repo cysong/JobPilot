@@ -261,6 +261,30 @@ async def test_reuse_judges_only_failed_pairs(session_factory):
     with pytest.raises(ValueError, match="used"):
         await run_evaluation(session_factory, gateway, dataset_ref="main@v1", reuse_run_id=first.id,
                              model_override=ModelOverride(provider="openrouter", model="openai/gpt-6.1-sol"))
+    with pytest.raises(ValueError, match="prompt"):
+        await run_evaluation(session_factory, gateway, dataset_ref="main@v1", reuse_run_id=first.id,
+                             prompt_version="v0")
+
+
+@pytest.mark.asyncio
+async def test_focus_labeled_keeps_only_ground_truth_items(session_factory):
+    calls: list = []
+    gateway = _gateway(calls)
+    async with session_factory() as db:
+        await _seed(db)
+        await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=5,
+                                                      filtered_sample=2, seed="t"))
+        items = (await db.execute(select(MatchEvalItem))).scalars().all()
+    expected = {i.job_id for i in items if i.label is not None or i.item_kind == "interviewed"}
+    assert expected and len(expected) < len(items)
+
+    run = await run_evaluation(session_factory, gateway, dataset_ref="main@v1", focus="labeled")
+    async with session_factory() as db:
+        preds = (await db.execute(select(MatchEvalPrediction).where(MatchEvalPrediction.run_id == run.id))).scalars()
+        assert {p.job_id for p in preds} == expected
+    assert run.config["focus"] == "labeled"
+    with pytest.raises(ValueError, match="focus"):
+        await run_evaluation(session_factory, gateway, dataset_ref="main@v1", focus="nope")
 
 
 @pytest.mark.asyncio

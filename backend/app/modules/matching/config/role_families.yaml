@@ -5,7 +5,7 @@
 # - `description` and `examples` are shown to the title classifier LLM.
 # - Bump `version` on any change. Removing or splitting a family requires a data
 #   migration for job_title_families, pending job_role_families and resumes.role_family.
-version: f1
+version: f2
 
 families:
   software_dev:
@@ -39,9 +39,16 @@ families:
   it_support:
     label: IT Support
     label_zh: IT 支持
-    description: Service desk, end-user, desktop and application support.
-    examples: [service desk analyst, it support engineer, it support technician, application support analyst, technical support specialist, desktop support engineer]
-    adjacent: [infrastructure]
+    description: Service desk, end-user and desktop support, hardware and accounts (not support of a specific business application).
+    examples: [service desk analyst, it support engineer, it support technician, technical support specialist, desktop support engineer, field technician]
+    adjacent: [infrastructure, app_support]
+
+  app_support:
+    label: Application Support
+    label_zh: 应用支持
+    description: Supports, configures and implements specific business software products (L2/L3 application support, production support, implementation consultants, platform admins such as ServiceNow).
+    examples: [application support analyst, application support engineer, applications support consultant, production support engineer, software implementation consultant, servicenow administrator, technical support engineer]
+    adjacent: [software_dev, it_support]
 
   data_engineering:
     label: Data Engineering

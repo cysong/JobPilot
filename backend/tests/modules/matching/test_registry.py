@@ -44,12 +44,12 @@ def test_requires_version_and_families():
 
 def test_shipped_config_loads_and_covers_design_families():
     reg = get_registry()
-    assert reg.version == "f1"
+    assert reg.version == "f2"
     expected = {
         "software_dev", "qa_test", "devops_platform", "infrastructure", "it_support",
         "data_engineering", "data_analytics", "ml_ai", "architecture", "integration",
         "security", "business_analysis", "product_delivery", "eng_management",
-        "ai_data_work", "research", "other_engineering", "other",
+        "ai_data_work", "research", "other_engineering", "other", "app_support",
     }
     assert set(reg.keys) == expected
 
@@ -57,6 +57,8 @@ def test_shipped_config_loads_and_covers_design_families():
 def test_shipped_config_adjacency_matches_design():
     reg = get_registry()
     assert reg.adjacent("qa_test") == {"software_dev", "devops_platform"}
+    assert reg.adjacent("app_support") == {"software_dev", "it_support"}
+    assert "app_support" in reg.adjacent("software_dev")
     assert "devops_platform" in reg.adjacent("software_dev")
     # Non-IT and gig families are isolated so they never reach the LLM via adjacency.
     for isolated in ("ai_data_work", "research", "other_engineering", "other"):

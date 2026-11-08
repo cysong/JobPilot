@@ -268,3 +268,82 @@ async def resolve_pending_jobs(
         await db.commit()
     await db.commit()
     return counts
+
+
+def stale_family_titles(family: str, families_version: str):
+    return select(JobTitleFamily.title_key, JobTitleFamily.example_title).where(
+        JobTitleFamily.role_family == family,
+        JobTitleFamily.source != TitleFamilySource.ADMIN,
+        JobTitleFamily.families_version != families_version,
+    )
+
+
+async def reclassify_family_titles(
+    db: AsyncSession, gateway: Gateway, family: str, *, registry: RoleFamilyRegistry | None = None,
+) -> int:
+    """Re-run the classifier on the non-admin title keys in ``family`` that were classified
+    against an older catalog (used after a family is split; re-running resumes failed batches).
+    Returns rows written."""
+    registry = registry or get_registry()
+    rows = (await db.execute(stale_family_titles(family, registry.version))).all()
+    return await classify_titles(db, gateway, [TitleToClassify(k, t) for k, t in rows], registry=registry)
+
+
+async def set_title_family(
+    db: AsyncSession, title: str, role_family: str | None, *, updated_by: int | None = None,
+    registry: RoleFamilyRegistry | None = None,
+) -> JobTitleFamily:
+    """Admin override for one title: a family key, or None for ambiguous (read the JD)."""
+    registry = registry or get_registry()
+    if role_family is not None and not registry.is_valid(role_family):
+        raise ValueError(f"unknown role family {role_family!r}")
+    key = normalize_title(title)
+    row = (await db.execute(select(JobTitleFamily).where(JobTitleFamily.title_key == key))).scalar_one_or_none()
+    if row is None:
+        row = JobTitleFamily(id=generate_id("jtf"), title_key=key, example_title=title[:500],
+                             classifier_version="admin")
+        db.add(row)
+    row.status = TitleFamilyStatus.CLASSIFIED if role_family else TitleFamilyStatus.AMBIGUOUS
+    row.role_family = role_family
+    row.source = TitleFamilySource.ADMIN
+    row.families_version = registry.version
+    row.model = None
+    row.updated_by = updated_by
+    await db.flush()
+    return row
+
+
+async def refresh_job_families(db: AsyncSession, job_ids: Sequence[int] | None = None) -> dict[str, int]:
+    """Re-derive job families from the current title cache.
+
+    Jobs classified from the cache follow the cache's new family; jobs whose title is now
+    ambiguous go back to pending (JD read). Jobs settled by a JD read are left alone unless
+    an admin has since pinned their title to a family.
+    """
+    stmt = (
+        select(JobRoleFamily, JobTitleFamily)
+        .join(JobTitleFamily, JobTitleFamily.title_key == JobRoleFamily.title_key)
+        .where(JobRoleFamily.status == JobFamilyStatus.CLASSIFIED)
+    )
+    if job_ids is not None:
+        stmt = stmt.where(JobRoleFamily.job_id.in_(list(job_ids)))
+    counts = {"changed": 0, "to_pending": 0}
+    for job_family, title_family in (await db.execute(stmt)).all():
+        cache_classified = title_family.status == TitleFamilyStatus.CLASSIFIED
+        if job_family.method == JobFamilyMethod.TITLE_CACHE:
+            if not cache_classified:
+                job_family.status, job_family.role_family, job_family.method = JobFamilyStatus.PENDING, None, None
+                job_family.attempts = 0
+                counts["to_pending"] += 1
+            elif job_family.role_family != title_family.role_family:
+                job_family.role_family = title_family.role_family
+                job_family.families_version = title_family.families_version
+                counts["changed"] += 1
+        elif title_family.source == TitleFamilySource.ADMIN and cache_classified \
+                and job_family.role_family != title_family.role_family:
+            job_family.role_family = title_family.role_family
+            job_family.method = JobFamilyMethod.TITLE_CACHE
+            job_family.families_version = title_family.families_version
+            counts["changed"] += 1
+    await db.commit()
+    return counts
