@@ -324,38 +324,6 @@ class ResumeBriefInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserJobMatchResponse(BaseModel):
-    """Match list item for current user."""
-
-    id: str
-    job: JobBriefInfo
-    skill_match_score: float = Field(..., description="Skill match score (0-100)")
-    resume_match_score: Optional[float] = Field(None, description="Resume match score (0-100)")
-    ai_match_score: Optional[float] = Field(None, description="AI match score (0-100)")
-    recommended_resume: Optional[ResumeBriefInfo]
-    skill_match_details: dict
-    ai_analysis: Optional[dict] = None
-    calculated_at: datetime
-    ai_analyzed_at: Optional[datetime]
-
-
-class UserJobMatchDetailResponse(BaseModel):
-    """Detailed match info for current user on a job."""
-
-    id: str
-    job: JobDetail  # full job
-    job_analysis: JobAnalysisResponse
-    skill_match_score: float
-    skill_match_details: dict
-    resume_match_score: Optional[float]
-    resume_match_details: Optional[dict]
-    recommended_resume: Optional[ResumeBriefInfo]
-    ai_match_score: Optional[float]
-    ai_analysis: Optional[dict]
-    calculated_at: datetime
-    ai_analyzed_at: Optional[datetime]
-
-
 class JobEnqueueRequest(BaseModel):
     """Body for POST /jobs/enqueue — single URL to push to AWS scraper."""
 

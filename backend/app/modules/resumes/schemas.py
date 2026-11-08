@@ -80,6 +80,9 @@ class ResumeResponse(ResumeBase):
     created_at: datetime
     updated_at: datetime
 
+    role_family: Optional[str] = None
+    role_family_source: Optional[str] = None
+
     # Embedded document content
     document: DocumentBase
 
@@ -98,6 +101,9 @@ class ResumeListItem(ResumeBase):
         default_factory=list,
         description="Selected target job titles for this resume",
     )
+
+    role_family: Optional[str] = Field(None, description="Matching v3 role family; null = not matched")
+    role_family_source: Optional[str] = Field(None, description="auto | user")
 
     # Only include metadata, not full content
     content_preview: Optional[str] = Field(None, description="First 200 characters of content")

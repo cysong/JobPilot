@@ -81,6 +81,8 @@ async def list_resumes(
             created_at=resume.created_at,
             updated_at=resume.updated_at,
             target_job_titles=resume.target_job_titles or [],
+            role_family=resume.role_family,
+            role_family_source=resume.role_family_source,
             content_preview=content_preview,
         )
         items.append(item)

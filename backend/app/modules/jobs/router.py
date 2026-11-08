@@ -1,7 +1,7 @@
 """
 Job API endpoints.
 """
-from typing import Annotated
+from typing import Annotated, Literal, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -12,11 +12,10 @@ from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.jobs import service
-from app.modules.jobs.repository import JobRepository, JobAnalysisRepository, UserJobViewRepository
+from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.jobs.schemas import (
     JobAnalysisResponse,
     JobBase,
-    JobBriefInfo,
     JobDetail,
     JobEnqueueRequest,
     JobEnqueueResponse,
@@ -25,135 +24,46 @@ from app.modules.jobs.schemas import (
     JobFiltersOptions,
     JobFiltersRequest,
     JobListResponse,
-    ResumeBriefInfo,
     SavedJobListResponse,
     SavedJobStatus,
     SourceMeta,
     JobViewedStatus,
-    UserJobMatchDetailResponse,
-    UserJobMatchResponse,
 )
 from app.modules.jobs.source_config import load_source_metas
-from app.modules.matching.repository import UserJobMatchRepository
-from app.modules.resumes.repository import ResumeRepository
+from app.modules.matching import service as matching_service
+from app.modules.matching.schemas import MatchDetail, MatchListResponse
 from app.shared.pagination import PaginationParams
 from app.modules.workflow import TaskService
 from app.shared.enums import EntityType, TaskType
 from app.modules.applications.service import ApplicationService
 from app.modules.applications.schemas import ApplicationDetail
-from app.modules.applications.repositories.application_repo import ApplicationRepository
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.get("/matches", response_model=list[UserJobMatchResponse])
+@router.get("/matches", response_model=MatchListResponse)
 async def list_my_matches(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    min_score: float = Query(40, ge=0, le=100, description="Minimum skill match score"),
+    view: Literal["recommended", "rejected"] = Query("recommended"),
+    tiers: Optional[str] = Query(None, description="Comma-separated tiers for the recommended view, default A,B"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    """List matches for current user."""
-    matches = await UserJobMatchRepository.get_user_matches(
-        db=db,
-        user_id=current_user.id,
-        min_score=min_score,
-        limit=limit,
-        offset=offset,
-    )
-
-    job_ids = [match.job_id for match in matches]
-
-    view_map = await UserJobViewRepository.get_view_map(
-        db=db,
-        user_id=current_user.id,
-        job_ids=job_ids,
-    )
-    application_job_ids = await ApplicationRepository.get_job_id_set_by_user(
-        db=db,
-        user_id=current_user.id,
-        job_ids=job_ids,
-    )
-
-    # Batch-load all jobs in one query (brief columns only — no `content`,
-    # no JobAnalysis selectinload). Replaces the previous N+1 loop.
-    job_map = await JobRepository.get_brief_map(db, job_ids)
-
-    # Batch-load all recommended resumes in one query.
-    resume_ids = [m.recommended_resume_id for m in matches if m.recommended_resume_id]
-    resume_map = await ResumeRepository.get_by_ids_map(db, resume_ids)
-
-    results: list[UserJobMatchResponse] = []
-    for match in matches:
-        job = job_map.get(match.job_id)
-        if not job:
-            continue
-        resume = resume_map.get(match.recommended_resume_id)
-
-        job_info = JobBriefInfo.model_validate(job)
-        viewed = view_map.get(match.job_id)
-        job_info.is_viewed = viewed is not None
-        job_info.last_viewed_at = viewed.last_viewed_at if viewed else None
-        job_info.has_application = match.job_id in application_job_ids
-
-        results.append(
-            UserJobMatchResponse(
-                id=match.id,
-                job=job_info,
-                skill_match_score=match.skill_match_score,
-                resume_match_score=match.resume_match_score,
-                ai_match_score=match.ai_match_score,
-                recommended_resume=ResumeBriefInfo.model_validate(resume)
-                if resume
-                else None,
-                skill_match_details=match.skill_match_details,
-                ai_analysis=match.ai_analysis,
-                calculated_at=match.calculated_at,
-                ai_analyzed_at=match.ai_analyzed_at,
-            )
-        )
-
-    return results
+    """Matching v3 results for the current user on live jobs, newest first."""
+    tier_list = [t.strip().upper() for t in tiers.split(",") if t.strip()] if tiers else None
+    return await matching_service.list_matches(db, current_user, view=view, tiers=tier_list,
+                                               limit=limit, offset=offset)
 
 
-@router.get("/matches/{job_id}", response_model=UserJobMatchDetailResponse | None)
+@router.get("/matches/{job_id}", response_model=MatchDetail | None)
 async def get_my_match_detail(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Get match detail for current user on a specific job."""
-    match = await UserJobMatchRepository.get_by_user_and_job(
-        db=db,
-        user_id=current_user.id,
-        job_id=job_id,
-    )
-    if not match:
-        return None
-
-    job = await JobRepository.get_by_id(db, job_id)
-    job_analysis = await JobAnalysisRepository.get_by_job_id(db, job_id)
-    if not job or not job_analysis:
-        raise NotFoundError("Job or analysis not found")
-    resume = None
-    if match.recommended_resume_id:
-        resume = await ResumeRepository.get_by_id(db, match.recommended_resume_id)
-
-    return UserJobMatchDetailResponse(
-        id=match.id,
-        job=JobDetail.model_validate(job),
-        job_analysis=JobAnalysisResponse.model_validate(job_analysis),
-        skill_match_score=match.skill_match_score,
-        skill_match_details=match.skill_match_details,
-        resume_match_score=match.resume_match_score,
-        resume_match_details=match.resume_match_details,
-        recommended_resume=ResumeBriefInfo.model_validate(resume) if resume else None,
-        ai_match_score=match.ai_match_score,
-        ai_analysis=match.ai_analysis,
-        calculated_at=match.calculated_at,
-        ai_analyzed_at=match.ai_analyzed_at,
-    )
+    """Full matching v3 judgment for the current user on a job (null if none)."""
+    return await matching_service.get_match_detail(db, current_user, job_id)
 
 
 @router.get("", response_model=JobListResponse)

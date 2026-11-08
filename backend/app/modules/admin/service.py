@@ -31,7 +31,7 @@ from app.modules.admin.schemas import (
 from app.modules.applications.models import Application
 from app.modules.auth.models import User
 from app.modules.jobs.models import SeekJob
-from app.modules.matching.models import UserJobMatch
+from app.modules.matching.models import JobMatch
 from app.modules.workflow.models import AICall, TaskExecution
 from app.shared.enums import TaskStatus
 from app.core.cache import jcache
@@ -84,8 +84,8 @@ class AdminService:
         matches_total, matches_today = (
             await db.execute(
                 select(
-                    func.count(UserJobMatch.id),
-                    func.count(UserJobMatch.id).filter(UserJobMatch.created_at >= today_start),
+                    func.count(JobMatch.id),
+                    func.count(JobMatch.id).filter(JobMatch.created_at >= today_start),
                 )
             )
         ).one()

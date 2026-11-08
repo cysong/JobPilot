@@ -11,14 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.matching.evaluation.metrics import outcome
 from app.modules.matching.evaluation.models import MatchEvalPrediction, MatchEvalRun
 from app.modules.matching.evaluation.runner import load_run_rows
-from app.modules.matching.labels.models import LABEL_VALUES, REASON_TAGS, MatchLabel
-from app.shared.utils import generate_id
+from app.modules.matching.labels.service import add_label
+from app.modules.matching.labels.models import REASON_TAGS
 
 EXPORT_COLUMNS = [
     "user_id", "job_id", "item_kind", "title", "company", "predicted", "tech_level",
@@ -95,39 +95,25 @@ async def import_labels(db: AsyncSession, path: Path, *, labeled_by: int, run_id
         if not label:
             skipped += 1
             continue
-        if label not in LABEL_VALUES:
-            errors.append(f"line {line_no}: invalid label {label!r}")
-            continue
-        tags = [t.strip().upper() for t in (row.get("reason_tags") or "").replace(",", "|").split("|") if t.strip()]
-        bad_tags = [t for t in tags if t not in REASON_TAGS]
-        if bad_tags:
-            errors.append(f"line {line_no}: invalid reason_tags {bad_tags}")
-            continue
         try:
             user_id, job_id = int(row["user_id"]), int(row["job_id"])
         except (KeyError, TypeError, ValueError):
             errors.append(f"line {line_no}: missing user_id/job_id")
             continue
-
         pred = predictions.get((user_id, job_id))
-        new_id = generate_id("ml")
-        db.add(MatchLabel(
-            id=new_id, user_id=user_id, job_id=job_id, label=label, reason_tags=tags,
-            note=(row.get("note") or "").strip() or None, source="import", labeled_by=labeled_by,
-            predicted_status=pred.status if pred else None,
-            predicted_tier=pred.tier if pred else None,
-            predicted_prompt_version=run_config.get("prompt_version"),
-            predicted_model=run_config.get("model"),
-            predicted_snapshot=(pred.judgment or {}).get("judgment") if pred else None,
-        ))
-        await db.flush()
-        await db.execute(
-            update(MatchLabel)
-            .where(MatchLabel.user_id == user_id, MatchLabel.job_id == job_id,
-                   MatchLabel.labeled_by == labeled_by, MatchLabel.superseded_by.is_(None),
-                   MatchLabel.id != new_id)
-            .values(superseded_by=new_id)
-        )
+        try:
+            await add_label(
+                db, user_id=user_id, job_id=job_id, label=label, labeled_by=labeled_by, source="import",
+                reason_tags=(row.get("reason_tags") or "").replace(",", "|").split("|"), note=row.get("note"),
+                prediction={
+                    "status": pred.status if pred else None, "tier": pred.tier if pred else None,
+                    "prompt_version": run_config.get("prompt_version"), "model": run_config.get("model"),
+                    "snapshot": (pred.judgment or {}).get("judgment") if pred else None,
+                } if run_id else None,
+            )
+        except ValueError as exc:
+            errors.append(f"line {line_no}: {exc}")
+            continue
         imported += 1
     await db.commit()
     return ImportResult(imported, skipped, errors)
