@@ -121,6 +121,8 @@ class Settings(BaseSettings):
 
     # Workflow task retry
     TASK_RETRY_STALE_TIMEOUT_MINUTES: int = 10
+    TASK_RECONCILE_ON_STARTUP: bool = True
+    TASK_RECONCILE_LOOKBACK_HOURS: int = 72  # worker startup resubmits unfinished tasks created within this window
 
     # Document Export (Resume, Cover Letter, etc.)
     # Default PDF template for all document types

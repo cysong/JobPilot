@@ -26,7 +26,7 @@ def _parse_args() -> argparse.Namespace:
         "--loglevel", default=os.getenv("CELERY_LOGLEVEL", "info"))
     parser.add_argument(
         "--pool",
-        default=os.getenv("CELERY_WORKER_POOL", "solo"),
+        default=os.getenv("CELERY_WORKER_POOL", "threads"),
         help="Celery pool type, e.g. threads/solo/prefork/eventlet/gevent",
     )
     parser.add_argument(

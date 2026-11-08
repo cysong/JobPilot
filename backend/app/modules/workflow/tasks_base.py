@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from contextvars import ContextVar
 from typing import Any
 
 from celery import Task
@@ -26,13 +27,17 @@ from app.shared.enums import TaskStatus
 
 logger = logging.getLogger(__name__)
 
+# Celery keeps one Task instance per task type, shared by every concurrent execution
+# (threads pool). The session therefore lives in a context variable: each execution
+# runs as its own asyncio task on the worker loop, with its own copy of the context.
+_current_db_session: ContextVar[AsyncSession | None] = ContextVar("current_db_session", default=None)
+
 
 class AsyncBaseTask(Task):
     """Async-aware Celery task that injects `self.db` session."""
 
     abstract = True
     auto_commit = False
-    _db_session: AsyncSession | None = None
 
     # Native Celery retry configuration
     autoretry_for = (Exception,)    # Retry on any exception
@@ -60,7 +65,7 @@ class AsyncBaseTask(Task):
         if asyncio.iscoroutine(result):
             async def _execute():
                 async with async_session_factory() as session:
-                    self._db_session = session
+                    _current_db_session.set(session)
                     try:
                         retval = await result
                         if self.auto_commit:
@@ -72,7 +77,7 @@ class AsyncBaseTask(Task):
                         self._handle_async_autoretry(exc)
                         raise
                     finally:
-                        self._db_session = None
+                        _current_db_session.set(None)
 
             return run_coroutine_sync(_execute())
         return result
@@ -80,7 +85,7 @@ class AsyncBaseTask(Task):
     def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
         async def _execute():
             async with async_session_factory() as session:
-                self._db_session = session
+                _current_db_session.set(session)
                 try:
                     result = await self.run(*args, **kwargs)
                     if self.auto_commit:
@@ -93,7 +98,7 @@ class AsyncBaseTask(Task):
                     self._handle_async_autoretry(exc)
                     raise
                 finally:
-                    self._db_session = None
+                    _current_db_session.set(None)
 
         return run_coroutine_sync(_execute())
 
@@ -166,9 +171,10 @@ class AsyncBaseTask(Task):
 
     @property
     def db(self) -> AsyncSession:
-        if not self._db_session:
+        session = _current_db_session.get()
+        if session is None:
             raise RuntimeError("Database session is not available")
-        return self._db_session
+        return session
 
 
 class DBTrackingTask(AsyncBaseTask):
@@ -190,8 +196,9 @@ class DBTrackingTask(AsyncBaseTask):
     retry_jitter = True
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        # Capture start time for duration calculation
-        self._start_time = time.perf_counter()
+        # Capture start time for duration calculation. Stored on the request (one
+        # per execution) rather than the shared Task instance.
+        self.request.jobpilot_started = time.perf_counter()
         return super().__call__(*args, **kwargs)
 
     @staticmethod
@@ -263,7 +270,8 @@ class DBTrackingTask(AsyncBaseTask):
             )
             return super().on_success(retval, task_id, args, kwargs)
 
-        elapsed_ms = int((time.perf_counter() - getattr(self, "_start_time", time.perf_counter())) * 1000)
+        started = getattr(self.request, "jobpilot_started", None) or time.perf_counter()
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
         output_data = retval.get("output_data", {}) if isinstance(retval, dict) else {}
 
         try:
@@ -430,6 +438,7 @@ class DBTrackingTask(AsyncBaseTask):
                     retry_count=getattr(self.request, "retries", 0)
                 )
                 await session.commit()
+                await _fail_workflow_application(session, task, error_message)
 
                 logger.info(
                     "Task marked as FAILED",
@@ -439,3 +448,29 @@ class DBTrackingTask(AsyncBaseTask):
                         "error_message": error_message[:200],  # Truncate long errors
                     }
                 )
+
+
+async def _fail_workflow_application(session: AsyncSession, failed: Any, error_message: str) -> None:
+    """A failed step stops its chain, so the application that owns the workflow would
+    otherwise stay PENDING / TAILORING forever. Mark it FAILED with the step's error."""
+    from sqlalchemy import select
+
+    from app.modules.applications.repositories.application_repo import ApplicationRepository
+    from app.modules.workflow.models import TaskExecution
+    from app.shared.enums import ApplicationStatus
+
+    application_id = (await session.execute(
+        select(TaskExecution.entity_id).where(
+            TaskExecution.workflow_id == failed.workflow_id, TaskExecution.entity_type == "application",
+        ).limit(1)
+    )).scalar_one_or_none()
+    if not application_id:
+        return
+    application = await ApplicationRepository.get_by_id(session, application_id)
+    if application is None or application.status not in (ApplicationStatus.PENDING, ApplicationStatus.TAILORING):
+        return
+    step = (failed.task_name or failed.task_type or "workflow step")
+    await ApplicationRepository.mark_failed(session, application, f"{step} failed: {error_message}"[:2000])
+    await session.commit()
+    logger.info("Application marked FAILED after workflow step failure",
+                extra={"application_id": application_id, "task_id": failed.id})

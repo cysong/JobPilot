@@ -557,40 +557,11 @@ class TaskService:
         )
 
     @staticmethod
-    async def retry_task(db: AsyncSession, task_id: str) -> TaskRetryResponse:
-        """
-        Retry starting from the first non-success task in the workflow.
-
-        Resets retry_count to 0 and resubmits the remaining tasks in order via Celery chain.
-        """
-        original = await db.get(TaskExecution, task_id)
-        if not original:
-            raise NotFoundError("Task not found")
-
-        # Fetch workflow tasks in order
-        workflow_tasks = (
-            await db.execute(
-                select(TaskExecution)
-                .where(TaskExecution.workflow_id == original.workflow_id)
-                .order_by(TaskExecution.step.asc())
-            )
-        ).scalars().all()
-        if not workflow_tasks:
-            raise NotFoundError("No tasks found for workflow")
-
-        # Find first non-success task and retry everything from there
-        start_idx = next((idx for idx, t in enumerate(workflow_tasks) if t.status != TaskStatus.SUCCESS), None)
-        if start_idx is None:
-            raise BadRequestError("All tasks already succeeded")
-        anchor_task = workflow_tasks[start_idx]
-        retryable, reason = TaskService._can_retry_anchor_task(
-            anchor_task,
-            now=datetime.now(timezone.utc),
-        )
-        if not retryable:
-            raise BadRequestError(reason)
-
-        to_retry = workflow_tasks[start_idx:]
+    async def resubmit_tasks(db: AsyncSession, to_retry: list[TaskExecution]) -> None:
+        """Reset ``to_retry`` (consecutive steps of one workflow) to PENDING and dispatch
+        them again as a Celery chain. Shared by manual retry and startup reconciliation."""
+        if not to_retry:
+            raise BadRequestError("No tasks to retry")
         signatures = []
         for t in to_retry:
             task_type_enum = TaskType.from_value(t.task_type)
@@ -628,9 +599,6 @@ class TaskService:
         await db.commit()
 
         # Submit chain and backfill celery ids
-        if not signatures:
-            raise BadRequestError("No tasks to retry")
-
         if len(signatures) == 1:
             result = signatures[0].apply_async()
             to_retry[0].celery_task_id = getattr(result, "id", None)
@@ -642,6 +610,43 @@ class TaskService:
                 current_result = getattr(current_result, "parent", None)
 
         await db.commit()
+
+    @staticmethod
+    async def retry_task(db: AsyncSession, task_id: str) -> TaskRetryResponse:
+        """
+        Retry starting from the first non-success task in the workflow.
+
+        Resets retry_count to 0 and resubmits the remaining tasks in order via Celery chain.
+        """
+        original = await db.get(TaskExecution, task_id)
+        if not original:
+            raise NotFoundError("Task not found")
+
+        # Fetch workflow tasks in order
+        workflow_tasks = (
+            await db.execute(
+                select(TaskExecution)
+                .where(TaskExecution.workflow_id == original.workflow_id)
+                .order_by(TaskExecution.step.asc())
+            )
+        ).scalars().all()
+        if not workflow_tasks:
+            raise NotFoundError("No tasks found for workflow")
+
+        # Find first non-success task and retry everything from there
+        start_idx = next((idx for idx, t in enumerate(workflow_tasks) if t.status != TaskStatus.SUCCESS), None)
+        if start_idx is None:
+            raise BadRequestError("All tasks already succeeded")
+        anchor_task = workflow_tasks[start_idx]
+        retryable, reason = TaskService._can_retry_anchor_task(
+            anchor_task,
+            now=datetime.now(timezone.utc),
+        )
+        if not retryable:
+            raise BadRequestError(reason)
+
+        to_retry = workflow_tasks[start_idx:]
+        await TaskService.resubmit_tasks(db, to_retry)
 
         return TaskRetryResponse(
             message="Task retry submitted",

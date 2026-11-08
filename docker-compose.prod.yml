@@ -27,6 +27,9 @@ services:
     env_file:
       - ./deploy/env/backend.env
     command: ["uv", "run", "python", "run_celery_worker.py"]
+    # Warm shutdown lets running LLM tasks finish; whatever is still cut off is
+    # resubmitted by the worker's startup reconcile.
+    stop_grace_period: 90s
     expose:
       - "9101"  # Prometheus metrics endpoint inside the internal network
     depends_on:
@@ -49,7 +52,9 @@ services:
       - jobpilot-internal
 
   jobpilot-redis:
-    image: redis:7-alpine
+    # Pinned: a floating tag makes `compose pull` recreate Redis on deploy, and the
+    # broker has no persistence (queued tasks are recovered by worker startup reconcile).
+    image: redis:7.4.12-alpine
     container_name: jobpilot-redis
     restart: unless-stopped
     command: [

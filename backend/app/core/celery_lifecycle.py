@@ -7,7 +7,7 @@ import logging
 import threading
 from typing import Any
 
-from celery.signals import worker_process_init, worker_process_shutdown, worker_ready
+from celery.signals import worker_init, worker_process_init, worker_process_shutdown, worker_ready
 
 from app.core.config import settings
 from app.core.database import engine
@@ -86,8 +86,8 @@ def _start_metrics_server(**kwargs: object) -> None:
 
     Worker-side metrics (Celery task signals, LLM gateway counters) accumulate
     in the worker's local registry. Without this server they would never be
-    scraped. Solo pool only — multi-process pools need ``prometheus_client``
-    multiprocess mode.
+    scraped. Single-process pools only (solo / threads) — multi-process pools
+    need ``prometheus_client`` multiprocess mode.
     """
     global _metrics_server_started
     if _metrics_server_started or settings.CELERY_METRICS_PORT <= 0:
@@ -106,6 +106,20 @@ def _start_metrics_server(**kwargs: object) -> None:
             settings.CELERY_METRICS_PORT,
             exc,
         )
+
+
+@worker_init.connect
+def _reconcile_unfinished_tasks(**kwargs: object) -> None:
+    """Resubmit workflow tasks left PENDING / RUNNING by a previous worker or a lost
+    broker. Runs before this worker consumes anything; never blocks startup on error."""
+    if not settings.TASK_RECONCILE_ON_STARTUP:
+        return
+    try:
+        from app.modules.workflow.reconcile import run_startup_reconcile
+
+        run_startup_reconcile()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("workflow_reconcile_crashed err=%s", exc, exc_info=True)
 
 
 @worker_process_shutdown.connect
