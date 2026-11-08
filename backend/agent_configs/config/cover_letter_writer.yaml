@@ -1,6 +1,7 @@
-version: 5
+version: 6
 name: cover_letter_writer
-model: gpt-5
+provider: openrouter
+model: "openai/gpt-6.1-terra"
 max_turns: 2
 
 model_settings:

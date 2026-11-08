@@ -435,12 +435,20 @@ class MatchJudgment(BaseModel):
 命令：
 
 ```bash
-uv run python -m app.modules.matching.evaluation dataset create --name main --user <id> --random 300 --filtered-sample 80
-uv run python -m app.modules.matching.evaluation run --dataset main@v1 --model <model> --prompt <version>
-uv run python -m app.modules.matching.evaluation run --dataset main@v1 --repeat 2   # stability check
-uv run python -m app.modules.matching.evaluation compare <run_a> <run_b>
-uv run python -m app.modules.matching.evaluation labels export|import --dataset main@v1
+# All LLM-backed commands are dry runs unless --yes is given.
+uv run python -m app.modules.matching.cli families classify-titles --all --yes   # one-off title cache warm-up
+uv run python -m app.modules.matching.cli families init --days 30 --yes          # classify live jobs
+uv run python -m app.modules.matching.cli resumes suggest --user <id> [--apply]
+uv run python -m app.modules.matching.cli resumes set <resume_id> <family>
+uv run python -m app.modules.matching.cli dataset create --name main --user <id> --random 300 --filtered-sample 80 --yes
+uv run python -m app.modules.matching.cli run --dataset main@v1 [--model <model>] [--repeat 2] [--baseline <run>] --yes
+uv run python -m app.modules.matching.cli report <run_id>
+uv run python -m app.modules.matching.cli compare <run_a> <run_b>
+uv run python -m app.modules.matching.cli labels export --run <run_id> --limit 50
+uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-by <user_id> --run <run_id>
 ```
+
+报告写入 `backend/reports/matching/<run_id>.md`（已加入 `.gitignore`，含个人求职数据），同时保存在 `match_eval_runs.report_md`。
 
 评估运行不写入线上 `job_matches`。
 
@@ -469,7 +477,9 @@ uv run python -m app.modules.matching.evaluation labels export|import --dataset 
 
 **不改动**：`seek_jobs`（只读）、`job_analyses`、`documents`、`user_skills`、`resume_skills`、`applications`、`user_job_views`、`ai_calls`（`user_id` 已可空）。
 
-约定：主键沿用 `VARCHAR(255)` 字符串 id（`generate_id(prefix)`）；时间为 `TIMESTAMPTZ`；新表 JSON 字段使用 `JSONB`。所有迁移只新建表或新增可空列，均可 `downgrade`。
+约定：主键沿用 `VARCHAR(255)` 字符串 id（`generate_id(prefix)`）；时间为 `TIMESTAMPTZ`；新表 JSON 字段使用 `JSONB`。档位列（`tier`、`predicted_tier`）实现为 `VARCHAR(1)` 而非 `CHAR(1)`，取值由 CHECK 约束限定。所有迁移只新建表或新增可空列，均可 `downgrade`。
+
+迁移：`alembic/versions/20261108_1200_ce72214e3bd7_add_matching_v3_tables.py`（第 1 阶段一次性包含 §9.1 #1–#6）。验证脚本 `scripts/verify_matching_v3_migration.py` 在本地临时库上执行 upgrade → 与 ORM 元数据比对 → downgrade → 再 upgrade。
 
 ### 9.2 `job_title_families`
 
@@ -748,30 +758,38 @@ uv run python -m app.modules.matching.evaluation labels export|import --dataset 
 backend/app/modules/matching/
 ├── config/
 │   ├── role_families.yaml        # version, families, labels, adjacency
-│   └── nz_locations.yaml         # cities, regions, aliases
+│   └── nz_locations.yaml         # preference cities, aliases, regions
 ├── families/
 │   ├── normalize.py              # title_key normalization (pure)
 │   ├── registry.py               # load YAML, adjacency lookup (pure)
 │   ├── classifier.py             # batch title classification + JD-read classification
-│   └── models.py / repository.py # job_title_families, job_role_families
-├── prefilter.py                  # active-job rule, candidate resumes (pure)
-├── location.py                   # location resolution, remote detection (pure)
+│   ├── resume_binding.py         # suggest / bind a family per resume
+│   └── models.py                 # job_title_families, job_role_families
 ├── judge/
-│   ├── input_builder.py          # prompt sections in cache-friendly order, JD cleaning
-│   └── validator.py              # schema, quote checks, rejection checks, flags
-├── labels/                       # match_labels models, service, router
-├── evaluation/                   # dataset builder, runner, metrics, report, label export/import, CLI
-├── models.py / repository.py / service.py / tasks.py / router.py / schemas.py
+│   ├── input_builder.py          # prompt sections in cache-friendly order, work history years (pure)
+│   ├── validator.py              # schema, quote checks, rejection checks, flags (pure)
+│   └── service.py                # load user/job context, plan_match, judge_pair
+├── labels/
+│   ├── models.py                 # match_labels (append-only)
+│   └── csv_io.py                 # labeling sheet export / import
+├── evaluation/
+│   ├── models.py                 # datasets, items, runs, predictions
+│   ├── dataset.py                # build and freeze datasets
+│   ├── runner.py                 # run a dataset, store predictions and report
+│   ├── metrics.py                # metrics and run comparison (pure)
+│   └── report.py                 # unified markdown report (pure)
+├── location.py                   # location resolution, remote detection (pure)
+├── prefilter.py                  # active-job rule, candidate resumes (pure)
+├── text.py                       # HTML to text, quote normalization (pure)
+├── cli.py                        # stage 1 command line
+└── models.py                     # job_matches (v3) + user_job_matches (v1, deprecated)
 
-backend/app/core/llm/gateway.py   # + model_override / model_settings_override
-
-backend/agent_configs/config/
-├── title_classifier.yaml
-├── job_family_reader.yaml        # JD-read classification for ambiguous titles
-└── match_judge.yaml              # replaces match_analyzer.yaml
+backend/app/core/llm/             # openrouter provider, model_override, usage in context
+backend/agent_configs/config/     # title_classifier, job_family_reader, match_judge
+backend/scripts/verify_matching_v3_migration.py
 ```
 
-`normalize.py`、`registry.py`、`prefilter.py`、`location.py`、`validator.py`、`evaluation/metrics.py` 为纯函数，单元测试不依赖数据库和 LLM。
+纯函数模块的单元测试不依赖数据库和 LLM；数据库相关测试在设置 `MATCHING_TEST_DATABASE_URL`（本地临时 Postgres）时运行，LLM 用 mock。
 
 ---
 

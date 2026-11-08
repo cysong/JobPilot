@@ -1,0 +1,135 @@
+# Role families (职业序列) for matching v3 prefiltering.
+# Derived from the live title distribution on 2026-11-08 (docs/job_matching_v3_design.md §4.1).
+#
+# - `adjacent` is symmetric: listing B under A also makes A adjacent to B.
+# - `description` and `examples` are shown to the title classifier LLM.
+# - Bump `version` on any change. Removing or splitting a family requires a data
+#   migration for job_title_families, pending job_role_families and resumes.role_family.
+version: f1
+
+families:
+  software_dev:
+    label: Software Development
+    label_zh: 软件开发
+    description: Builds software products or applications (backend, frontend, full stack, mobile, embedded, platform-specific developers such as Salesforce or Guidewire).
+    examples: [software engineer, software developer, developer, full stack developer, web developer, frontend engineer, mobile engineer, backend engineer, java developer, c++ developer, salesforce developer, embedded software engineer, product engineer]
+    adjacent: [qa_test, devops_platform, integration, architecture, data_engineering, ml_ai, eng_management]
+
+  qa_test:
+    label: QA & Testing
+    label_zh: 测试与质量
+    description: Software testing and quality assurance, manual or automated (not manufacturing quality).
+    examples: [test analyst, test engineer, qa engineer, quality assurance engineer, test automation engineer, automation test engineer, software tester, sdet, test manager]
+    adjacent: [software_dev, devops_platform]
+
+  devops_platform:
+    label: DevOps / Platform / Cloud
+    label_zh: DevOps / 平台 / 云
+    description: CI/CD, cloud infrastructure as code, platform engineering and site reliability.
+    examples: [devops engineer, cloud engineer, platform engineer, site reliability engineer, cloud infrastructure engineer, cloud platform engineer]
+    adjacent: [software_dev, qa_test, infrastructure, security, architecture]
+
+  infrastructure:
+    label: Systems & Networks
+    label_zh: 系统与网络
+    description: Operating and administering servers, networks, databases and identity systems.
+    examples: [infrastructure engineer, systems administrator, network engineer, it systems engineer, ict systems engineer, database administrator, identity engineer]
+    adjacent: [devops_platform, security, it_support]
+
+  it_support:
+    label: IT Support
+    label_zh: IT 支持
+    description: Service desk, end-user, desktop and application support.
+    examples: [service desk analyst, it support engineer, it support technician, application support analyst, technical support specialist, desktop support engineer]
+    adjacent: [infrastructure]
+
+  data_engineering:
+    label: Data Engineering
+    label_zh: 数据工程
+    description: Builds data pipelines, warehouses and analytics infrastructure.
+    examples: [data engineer, analytics engineer, etl developer]
+    adjacent: [software_dev, data_analytics, ml_ai]
+
+  data_analytics:
+    label: Data Analytics / BI
+    label_zh: 数据分析 / BI
+    description: Analyses data and builds reports or dashboards.
+    examples: [data analyst, business intelligence analyst, bi developer, data consultant]
+    adjacent: [data_engineering, business_analysis]
+
+  ml_ai:
+    label: AI / Machine Learning
+    label_zh: AI / 机器学习
+    description: Builds or researches machine learning and AI systems as an employee or contractor (not hourly AI data-labelling gigs).
+    examples: [ai engineer, machine learning engineer, data scientist]
+    adjacent: [software_dev, data_engineering]
+
+  architecture:
+    label: Architecture
+    label_zh: 架构
+    description: Solution, software and enterprise architecture.
+    examples: [solution architect, solutions architect, enterprise architect, software architect]
+    adjacent: [software_dev, integration, devops_platform]
+
+  integration:
+    label: Integration
+    label_zh: 集成
+    description: Builds integrations between systems (APIs, middleware, iPaaS).
+    examples: [integration engineer, integration developer]
+    adjacent: [software_dev, architecture]
+
+  security:
+    label: Security
+    label_zh: 信息安全
+    description: Cyber and information security engineering and analysis.
+    examples: [security engineer, cyber security engineer, security analyst]
+    adjacent: [devops_platform, infrastructure]
+
+  business_analysis:
+    label: Business Analysis
+    label_zh: 业务分析
+    description: Business, systems and technical analysis of requirements.
+    examples: [business analyst, technical business analyst, business systems analyst, systems analyst, technical analyst, product analyst]
+    adjacent: [product_delivery, data_analytics]
+
+  product_delivery:
+    label: Product / Project / Delivery
+    label_zh: 产品 / 项目 / 交付
+    description: Product management, project and programme management, delivery and service delivery management.
+    examples: [project manager, project coordinator, product manager, product owner, service delivery manager, delivery manager, programme manager]
+    adjacent: [business_analysis, eng_management]
+
+  eng_management:
+    label: Engineering Management
+    label_zh: 技术管理
+    description: Manages engineering or IT teams and functions.
+    examples: [engineering manager, software engineering manager, it manager, head of engineering, chief technology officer]
+    adjacent: [software_dev, product_delivery]
+
+  ai_data_work:
+    label: AI Training / Data Labelling Gigs
+    label_zh: AI 训练 / 标注类零工
+    description: Hourly or freelance work producing or reviewing data for AI training (often titled "<subject> expert").
+    examples: [data science expert, computer engineering expert, coding expert, ai trainer]
+    adjacent: []
+
+  research:
+    label: Research
+    label_zh: 科研
+    description: Academic or research positions.
+    examples: [postdoctoral researcher, masters or phd researcher, research fellow]
+    adjacent: []
+
+  other_engineering:
+    label: Other Engineering
+    label_zh: 其他工程
+    description: Non-software engineering (electrical, mechanical, civil, industrial automation, manufacturing quality).
+    examples: [electrical engineer, mechanical engineer, project engineer, civil engineer, plc automation engineer]
+    adjacent: []
+
+  other:
+    label: Other (non-IT)
+    label_zh: 其他非 IT
+    description: Anything else, e.g. healthcare, social services, finance, sales, hospitality.
+    examples: [registered nurse, psychologist, social worker, finance business partner, sales manager]
+    adjacent: []

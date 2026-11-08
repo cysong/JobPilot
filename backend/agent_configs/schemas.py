@@ -1,7 +1,7 @@
 """Pydantic schemas for Agent structured outputs."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 from app.shared.enums import ProficiencyLevel
@@ -227,6 +227,93 @@ class MatchAnalysis(BaseModel):
     )
 
 
+
+# ===== Matching v3 (docs/job_matching_v3_design.md) =====
+# Role family keys are validated in code against role_families.yaml rather than
+# enumerated here, so the families config can change without a schema change.
+
+
+class TitleClassificationItem(BaseModel):
+    """Role family for one normalized job title."""
+
+    title_key: str = Field(..., description="The title_key exactly as given in the input")
+    role_family: Optional[str] = Field(
+        ..., description="One family key from the catalog, or null when ambiguous"
+    )
+    ambiguous: bool = Field(
+        ..., description="True when the title alone cannot decide the family (e.g. 'engineer', 'consultant')"
+    )
+
+
+class TitleClassificationBatch(BaseModel):
+    """Batch output of the title_classifier agent."""
+
+    __version__ = "c1"
+
+    items: list[TitleClassificationItem]
+
+
+class JobFamilyReading(BaseModel):
+    """Role family decided by reading the title plus a JD excerpt."""
+
+    __version__ = "r1"
+
+    role_family: str = Field(..., description="One family key from the catalog")
+    reason: str = Field(..., description="One short sentence explaining the choice")
+
+
+class JudgeEvidence(BaseModel):
+    job_quote: Optional[str] = Field(..., description="Verbatim text from the job description, or null")
+    resume_quote: Optional[str] = Field(..., description="Verbatim text from the chosen resume or skill library, or null")
+
+
+class JudgeTechItem(BaseModel):
+    requirement: str = Field(..., description="The job requirement, verbatim")
+    is_core: bool = Field(..., description="True when this requirement defines the role")
+    relation: Literal["same", "substitute", "missing"]
+    evidence: JudgeEvidence
+
+
+class WorkRightsCheck(BaseModel):
+    requirement: Literal["none", "right_to_work", "pr_or_citizen", "citizen"]
+    quote: Optional[str] = Field(..., description="Verbatim JD sentence; null when requirement is none")
+    satisfied: Optional[bool] = Field(..., description="Null when the candidate status is unknown")
+
+
+class ClearanceCheck(BaseModel):
+    requirement: Literal["none", "obtainable", "must_hold"]
+    quote: Optional[str] = Field(..., description="Verbatim JD sentence; null when requirement is none")
+    satisfied: Optional[bool] = Field(..., description="Null when the candidate status is unknown")
+
+
+class JudgeRejection(BaseModel):
+    code: Literal["WORK_RIGHTS", "SECURITY_CLEARANCE"]
+    reason: str = Field(..., description="One sentence")
+    quote: str = Field(..., description="Verbatim JD sentence stating the requirement")
+
+
+class MatchJudgment(BaseModel):
+    """Output of the match_judge agent. Field order is deliberate: checks before conclusions."""
+
+    __version__ = "j1"
+
+    decision: Literal["rated", "rejected"]
+    rejection: Optional[JudgeRejection] = Field(..., description="Required when decision is rejected, else null")
+    work_rights: WorkRightsCheck
+    security_clearance: ClearanceCheck
+    best_resume_id: str = Field(..., description="One of the candidate resume ids")
+    is_different_track: bool = Field(..., description="True when the job is a different career track (tier D)")
+    seniority_mismatch: bool = Field(..., description="True when seniority is severely mismatched (tier C)")
+    tech_level: Literal["strong", "partial", "weak"]
+    tech_items: list[JudgeTechItem] = Field(..., description="Core and must-have requirements, at most 12")
+    experience_level: Literal["strong", "partial", "none"]
+    relevant_years: Optional[float] = Field(..., description="Years of relevant dated work experience")
+    required_years: Optional[float] = Field(..., description="Minimum years stated in the JD, or null")
+    experience_evidence: list[JudgeEvidence]
+    tier: Literal["A", "B", "C", "D"]
+    tier_reason: str = Field(..., description="1-2 sentences citing concrete requirements and evidence")
+
+
 SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
     "AnalyzedJob": AnalyzedJob,
     "Skill": Skill,
@@ -237,6 +324,9 @@ SCHEMA_REGISTRY: dict[str, type[BaseModel]] = {
     "TailoredResume": TailoredResume,
     "TranslatedText": TranslatedText,
     "MatchAnalysis": MatchAnalysis,
+    "TitleClassificationBatch": TitleClassificationBatch,
+    "JobFamilyReading": JobFamilyReading,
+    "MatchJudgment": MatchJudgment,
 }
 
 
@@ -249,5 +339,8 @@ __all__ = [
     "ReviewResult",
     "TailoredResume",
     "MatchAnalysis",
+    "TitleClassificationBatch",
+    "JobFamilyReading",
+    "MatchJudgment",
     "SCHEMA_REGISTRY",
 ]

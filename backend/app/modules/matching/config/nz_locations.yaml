@@ -1,0 +1,65 @@
+# NZ location knowledge for the matching v3 location hard filter.
+#
+# `cities` keys must match the preference options in
+# app/modules/users/schemas.py (NZ_JOB_LOCATION_OPTIONS). Aliases are lowercase,
+# macron-free place names that seek_jobs.location_city / location_label use for
+# that preference city (CBD, suburbs, metro towns).
+#
+# `regions` lets the resolver recognise region-only locations
+# ("Canterbury", "Waikato Region"). A job known only by region is never
+# rejected: e.g. "Ashburton, Canterbury" may or may not be within commuting
+# distance of Christchurch, so it is reported as unknown instead.
+#
+# `non_place_values` are location strings that carry no usable place.
+version: l1
+
+cities:
+  Auckland:
+    region: auckland
+    aliases: [auckland, auckland cbd, auckland city, auckland airport, auckland metropolitan area, north shore, albany, manukau, east tamaki, penrose, newmarket, takapuna, henderson, mt wellington, mount wellington, onehunga, ellerslie, parnell, ponsonby, rosedale, mairangi bay]
+  Wellington:
+    region: wellington
+    aliases: [wellington, wellington city, wellington cbd, wellington central, lower hutt, upper hutt, hutt, hutt central, petone, porirua, gracefield, avalon, island bay, thorndon, te aro, johnsonville, kilbirnie]
+  Christchurch:
+    region: canterbury
+    aliases: [christchurch, christchurch city, christchurch central, christchurch airport, addington, riccarton, sydenham, hornby, burnside, papanui, sockburn, middleton, wigram, merivale, fendalton, linwood, woolston, harewood, bromley, islington]
+  Hamilton:
+    region: waikato
+    aliases: [hamilton, hamilton central, hamilton east, hamilton lake, hamilton west, te rapa, rototuna, hillcrest]
+  Tauranga:
+    region: bay of plenty
+    aliases: [tauranga, tauranga central, mount maunganui, papamoa, bethlehem, greerton]
+  Dunedin:
+    region: otago
+    aliases: [dunedin, dunedin central, city rise, mosgiel, north dunedin, south dunedin]
+  Palmerston North:
+    region: manawatu
+    aliases: [palmerston north, palmerston north central]
+  Queenstown:
+    region: otago
+    aliases: [queenstown, queenstown central, arrowtown]
+  Napier-Hastings:
+    region: hawkes bay
+    aliases: [napier, napier south, hastings, hastings central, ahuriri, havelock north, taradale, onekawa]
+  Nelson:
+    region: tasman
+    aliases: [nelson, nelson central, stoke, richmond]
+
+regions:
+  auckland: [auckland, auckland region]
+  wellington: [wellington, wellington region]
+  canterbury: [canterbury, canterbury region]
+  waikato: [waikato, waikato region]
+  bay of plenty: [bay of plenty, bay of plenty region]
+  otago: [otago, otago region, central otago]
+  manawatu: [manawatu, manawatu-whanganui, manawatu-whanganui region, manawatu whanganui]
+  hawkes bay: [hawkes bay, hawke's bay, hawkes bay region, hawke's bay region]
+  tasman: [tasman, tasman region, nelson region]
+  northland: [northland, northland region]
+  taranaki: [taranaki, taranaki region]
+  southland: [southland, southland region]
+  marlborough: [marlborough, marlborough region]
+  gisborne: [gisborne region]
+  west coast: [west coast, west coast region]
+
+non_place_values: [new zealand, nz, various locations, various, multiple locations, nationwide, anywhere, remote]

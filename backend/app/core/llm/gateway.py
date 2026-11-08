@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import time
 from typing import Any, Optional
 
 import structlog
 from agents import Agent, Runner
 from agents import Usage
+from agents.model_settings import ModelSettings
 from agents.run_config import RunConfig
 
 from app.core.database import async_session_factory
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
-from app.core.llm.providers import build_provider_runtime
-from app.core.llm.types import GatewayContext
+from app.core.llm.output_schemas import CleaningOutputSchema, should_use_cleaning_schema
+from app.core.llm.providers import build_provider_runtime, normalize_provider_name
+from app.core.llm.types import GatewayContext, ModelOverride
 from app.core.metrics import (
     llm_call_duration_seconds,
     llm_call_total,
@@ -53,6 +56,7 @@ class AgentGateway:
         agent_id: str,
         input_data: str,
         context: GatewayContext | None = None,
+        model_override: ModelOverride | None = None,
     ) -> Any:
         """
         Execute an Agent and return its output.
@@ -60,15 +64,19 @@ class AgentGateway:
         Args:
             agent_id: Agent identifier (YAML filename)
             input_data: Input string for the agent (plain text or YAML-formatted)
-            context: Additional metadata for logging
+            context: Additional metadata for logging. When the call is recorded,
+                the gateway writes the AICall id back as ``context["ai_call_id"]``.
+            model_override: Optional per-call provider/model/settings override
 
         Returns:
             Agent output (final_output)
         """
-        context = context or {}
+        context = context if context is not None else {}
         start_time = time.time()
 
         agent = await self.loader.load_agent(agent_id)
+        if model_override is not None:
+            agent = self._apply_model_override(agent, model_override)
         self._log_start(agent_id, agent, context)
 
         try:
@@ -76,7 +84,8 @@ class AgentGateway:
             latency_ms = int((time.time() - start_time) * 1000)
 
             self._log_success(agent_id, agent, usage, latency_ms, context)
-            await self._record_ai_call(
+            context["usage"] = self._usage_summary(agent, usage)
+            ai_call_id = await self._record_ai_call(
                 agent_id=agent_id,
                 agent=agent,
                 status="success",
@@ -84,6 +93,8 @@ class AgentGateway:
                 usage=usage,
                 context=context,
             )
+            if ai_call_id:
+                context["ai_call_id"] = ai_call_id
 
             return result
 
@@ -93,7 +104,7 @@ class AgentGateway:
 
             self._log_error(agent_id, agent, error_type,
                             exc, latency_ms, context)
-            await self._record_ai_call(
+            ai_call_id = await self._record_ai_call(
                 agent_id=agent_id,
                 agent=agent,
                 status=error_type,
@@ -101,6 +112,8 @@ class AgentGateway:
                 error_message=str(exc),
                 context=context,
             )
+            if ai_call_id:
+                context["ai_call_id"] = ai_call_id
             exc.add_note(
                 f"provider={getattr(agent, 'provider', 'unknown')}, agent_id={agent_id}"
             )
@@ -120,6 +133,8 @@ class AgentGateway:
             Tuple of (final_output, usage)
         """
         provider_runtime = build_provider_runtime(getattr(agent, "provider", None))
+        if provider_runtime.default_extra_body:
+            agent = self._with_default_extra_body(agent, provider_runtime.default_extra_body)
         run_kwargs: dict[str, Any] = {
             "run_config": RunConfig(
                 reasoning_item_id_policy="omit",
@@ -151,6 +166,76 @@ class AgentGateway:
             getattr(result, "context_wrapper", None), "usage", None)
         final_output = getattr(result, "final_output", None)
         return final_output, usage
+
+    @classmethod
+    def _usage_summary(cls, agent: Agent, usage: Optional[Usage]) -> dict[str, Any]:
+        input_tokens = getattr(usage, "input_tokens", 0) or 0
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
+        return {
+            "model": getattr(agent, "model", None),
+            "provider": getattr(agent, "provider", None),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "estimated_cost": cls._calculate_cost(getattr(agent, "model", ""), input_tokens, output_tokens),
+        }
+
+    @staticmethod
+    def _apply_model_override(agent: Agent, override: ModelOverride) -> Agent:
+        """Return a copy of ``agent`` with provider/model/settings overridden.
+
+        The loaded agent is shared (and cached), so it is cloned rather than mutated.
+        Gateway attributes set by the loader (provider, config metadata, ...) are not
+        dataclass fields, so they are copied onto the clone explicitly.
+        """
+        provider = (
+            normalize_provider_name(override.provider)
+            if override.provider
+            else getattr(agent, "provider", None)
+        )
+        model = override.model or agent.model
+
+        model_settings = agent.model_settings
+        if override.model_settings:
+            model_settings = model_settings.resolve(ModelSettings(**override.model_settings))
+
+        # Re-decide the output wrapper: JSON cleanup applies to non-OpenAI providers.
+        output_type = agent.output_type
+        raw_output_type = (
+            output_type._schema.output_type
+            if isinstance(output_type, CleaningOutputSchema)
+            else output_type
+        )
+        if raw_output_type is not None and should_use_cleaning_schema(provider, raw_output_type):
+            output_type = CleaningOutputSchema(raw_output_type)
+        else:
+            output_type = raw_output_type
+
+        clone = agent.clone(model=model, model_settings=model_settings, output_type=output_type)
+        config_metadata = dict(getattr(agent, "config_metadata", {}) or {})
+        config_metadata.update(
+            {
+                "provider": provider,
+                "model": model,
+                "model_settings": {
+                    **(config_metadata.get("model_settings") or {}),
+                    **override.model_settings,
+                },
+                "model_override": True,
+            }
+        )
+        for attr in ("agent_id", "config_version", "max_turns"):
+            setattr(clone, attr, getattr(agent, attr, None))
+        setattr(clone, "provider", provider)
+        setattr(clone, "config_metadata", config_metadata)
+        return clone
+
+    @staticmethod
+    def _with_default_extra_body(agent: Agent, default_extra_body: dict[str, Any]) -> Agent:
+        """Merge provider-level extra_body defaults; values set by the agent win."""
+        current = agent.model_settings.extra_body
+        merged = {**default_extra_body, **(current if isinstance(current, dict) else {})}
+        model_settings = dataclasses.replace(agent.model_settings, extra_body=merged)
+        return agent.clone(model_settings=model_settings)
 
     def _log_start(
         self, agent_id: str, agent: Agent, context: GatewayContext
@@ -270,18 +355,21 @@ class AgentGateway:
         usage: Optional[Usage] = None,
         error_message: Optional[str] = None,
         context: GatewayContext,
-    ) -> None:
+    ) -> Optional[str]:
         """
         Record AI call to database (success or failure).
 
         Creates an ai_call record for tracking and analytics.
+
+        Returns:
+            The created AICall id, or None when nothing was recorded.
         """
         task_id = context.get("task_id")
         user_id = context.get("user_id")
 
         # Skip recording if missing required task context
         if not task_id:
-            return
+            return None
 
         # Map status string to AICallStatus enum
         status_map = {
@@ -317,7 +405,7 @@ class AgentGateway:
             # don't erase observability data on failures/retries.
             async with async_session_factory() as db:
                 agent_config_metadata = getattr(agent, "config_metadata", {}) or {}
-                await AICallRepository.create(
+                ai_call = await AICallRepository.create(
                     db,
                     task_id=task_id,
                     user_id=user_id,
@@ -345,6 +433,7 @@ class AgentGateway:
                     },
                 )
                 await db.commit()
+                return ai_call.id
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "ai_call_record_failed",
@@ -352,6 +441,7 @@ class AgentGateway:
                 agent_id=agent_id,
                 error=str(exc),
             )
+            return None
 
     @staticmethod
     def _classify_error(error: Exception) -> str:

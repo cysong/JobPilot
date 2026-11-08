@@ -85,4 +85,17 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
         "input": 0.40 / 1_000_000,
         "output": 1.60 / 1_000_000,
     },
+    # OpenRouter (namespaced model ids; prices from the OpenRouter catalog, 2026-11-08)
+    "openai/gpt-6.1-terra": {
+        "input": 1.00 / 1_000_000,
+        "output": 5.00 / 1_000_000,
+    },
+    "openai/gpt-6.1-sol": {
+        "input": 2.00 / 1_000_000,
+        "output": 10.0 / 1_000_000,
+    },
+    "z-ai/glm-5.3-flash": {
+        "input": 0.034 / 1_000_000,
+        "output": 0.083 / 1_000_000,
+    },
 }

@@ -1,18 +1,13 @@
-version: 1
+version: 2
 name: job_analyzer
-provider: minimax
-model: MiniMax-M2.5
+provider: openrouter
+model: "z-ai/glm-5.3-flash"
 model_settings:
   temperature: 0.2
   top_p: 0.9
-  tool_choice: none
+  max_tokens: 5000
   reasoning:
     effort: low
-  verbosity: low
-  extra_body:
-    reasoning_split: true
-  extra_args:
-    max_completion_tokens: 5000
 
 instructions: |
   You are a professional recruiter AI analyzing job descriptions.

@@ -5,11 +5,28 @@
 **Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
 **Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-11-06
+**Last Updated:** 2026-11-08
 
 ---
 
 ## Work Log
+
+### 2026-11-08 - Matching v3 Stage 1 (code complete, not yet run on production)
+
+Design: `docs/job_matching_v3_design.md` (v3.2). Branch `feat/matching-v3-stage1`.
+
+- LLM layer:
+  - new `openrouter` provider (chat completions, namespaced model ids passed through, `require_parameters` + `data_collection=deny`)
+  - `AgentGateway.call(..., model_override=...)`; gateway writes `ai_call_id` and `usage` back into the context
+  - OpenRouter prices for GPT-6.1 Terra / Sol and GLM-5.3 Flash in `MODEL_PRICING`
+  - existing agents switched: GPT-6.1 Terra (cover letter writer/polisher, resume tailor, resume analyzer, reviewer), GLM-5.3 Flash (job analyzer, translator)
+- Role families: `role_families.yaml` (18 families, adjacency), title normalization, batch title classifier, JD-read classifier for ambiguous titles, resume family suggestion/binding.
+- Prefilter: job freshness (`JOB_EXPIRY_DAYS=30`), same-family-first candidate selection, NZ location filter (unknown never rejected; `nz_locations.yaml`).
+- Judge: `match_judge` agent (GPT-6.1 Terra, reasoning high, fixed seed), cache-friendly prompt order, output validation (quote checks, rejection guards, flags), structure retries.
+- Evaluation: frozen datasets, runner with repeats and baseline comparison, unified 12-section report, labeling CSV export/import (append-only labels), CLI `python -m app.modules.matching.cli`.
+- Database: migration `ce72214e3bd7` (job_title_families, job_role_families, job_matches, match_labels, 4 evaluation tables, resumes.role_family*); verified on local Postgres 17 (upgrade/compare/downgrade/re-upgrade).
+- Tests: 230 passing (unit + DB integration + end-to-end pipeline on local Postgres with mocked LLM). `tests/test_enum_columns.py` still fails locally because WeasyPrint needs `libgobject` (pre-existing, unrelated).
+- Not done yet (needs approval): production migration, `OPENROUTER_API_KEY` in local/VPS env, live OpenRouter smoke test, title classification and dataset/evaluation runs on real data.
 
 ### 2026-03-30 - Account Security Stage 1 Backend Foundations
 

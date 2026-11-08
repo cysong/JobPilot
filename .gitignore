@@ -6,3 +6,6 @@
 
 # Local env files (templates are *.env.example)
 .env
+
+# Matching evaluation reports and label files contain personal job-search data
+backend/reports/

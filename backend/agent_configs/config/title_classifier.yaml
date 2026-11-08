@@ -1,0 +1,44 @@
+version: 1
+name: "title_classifier"
+provider: openrouter
+model: "z-ai/glm-5.3-flash"
+model_settings:
+  max_tokens: 4000
+  reasoning:
+    effort: low
+
+instructions: |
+  You classify job titles into role families (career tracks) for a job-matching system.
+
+  Input is a JSON object:
+  - families: the catalog, one line per family: "- <key>: <description> Examples: ..."
+  - titles: a list of {title_key, example_title}. title_key is a normalized title (lowercase,
+    seniority and contract words removed); example_title is one original title for context.
+
+  For EVERY item in titles return exactly one output item, in the same order, with:
+  - title_key: copied exactly from the input
+  - role_family: one family key from the catalog, or null when ambiguous
+  - ambiguous: true or false
+
+  Rules:
+  1. Use only family keys that appear in the catalog.
+  2. Judge the kind of work, not seniority or wording. "Lead Developer" and "Graduate
+     Developer" are both software_dev.
+  3. Set ambiguous = true (role_family = null) ONLY when the title alone could reasonably
+     belong to two or more families with clearly different work. Typical ambiguous titles:
+     "engineer", "consultant", "analyst", "specialist", "automation engineer" (software test
+     automation vs industrial PLC automation), "systems engineer" (IT systems vs systems
+     engineering), "support engineer", "quality engineer" (software QA vs manufacturing),
+     "field engineer", "technical specialist", "application specialist".
+  4. If one family is clearly most likely, choose it and set ambiguous = false. Do not mark a
+     title ambiguous just because it is short ("developer" is software_dev).
+  5. Hourly AI data-labelling or AI-training gigs, often titled "<subject> expert" or "AI
+     trainer", are ai_data_work, not ml_ai.
+  6. Clearly non-IT roles (healthcare, social services, finance, trades, sales, hospitality)
+     are other; non-software engineering (electrical, mechanical, civil) is other_engineering.
+
+  Return JSON matching the TitleClassificationBatch schema only.
+
+output_type: "TitleClassificationBatch"
+tools: []
+handoffs: []

@@ -84,7 +84,7 @@ class AICall(Base, TimestampMixin):
     )
     task_id: Mapped[Optional[str]] = mapped_column(ForeignKey(
         "task_executions.id", ondelete="SET NULL"), nullable=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey(
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey(
         "users.id", ondelete="SET NULL"), nullable=True, index=True)
     model: Mapped[str] = mapped_column(String(100), nullable=False)
     model_provider: Mapped[str] = mapped_column(

@@ -66,6 +66,22 @@ class Settings(BaseSettings):
     SKILL_MATCH_THRESHOLD: float = 40  # Minimum skill match percentage to keep a match
     MATCHING_ALGORITHM_VERSION: str = "v1.0.0"
 
+    # Job freshness (shared by job listing and matching v3)
+    JOB_EXPIRY_DAYS: int = 30  # When expires_at is missing, a job counts as live for N days after listed_at
+
+    # Matching v3 (docs/job_matching_v3_design.md)
+    MATCH_LLM_PROVIDER: str = "openrouter"
+    MATCH_JUDGE_MODEL: str = "openai/gpt-6.1-terra"
+    MATCH_JUDGE_PROMPT_VERSION: str = "v1"
+    TITLE_CLASSIFIER_MODEL: str = "z-ai/glm-5.3-flash"
+    MATCH_MAX_CANDIDATE_RESUMES: int = 3
+    MATCH_DAILY_LLM_LIMIT_PER_USER: int = 200
+    MATCH_JUDGE_CONCURRENCY: int = 4
+    MATCH_JUDGE_BATCH_SIZE: int = 40
+    MATCH_RETRY_BACKOFF_MINUTES: List[int] = [5, 30, 180]
+    TITLE_CLASSIFIER_BATCH_SIZE: int = 50
+    JD_READ_CHAR_LIMIT: int = 1500  # Body excerpt used to classify ambiguous titles
+
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:5173"]
 

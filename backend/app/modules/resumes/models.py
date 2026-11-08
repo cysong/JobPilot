@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 from enum import Enum
 
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, Integer, Index, UniqueConstraint
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, Integer, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.base_model import Base, TimestampMixin
@@ -77,6 +77,14 @@ class Resume(Base, TimestampMixin):
     Supports draft/formal version workflow and soft delete.
     """
     __tablename__ = "resumes"
+    __table_args__ = (
+        Index(
+            "ix_resumes_user_family",
+            "user_id",
+            "role_family",
+            postgresql_where=text("is_draft = false AND is_deleted = false"),
+        ),
+    )
 
     # Primary key
     id: Mapped[str] = mapped_column(String(255), primary_key=True)
@@ -103,6 +111,15 @@ class Resume(Base, TimestampMixin):
     analysis_result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     analysis_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # Matching v3: the single role family (职业序列) this resume targets.
+    role_family: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    role_family_source: Mapped[Optional[str]] = mapped_column(
+        String(8), nullable=True, comment="auto | user"
+    )
+    role_family_version: Mapped[Optional[str]] = mapped_column(
+        String(16), nullable=True, comment="role_families.yaml version at binding time"
+    )
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="resumes", foreign_keys=[user_id])

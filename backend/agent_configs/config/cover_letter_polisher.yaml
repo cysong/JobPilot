@@ -1,6 +1,7 @@
-version: 1
+version: 2
 name: cover_letter_polisher
-model: gpt-5
+provider: openrouter
+model: "openai/gpt-6.1-terra"
 max_turns: 2
 
 model_settings:
