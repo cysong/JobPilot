@@ -217,6 +217,7 @@ async def run_evaluation(
             row.update({k: previous[k] for k in (
                 "status", "tier", "tier_reason", "reject_code", "resume_id", "validation", "judgment", "usage")})
             row["judged"] = True
+            row["reused"] = True  # copied from an earlier run: its cost was paid there
             candidates = ()
         if candidates:
             async with sem:
@@ -271,8 +272,9 @@ async def run_evaluation(
                 run_id=run.id, repeat_index=r["repeat_index"], user_id=r["user_id"], job_id=r["job_id"],
                 prefilter=r["prefilter"], location_check=r["location_check"], status=r["status"],
                 tier=r["tier"], reject_code=r["reject_code"], resume_id=r["resume_id"],
-                judgment={k: r[k] for k in ("judgment", "validation", "usage", "tier_reason", "family",
-                                            "judged", "error", "title", "company")},
+                judgment={**{k: r[k] for k in ("judgment", "validation", "usage", "tier_reason", "family",
+                                               "judged", "error", "title", "company")},
+                          "reused": bool(r.get("reused"))},
             )
             for r in rows
         )
@@ -308,5 +310,6 @@ async def load_run_rows(db: AsyncSession, run_id: str) -> list[dict[str, Any]]:
             "tier_reason": extra.get("tier_reason"), "judged": bool(extra.get("judged")),
             "validation": extra.get("validation"), "usage": extra.get("usage") or [],
             "judgment": extra.get("judgment"),
+            "reused": bool(extra.get("reused")),
         })
     return rows

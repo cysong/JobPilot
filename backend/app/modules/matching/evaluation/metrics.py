@@ -181,21 +181,25 @@ def _validation(rows: Sequence[dict]) -> dict[str, Any]:
 
 
 def _cost(rows: Sequence[dict]) -> dict[str, Any]:
+    """Spend of this run only: results reused from an earlier run are excluded, and the
+    average is over successful calls (failed calls report no usage)."""
     calls = input_tokens = output_tokens = 0
     cost = 0.0
     for r in rows:
+        if r.get("reused"):
+            continue
         for usage in r.get("usage") or []:
             calls += 1
             input_tokens += usage.get("input_tokens") or 0
             output_tokens += usage.get("output_tokens") or 0
             cost += usage.get("estimated_cost") or 0.0
-    judged = sum(1 for r in rows if r.get("judged"))
     return {
         "judge_calls": calls,
+        "reused_results": sum(1 for r in rows if r.get("reused")),
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "estimated_cost_usd": round(cost, 4),
-        "avg_cost_per_judgment_usd": round(cost / judged, 5) if judged else None,
+        "avg_cost_per_judgment_usd": round(cost / calls, 5) if calls else None,
     }
 
 

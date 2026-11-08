@@ -103,6 +103,19 @@ def test_cost_counts_all_repeats():
     judged = sum(1 for r in ROWS if r["judged"])
     assert cost["judge_calls"] == judged
     assert cost["estimated_cost_usd"] == pytest.approx(0.0035 * judged, abs=1e-4)
+    assert cost["avg_cost_per_judgment_usd"] == pytest.approx(0.0035)
+
+
+def test_cost_excludes_reused_and_failed():
+    rows = [
+        _row(1, "applied", tier="A"),
+        {**_row(2, "applied", tier="B"), "reused": True},
+        {**_row(3, "applied", judged=True, status="failed_final"), "usage": []},
+    ]
+    cost = compute_metrics(rows)["cost"]
+    assert cost["judge_calls"] == 1
+    assert cost["reused_results"] == 1
+    assert cost["avg_cost_per_judgment_usd"] == pytest.approx(0.0035)
 
 
 def test_compare_runs():

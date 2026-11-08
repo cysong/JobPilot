@@ -147,7 +147,8 @@ def render_report(*, run: dict[str, Any], metrics: dict[str, Any], comparison: d
     cost = m["cost"]
     lines += [
         "## 12. Cost",
-        f"- Judge calls: {cost['judge_calls']}; input tokens: {cost['input_tokens']};"
+        f"- Judge calls: {cost['judge_calls']} (plus {cost.get('reused_results', 0)} results reused from an earlier run);"
+        f" input tokens: {cost['input_tokens']};"
         f" output tokens: {cost['output_tokens']}",
         f"- Estimated cost: ${cost['estimated_cost_usd']}; per judgment:"
         f" {('$' + str(cost['avg_cost_per_judgment_usd'])) if cost['avg_cost_per_judgment_usd'] is not None else NA}",
