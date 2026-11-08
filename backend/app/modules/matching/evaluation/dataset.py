@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, ApplicationStatusHistory
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.evaluation.models import ItemKind, MatchEvalDataset, MatchEvalItem
 from app.modules.matching.families.classifier import Gateway, classify_missing_titles, register_jobs, resolve_pending_jobs
@@ -47,11 +47,20 @@ async def create_dataset(
         .where(Application.user_id == spec.user_id, Application.is_deleted.is_(False))
     )).all()
     applied_job_ids = {job_id for _, job_id, _, _ in apps}  # includes FAILED: never sample as random
+    # "Interviewed" means the application ever reached an interview stage, even if it was
+    # rejected afterwards, so the status history is checked as well as the current status.
+    ever_interviewed = set((await db.execute(
+        select(ApplicationStatusHistory.application_id)
+        .join(Application, Application.id == ApplicationStatusHistory.application_id)
+        .where(Application.user_id == spec.user_id)
+        .where(func.cast(ApplicationStatusHistory.to_status, String).in_(INTERVIEW_STATUSES))
+    )).scalars())
     for app_id, job_id, status, resume_id in apps:
         name = _status_name(status)
         if name in EXCLUDED_STATUSES:
             continue
-        kind = ItemKind.INTERVIEWED if name in INTERVIEW_STATUSES else ItemKind.APPLIED
+        reached_interview = name in INTERVIEW_STATUSES or app_id in ever_interviewed
+        kind = ItemKind.INTERVIEWED if reached_interview else ItemKind.APPLIED
         if job_id in items and items[job_id]["item_kind"] == ItemKind.INTERVIEWED:
             continue
         items[job_id] = {"item_kind": kind, "applied_resume_id": resume_id, "source_id": app_id, "label": None}

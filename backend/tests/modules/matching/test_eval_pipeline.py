@@ -289,3 +289,27 @@ async def test_reuse_across_datasets_only_when_candidates_unchanged(session_fact
     assert len(judged_prompts) == second.config["llm_pairs"] - second.config["reused_pairs"]
     assert all(p.resume_id != "res_java" for p in preds.values())
     assert preds[2].resume_id == "res_qa"
+
+
+@pytest.mark.asyncio
+async def test_rejected_after_interview_counts_as_interviewed(session_factory):
+    from app.modules.applications.models import ApplicationStatusHistory
+
+    gateway = _gateway([])
+    async with session_factory() as db:
+        await _seed(db)
+        # Job 2 was interviewed, then rejected: current status is REJECTED.
+        app2 = await db.get(Application, "app2")
+        app2.status = ApplicationStatus.REJECTED
+        db.add(ApplicationStatusHistory(id="h1", application_id="app2", from_status=ApplicationStatus.APPLIED,
+                                        to_status=ApplicationStatus.INTERVIEWING, changed_at=NOW))
+        db.add(ApplicationStatusHistory(id="h2", application_id="app2", from_status=ApplicationStatus.INTERVIEWING,
+                                        to_status=ApplicationStatus.REJECTED, changed_at=NOW))
+        await db.commit()
+        dataset = await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=0,
+                                                                 filtered_sample=0, seed="t"))
+        kinds = {i.job_id: i.item_kind for i in (await db.execute(
+            select(MatchEvalItem).where(MatchEvalItem.dataset_id == dataset.id))).scalars()}
+    assert kinds[1] == "interviewed"  # current status INTERVIEWING
+    assert kinds[2] == "interviewed"  # reached interview before rejection
+    assert kinds[3] == "applied"
