@@ -79,6 +79,7 @@ async def run_evaluation(
     judged_limit: int | None = None,
     repeat_sample: int | None = None,
     sample_seed: str = "eval",
+    reuse_run_id: str | None = None,
 ) -> MatchEvalRun:
     """Evaluate a dataset.
 
@@ -87,6 +88,9 @@ async def run_evaluation(
     ``repeat_sample`` limits extra repeats to that many LLM pairs. Both pick
     pairs by a stable hash of (sample_seed, job_id), so smaller samples are
     subsets of larger ones.
+    ``reuse_run_id`` copies successful LLM results (rated / rejected) from an
+    earlier run of the same dataset and model, and only judges the rest; used to
+    resume a run that stopped part-way (e.g. provider credit exhausted).
     """
     registry = get_registry()
     override = model_override or judge_override()
@@ -128,6 +132,18 @@ async def run_evaluation(
             llm_items = llm_items[:judged_limit]
         repeat_items = llm_items if repeat_sample is None else llm_items[:repeat_sample]
 
+        reused: dict[tuple[int, int, int], dict[str, Any]] = {}
+        if reuse_run_id:
+            source = await db.get(MatchEvalRun, reuse_run_id)
+            if source is None or source.dataset_id != dataset.id:
+                raise ValueError(f"run {reuse_run_id} is not a run of {dataset_ref}")
+            if source.config.get("model") != override.model:
+                raise ValueError(
+                    f"run {reuse_run_id} used {source.config.get('model')}, not {override.model}")
+            for row in await load_run_rows(db, reuse_run_id):
+                if row["judged"] and row["status"] in ("rated", "rejected"):
+                    reused[(row["user_id"], row["job_id"], row["repeat_index"])] = row
+
         run = MatchEvalRun(
             id=generate_id("mer"),
             dataset_id=dataset.id,
@@ -143,6 +159,8 @@ async def run_evaluation(
                 "judged_limit": judged_limit,
                 "repeat_sample": len(repeat_items) if repeats > 1 else 0,
                 "sample_seed": sample_seed,
+                "reused_from": reuse_run_id,
+                "reused_pairs": len(reused),
             },
             baseline_run_id=baseline_run_id,
             status="running",
@@ -152,7 +170,7 @@ async def run_evaluation(
 
     sem = asyncio.Semaphore(concurrency or settings.MATCH_JUDGE_CONCURRENCY)
     rows: list[dict[str, Any]] = []
-    progress = {"done": 0, "total": len(llm_items) + len(repeat_items) * (repeats - 1)}
+    progress = {"done": 0, "total": len(llm_items) + len(repeat_items) * (repeats - 1) - len(reused)}
 
     async def evaluate(item: MatchEvalItem, repeat: int) -> None:
         job = jobs[item.job_id]
@@ -176,6 +194,12 @@ async def run_evaluation(
                 row["status"], row["reject_code"] = "rejected", "LOCATION"
         if not candidates and item.item_kind == ItemKind.RANDOM_FILTERED:
             candidates = fallback_candidates(user)
+        previous = reused.get((item.user_id, item.job_id, repeat)) if candidates else None
+        if previous is not None:
+            row.update({k: previous[k] for k in (
+                "status", "tier", "tier_reason", "reject_code", "resume_id", "validation", "judgment", "usage")})
+            row["judged"] = True
+            candidates = ()
         if candidates:
             async with sem:
                 try:

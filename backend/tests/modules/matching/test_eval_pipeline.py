@@ -226,3 +226,35 @@ async def test_judged_limit_and_repeat_sample(session_factory):
         big_jobs = {p.job_id for p in (await db.execute(
             select(MatchEvalPrediction).where(MatchEvalPrediction.run_id == bigger.id))).scalars() if p.tier}
     assert judged_jobs <= big_jobs
+
+
+@pytest.mark.asyncio
+async def test_reuse_judges_only_failed_pairs(session_factory):
+    calls: list = []
+    gateway = _gateway(calls)
+    async with session_factory() as db:
+        await _seed(db)
+        await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=5,
+                                                      filtered_sample=2, seed="t"))
+
+    # First run: the provider fails for job 2 (e.g. out of credit).
+    async def flaky(agent_id, input_data, context=None, model_override=None):
+        if agent_id == "match_judge" and "title: QA Engineer" in input_data:
+            raise RuntimeError("Error code: 402 insufficient credits")
+        return await _gateway(calls).call(agent_id, input_data, context=context, model_override=model_override)
+
+    broken = AsyncMock()
+    broken.call = AsyncMock(side_effect=flaky)
+    first = await run_evaluation(session_factory, broken, dataset_ref="main@v1")
+    assert first.metrics["validation"]["failed"] == 1
+
+    calls.clear()
+    resumed = await run_evaluation(session_factory, gateway, dataset_ref="main@v1", reuse_run_id=first.id)
+    judge_titles = [c for c in calls if c[0] == "match_judge"]
+    assert len(judge_titles) == 1  # only the failed pair is judged again
+    assert resumed.metrics["validation"]["failed"] == 0
+    assert resumed.config["reused_pairs"] == first.config["llm_pairs"] - 1
+
+    with pytest.raises(ValueError, match="used"):
+        await run_evaluation(session_factory, gateway, dataset_ref="main@v1", reuse_run_id=first.id,
+                             model_override=ModelOverride(provider="openrouter", model="openai/gpt-6.1-sol"))

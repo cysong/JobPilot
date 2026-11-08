@@ -142,12 +142,14 @@ async def _run(args) -> None:
     override = ModelOverride(provider=args.provider, model=args.model)
     if not _confirm(args, f"Run {args.dataset} with {override.provider}/{override.model}, "
                           f"repeat={args.repeat} (sample {args.repeat_sample or 'all'}), "
-                          f"judged_limit={args.judged_limit or 'all'}, limit={args.limit or 'all'}."):
+                          f"judged_limit={args.judged_limit or 'all'}, limit={args.limit or 'all'}, "
+                          f"reuse={args.reuse or '-'}."):
         return
     run = await run_evaluation(
         async_session_factory, AgentGateway.get(), dataset_ref=args.dataset, model_override=override,
         repeats=args.repeat, concurrency=args.concurrency, baseline_run_id=args.baseline, limit=args.limit,
         judged_limit=args.judged_limit, repeat_sample=args.repeat_sample, sample_seed=args.sample_seed,
+        reuse_run_id=args.reuse,
     )
     path = _write_report(run.id, run.report_md or "")
     print(f"run {run.id} {run.status}; report: {path}; cost: {run.cost}")
@@ -252,6 +254,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--judged-limit", type=int, help="only N of the pairs that reach the LLM")
     p.add_argument("--repeat-sample", type=int, help="repeat only N LLM pairs")
     p.add_argument("--sample-seed", default="eval")
+    p.add_argument("--reuse", help="copy successful results from this earlier run and judge only the rest")
     p.set_defaults(func=_run)
 
     p = sub.add_parser("report")
