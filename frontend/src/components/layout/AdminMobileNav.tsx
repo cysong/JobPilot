@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ComponentType } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, LayoutDashboard, ListChecks } from 'lucide-react'
+import { Menu, LayoutDashboard, ListChecks, Tags } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +29,11 @@ const navItems: NavItem[] = [
     title: 'Tasks',
     href: '/admin/tasks',
     icon: ListChecks,
+  },
+  {
+    title: 'Title Families',
+    href: '/admin/matching/title-families',
+    icon: Tags,
   },
 ]
 

@@ -30,6 +30,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSourceMetaByKey, useSourceMetaStore } from "@/store/sourceMetaStore";
 import { EnqueueJobDialog } from "@/features/jobs/components/EnqueueJobDialog";
 import { MatchFilterBar } from "@/features/matching/components/MatchFilterBar";
+import { MatchLabelPopover } from "@/features/matching/components/MatchLabelPopover";
 
 export default function JobListingPage() {
   const {
@@ -402,6 +403,7 @@ export default function JobListingPage() {
                         key={item.match.id}
                         job={item.job}
                         matchData={item.match}
+                        matchActions={<MatchLabelPopover jobId={item.job.id} current={item.match.label} />}
                         onOpenJob={handleOpenJob}
                         highlighted={highlightedJobId === item.job.id}
                       />

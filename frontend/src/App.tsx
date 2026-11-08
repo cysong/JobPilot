@@ -28,6 +28,7 @@ import CoverLetterEditPage from '@/features/applications/CoverLetterEditPage'
 import { SkillsPage } from '@/features/skills/SkillsPage'
 import AdminDashboardPage from '@/features/admin/pages/AdminDashboardPage'
 import TaskMonitorPage from '@/features/admin/pages/TaskMonitorPage'
+import TitleFamiliesPage from '@/features/admin/pages/TitleFamiliesPage'
 import AdminJobsChartPage from '@/features/admin/pages/AdminJobsChartPage'
 import AdminAIUsageChartPage from '@/features/admin/pages/AdminAIUsageChartPage'
 import AdminTasksChartPage from '@/features/admin/pages/AdminTasksChartPage'
@@ -98,6 +99,7 @@ function App() {
             <Route path="/admin/ai/charts" element={<AdminAIUsageChartPage />} />
             <Route path="/admin/tasks/chart" element={<AdminTasksChartPage />} />
             <Route path="/admin/tasks" element={<TaskMonitorPage />} />
+            <Route path="/admin/matching/title-families" element={<TitleFamiliesPage />} />
             {/* Admin-scoped fallback: keeps bare /admin and /admin/<unknown>
                 inside the admin area instead of falling through to the global
                 catch-all which sends users to / and then to /dashboard. */}

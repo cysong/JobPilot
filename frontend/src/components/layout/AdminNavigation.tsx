@@ -9,6 +9,7 @@ export function AdminNavigation() {
   const navLinks = [
     { href: '/admin/dashboard', label: 'Dashboard' },
     { href: '/admin/tasks', label: 'Tasks' },
+    { href: '/admin/matching/title-families', label: 'Title Families' },
   ]
 
   return (

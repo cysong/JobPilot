@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/utils/cn'
 import type { MatchCounts, MatchTier, MatchView } from '@/types/job'
 
-import { TIER_META } from './MatchBadges'
+import { TIER_META } from './matchMeta'
 
 const FILTER_TIERS = ['A', 'B', 'C'] as const satisfies readonly MatchTier[]
 

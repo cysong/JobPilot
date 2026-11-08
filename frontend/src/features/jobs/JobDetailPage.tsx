@@ -29,6 +29,9 @@ import {
 import { useApplicationByJob } from "@/features/applications/hooks/useApplicationByJob";
 import { ApplicationDialog } from "@/features/applications/components/ApplicationDialog";
 import { MatchResultPanel } from "@/features/matching/components/MatchResultPanel";
+import { MatchLabelPopover } from "@/features/matching/components/MatchLabelPopover";
+import { useAuthStore } from "@/store/authStore";
+import { Role } from "@/types/auth";
 import { getApplicationStatusPresentation } from "@/features/applications/components/ApplicationStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +89,7 @@ export default function JobDetailPage() {
     total: 0,
   });
   const jobIdNum = parseInt(jobId || "0");
+  const isAdmin = useAuthStore((state) => state.user?.role === Role.ADMIN);
   const {
     data: job,
     isLoading,
@@ -454,7 +458,16 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            <MatchResultPanel jobId={jobIdNum} />
+            <MatchResultPanel
+              jobId={jobIdNum}
+              renderActions={
+                isAdmin
+                  ? (detail) => (
+                      <MatchLabelPopover jobId={jobIdNum} current={detail?.label ?? null} noResult={!detail} />
+                    )
+                  : undefined
+              }
+            />
 
             {/* Job Description */}
             <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-6">
