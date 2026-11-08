@@ -120,10 +120,10 @@
 
 | 结果 | 默认展示 |
 |---|---|
-| A | 绿色徽标，排最前 |
-| B | 黄色徽标 |
-| C | 默认折叠 |
-| D | 不显示（API 默认排除） |
+| A | 绿色徽标，默认显示 |
+| B | 蓝色徽标，默认显示 |
+| C | 橙色徽标，默认不显示，打开 C 筛选后可见 |
+| D | 不显示：列表和详情 API 对普通用户都不返回 D，管理员可见（用于标注） |
 | 拒绝 | 不在默认列表中，"已拒绝"筛选中可见 |
 | 地点未知 | 档位徽标旁标注"地点未确认" |
 
@@ -434,7 +434,7 @@ v2 依据第 1 阶段 50 条标注调整（v1 把 13/18 个应为 A 的岗位判
 ## 7. 结果存储与展示
 
 - 每个「岗位 × 用户」一条记录（`job_matches`）：最佳简历、档位、技术 / 经验等级、原因、拒绝信息、地点检查结果、完整判定。
-- 判定为 D 的也入库（API 默认排除），用于评估初筛效果。岗位族初筛未通过的不入库。
+- 判定为 D 的也入库（普通用户的 API 不返回，管理员可见），用于评估初筛效果。岗位族初筛未通过的不入库。
 - 不重跑已有匹配；记录中保存当时的简历内容 hash、JD 内容 hash 和岗位族版本，便于追溯。
 - 职位列表：档位徽标、档位原因、推荐简历；按档位筛选；"已拒绝"筛选显示拒绝原因；"地点未确认"标注；已投递的岗位通过关联 `applications` 显示投递状态。
 - 职位详情：技术逐条对照（`tech_items`）、经验依据、JD 中的签证 / 安全许可原文。
@@ -767,9 +767,13 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 |---|---|---|
 | `discover_new_jobs` | 5 分钟 | 查询在架且 `job_role_families` 中没有记录的岗位（按 `listed_at` 从新到旧，每轮上限 500），写入 `pending` |
 | `classify_pending_titles` | 5 分钟 | 批量归类新的 `title_key`；对缓存命中的岗位直接完成归类；`ambiguous` 的岗位做读正文归类；归类完成后计算候选简历与地点检查，写入 `job_matches`（`queued` 或 `LOCATION` 拒绝） |
-| `judge_queued_matches` | 2 分钟 | 按 `job_listed_at DESC` 出队 `MATCH_JUDGE_BATCH_SIZE` 条，并发 `MATCH_JUDGE_CONCURRENCY`；出队时再检查在架（已过期 → `skipped_expired`）；遵守每用户每日上限；同时处理到期的 `failed_retryable` |
+| `judge_queued_matches` | 2 分钟 | 按 `job_listed_at DESC` 出队，每次领取 `MATCH_JUDGE_CONCURRENCY` 条并发判定，一轮最多 `MATCH_JUDGE_BATCH_SIZE` 条；出队时再检查在架（已过期 → `skipped_expired`）；遵守每用户每日上限；同时处理到期的 `failed_retryable` |
 
-- 判定任务使用 `AsyncBaseTask` 批处理，以 `job_matches` 本身作为任务账本，不为每条判定写 `task_executions`。新增两个 `TaskType` 供批任务记录运行情况。
+- 三个任务都受总开关 `MATCH_V3_ENABLED` 控制（默认关闭，关闭时任务直接返回）；不走 Celery 自动重试，剩余工作由下一轮接着做。
+- 判定任务以 `job_matches` 本身作为任务账本，不为每条判定写 `task_executions`，也不新增 `TaskType`。
+- **领取与租约**：领取时用 `FOR UPDATE SKIP LOCKED` 选行，并把 `next_attempt_at` 设为 `now + MATCH_JUDGE_LEASE_MINUTES`（20 分钟），在此期间其他轮次不会再领取；进程崩溃时租约到期后自动重新可领取。
+- **时间预算**：一轮在 `MATCH_JUDGE_TIME_BUDGET_SECONDS`（90 秒）后不再领取新的一批，已开始的一批会做完，因此相邻两轮可能短暂重叠。
+- **每日上限**按"每次判定尝试"计数（`judged_at` 落在当天 UTC 的行），失败的尝试也算，因为它们可能已产生费用。
 - 每日上限用尽时，剩余条目保持 `queued`，次日继续；岗位如果在此期间过期，出队时记为 `skipped_expired`。
 - v1 的 `pull_unmatched_jobs`、`calculate_job_user_matches_task`、`match_user_recent_jobs_task`、`analyze_match_with_ai_task` 删除。
 
@@ -782,23 +786,30 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 
 ### 10.3 回填（新用户 / 新绑定岗位族）
 
-- 触发：简历首次绑定岗位族，或用户修改简历的岗位族。
-- 范围：当前在架、且该用户**尚无** `job_matches` 记录的岗位，按 §5 计算候选简历后入队（`origin = backfill`）。
+- 不需要单独触发：`classify_pending_titles` 每轮都会为每个有绑定简历的用户检查所有"已归类、在架、且该用户尚无 `job_matches` 记录"的岗位，按 §5 计算候选简历；因此简历首次绑定或修改岗位族后，下一轮就会把新符合条件的岗位入队。初筛未通过的岗位不入库，下一轮会再次检查（计算很轻，不调用模型）。
+- `origin`：岗位的岗位族确定时间晚于该用户绑定简历的最近修改时间 → `new_job`，否则 → `backfill`。
+- 上线首日把 `MATCH_DAILY_LLM_LIMIT_PER_USER` 临时调到 1000，让近 30 天的回填一天内跑完，之后改回 200（2026-11-09 确认）。
 - 已有记录的岗位不重跑。回填同样受每用户每日上限约束，并按发布时间从新到旧处理。
 
 ### 10.4 可观测性（Prometheus / Grafana）
 
 | 指标 | 说明 |
 |---|---|
-| `jobpilot_match_queue_depth` / `jobpilot_match_queue_oldest_age_seconds` | 队列深度、最老一条的等待时长 |
-| `jobpilot_match_judge_total{outcome}` | 判定结果：rated / rejected / failed_retryable / failed_final / skipped_expired |
+| `jobpilot_match_queue_depth` | 待判定数量（`queued` + 待重试） |
+| `jobpilot_match_queue_oldest_age_seconds` | 排队最久的**新岗位**的等待时长（不含回填：回填在每日上限下要排多天） |
+| `jobpilot_match_judged_24h{status}` | 最近 24 小时各状态的判定次数 |
+| `jobpilot_match_tier_24h{tier}` | 最近 24 小时各档位数量，用于发现漂移 |
+| `jobpilot_match_judge_total{outcome}` | 判定结果计数：rated / rejected / failed_retryable / failed_final / skipped_expired / error |
 | `jobpilot_match_judge_duration_seconds` | 判定耗时 |
-| `jobpilot_match_tier_total{tier}` | 每日各档位数量，用于发现漂移（A 占比突变或为 0 时告警） |
-| `jobpilot_match_validation_total{kind}` | `consistency_fixes`、`unverified`、`tier_flag_conflict` 等校验事件 |
-| `jobpilot_title_classify_total{outcome}` | 职位名归类：classified / ambiguous / jd_read / failed |
+| `jobpilot_match_validation_total{kind}` | 校验事件：consistency_fix / flag / unverified_quote |
+| `jobpilot_title_classify_total{outcome}` | 岗位归类：title_cache / jd_read / failed |
 | LLM 费用 | 复用现有 `jobpilot_llm_*` 指标，按 agent 统计 |
 
-告警：队列最老一条超过 24 小时；`failed_final` 占比超过 5%；当日 A 档为 0 且判定数大于 20。
+- 计数器（`*_total`、耗时）由 worker 上报；队列与 24 小时指标由 API 进程每分钟从 `job_matches` 查询得出，worker 重启不影响。
+- 告警（处理手册见 `docs/runbooks.md`）：
+  - `MatchQueueStale`：排队最久的新岗位超过 24 小时，持续 15 分钟。
+  - `MatchFailedFinalRatio`：最近 24 小时 `failed_final` 占比超过 5% 且判定数至少 20，持续 30 分钟。
+  - `MatchNoATier`：最近 24 小时没有 A 档且判定数大于 20，持续 1 小时（用滚动 24 小时而不是自然日，避免每天零点误报）。
 
 ---
 
@@ -867,7 +878,7 @@ backend/scripts/verify_matching_v3_migration.py
 | 范围 | 内容 |
 |---|---|
 | 数据库 | §9.1 #7–#8 |
-| 后端 | 三个定时任务、队列与重试、回填；匹配结果 API（默认排除 D）；标签 API；停用 v1；监控指标与告警 |
+| 后端 | 三个定时任务、队列与重试、回填；匹配结果 API（普通用户不返回 D）；标签 API；停用 v1；监控指标与告警 |
 | 前端 | 职位卡片档位徽标与原因；按档位筛选；"已拒绝"筛选；"地点未确认"标注；详情页技术对照与经验依据；简历页岗位族选择；偏好设置新增签证与安全许可（预填建议值）；管理员标注界面；后台职位名岗位族修正 |
 
 按以下顺序实施，每步单独验证、单独提交（2026-11-09 确认）：
