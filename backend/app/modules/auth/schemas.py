@@ -44,12 +44,21 @@ class SalaryExpectation(BaseModel):
         return self
 
 
+WorkRights = Literal["citizen", "permanent_resident", "work_visa", "needs_sponsorship"]
+SecurityClearance = Literal["holds", "eligible", "not_eligible"]
+
+
 class UserPreferences(BaseModel):
     """Supported user profile preferences."""
 
     default_tailoring_level: TailoringLevel | None = None
     job_locations: list[str] = Field(default_factory=list)
     salary_expectation: SalaryExpectation | None = None
+    # Matching v3 hard conditions; None / empty means "unknown" and never causes a rejection.
+    work_rights: WorkRights | None = None
+    security_clearance: SecurityClearance | None = None
+    country: str | None = None  # None -> settings.MATCH_DEFAULT_COUNTRY
+    languages: list[str] = Field(default_factory=list)
 
 
 class UserRegister(BaseModel):

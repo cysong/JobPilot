@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { usersApi } from '@/api/users'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/store/authStore'
-import type { UserPreferences } from '@/types/auth'
+import type { SecurityClearance, UserPreferences, WorkRights } from '@/types/auth'
 import { ApiError } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +37,23 @@ const NZ_JOB_LOCATIONS = [
 
 type SalaryMode = 'unset' | 'exact' | 'range'
 
+const DEFAULT_COUNTRY = 'New Zealand'
+
+const WORK_RIGHTS_OPTIONS: { value: WorkRights; label: string }[] = [
+  { value: 'citizen', label: 'NZ citizen' },
+  { value: 'permanent_resident', label: 'Permanent / resident visa' },
+  { value: 'work_visa', label: 'Work visa (already allowed to work)' },
+  { value: 'needs_sponsorship', label: 'Need visa sponsorship' },
+]
+
+const CLEARANCE_OPTIONS: { value: SecurityClearance; label: string }[] = [
+  { value: 'holds', label: 'Currently hold a NZ security clearance' },
+  { value: 'eligible', label: 'Eligible to obtain one' },
+  { value: 'not_eligible', label: 'Not eligible' },
+]
+
+const COMMON_LANGUAGES = ['English', 'Chinese', 'Hindi', 'Japanese', 'Korean', 'Spanish', 'French', 'German'] as const
+
 interface PreferencesFormValues {
   default_tailoring_level: 'light' | 'moderate' | 'deep'
   job_locations: string[]
@@ -44,6 +61,10 @@ interface PreferencesFormValues {
   salary_exact: string
   salary_min: string
   salary_max: string
+  work_rights: WorkRights | 'unset'
+  security_clearance: SecurityClearance | 'unset'
+  country: string
+  languages: string[]
 }
 
 export default function JobPreferencesPage() {
@@ -51,6 +72,8 @@ export default function JobPreferencesPage() {
   const { toast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [workRightHint, setWorkRightHint] = useState<string | null>(null)
+  const [otherLanguage, setOtherLanguage] = useState('')
 
   const form = useForm<PreferencesFormValues>({
     defaultValues: {
@@ -60,8 +83,19 @@ export default function JobPreferencesPage() {
       salary_exact: '',
       salary_min: '',
       salary_max: '',
+      work_rights: 'unset',
+      security_clearance: 'unset',
+      country: DEFAULT_COUNTRY,
+      languages: [],
     },
   })
+
+  useEffect(() => {
+    usersApi
+      .getProfilePreferences()
+      .then((preferences) => setWorkRightHint(preferences.work_right_hint ?? null))
+      .catch(() => setWorkRightHint(null))
+  }, [])
 
   useEffect(() => {
     const preferences = user?.preferences
@@ -74,11 +108,35 @@ export default function JobPreferencesPage() {
       salary_exact: salary?.mode === 'exact' && salary.value != null ? String(salary.value) : '',
       salary_min: salary?.mode === 'range' && salary.min != null ? String(salary.min) : '',
       salary_max: salary?.mode === 'range' && salary.max != null ? String(salary.max) : '',
+      work_rights: preferences?.work_rights ?? 'unset',
+      security_clearance: preferences?.security_clearance ?? 'unset',
+      country: preferences?.country ?? DEFAULT_COUNTRY,
+      languages: preferences?.languages ?? [],
     })
   }, [form, user])
 
   const salaryMode = form.watch('salary_mode')
   const selectedLocations = form.watch('job_locations')
+  const selectedLanguages = form.watch('languages')
+  const languageChoices = [
+    ...COMMON_LANGUAGES,
+    ...selectedLanguages.filter((item) => !(COMMON_LANGUAGES as readonly string[]).includes(item)),
+  ]
+
+  const toggleLanguage = (language: string, checked: boolean) => {
+    const next = checked
+      ? [...selectedLanguages, language]
+      : selectedLanguages.filter((item) => item !== language)
+    form.setValue('languages', next, { shouldDirty: true })
+  }
+
+  const addOtherLanguage = () => {
+    const language = otherLanguage.trim().replace(/\s+/g, ' ')
+    if (language && !selectedLanguages.some((item) => item.toLowerCase() === language.toLowerCase())) {
+      toggleLanguage(language, true)
+    }
+    setOtherLanguage('')
+  }
 
   const onSubmit = async (values: PreferencesFormValues) => {
     setIsSaving(true)
@@ -122,6 +180,10 @@ export default function JobPreferencesPage() {
         default_tailoring_level: values.default_tailoring_level,
         job_locations: values.job_locations,
         salary_expectation: salaryExpectation,
+        work_rights: values.work_rights === 'unset' ? null : values.work_rights,
+        security_clearance: values.security_clearance === 'unset' ? null : values.security_clearance,
+        country: values.country.trim() || null,
+        languages: values.languages,
       })
 
       const currentUser = await authApi.getCurrentUser()
@@ -273,6 +335,129 @@ export default function JobPreferencesPage() {
                 />
               </div>
             ) : null}
+
+            <div className="space-y-6 border-t border-slate-200 pt-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Job matching conditions</h3>
+                <p className="text-sm text-slate-500">
+                  Jobs whose description explicitly requires something you don&apos;t meet are marked as
+                  rejected. Leave a field unset to never reject on it.
+                </p>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="work_rights"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Work rights in New Zealand</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="max-w-sm">
+                          <SelectValue placeholder="Select work rights" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="unset">Not set</SelectItem>
+                        {WORK_RIGHTS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {workRightHint ? (
+                      <p className="text-xs text-slate-500">Your resume says: {workRightHint}</p>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="security_clearance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Security clearance</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="max-w-sm">
+                          <SelectValue placeholder="Select security clearance" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="unset">Not set</SelectItem>
+                        {CLEARANCE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem className="max-w-sm">
+                    <FormLabel>Country you live in</FormLabel>
+                    <FormControl>
+                      <Input placeholder={DEFAULT_COUNTRY} {...field} />
+                    </FormControl>
+                    <p className="text-xs text-slate-500">
+                      Jobs that require working on site or living in another country are rejected.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="languages"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Languages you can work in</FormLabel>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {languageChoices.map((language) => (
+                        <label
+                          key={language}
+                          className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={selectedLanguages.includes(language)}
+                            onCheckedChange={(checked) => toggleLanguage(language, checked === true)}
+                          />
+                          <span>{language}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex max-w-sm gap-2">
+                      <Input
+                        value={otherLanguage}
+                        placeholder="Other language"
+                        onChange={(event) => setOtherLanguage(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addOtherLanguage()
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" onClick={addOtherLanguage}>
+                        Add
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 

@@ -9,7 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.modules.auth.schemas import SalaryExpectation, UserPreferences
+from app.modules.auth.schemas import SalaryExpectation, SecurityClearance, UserPreferences, WorkRights
 from app.shared.enums import ProficiencyLevel, TailoringLevel
 
 
@@ -87,6 +87,10 @@ class UserProfileUpdate(BaseModel):
 class ProfilePreferencesResponse(UserPreferences):
     """User profile preferences payload."""
 
+    # Free-text work authorization from the latest analyzed resume; a hint for
+    # filling work_rights, never used for matching.
+    work_right_hint: str | None = None
+
 
 class ProfilePreferencesUpdate(BaseModel):
     """Update profile preferences payload."""
@@ -94,6 +98,28 @@ class ProfilePreferencesUpdate(BaseModel):
     default_tailoring_level: TailoringLevel | None = Field(default=None)
     job_locations: list[str] = Field(default_factory=list)
     salary_expectation: SalaryExpectation | None = None
+    work_rights: WorkRights | None = None
+    security_clearance: SecurityClearance | None = None
+    country: str | None = Field(default=None, max_length=64)
+    languages: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("country", mode="before")
+    @classmethod
+    def validate_country(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("languages")
+    @classmethod
+    def validate_languages(cls, value: list[str]) -> list[str]:
+        languages: list[str] = []
+        for raw in value:
+            item = " ".join(raw.split())
+            if item and len(item) <= 32 and item.lower() not in {x.lower() for x in languages}:
+                languages.append(item)
+        return languages
 
     @field_validator("default_tailoring_level", mode="before")
     @classmethod

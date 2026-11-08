@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.models import User
 from app.modules.users.models import UserSkill
 from app.modules.users.schemas import ProfilePreferencesUpdate, UserProfileUpdate
-from app.modules.resumes.models import ResumeSkill
+from app.modules.resumes.models import Resume, ResumeSkill
 from app.shared.enums import ProficiencyLevel
 
 
@@ -394,11 +394,28 @@ async def get_profile_preferences(
     db: AsyncSession,
     user_id: int,
 ) -> dict[str, Any]:
-    """Return the stored profile preferences for a user."""
+    """Return the stored profile preferences for a user, plus a work rights hint."""
     user = await db.get(User, user_id)
     if not user:
         return {}
-    return dict(user.preferences or {})
+    preferences = dict(user.preferences or {})
+    preferences["work_right_hint"] = await _latest_resume_work_right(db, user_id)
+    return preferences
+
+
+async def _latest_resume_work_right(db: AsyncSession, user_id: int) -> str | None:
+    analyses = (await db.execute(
+        select(Resume.analysis_result)
+        .where(Resume.user_id == user_id, Resume.is_draft.is_(False), Resume.is_deleted.is_(False),
+               Resume.analysis_result.is_not(None))
+        .order_by(Resume.updated_at.desc())
+        .limit(5)
+    )).scalars().all()
+    for analysis in analyses:
+        value = (analysis or {}).get("work_right")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 async def update_profile_preferences(
@@ -406,24 +423,17 @@ async def update_profile_preferences(
     user_id: int,
     payload: ProfilePreferencesUpdate,
 ) -> dict[str, Any]:
-    """Persist the supported profile preferences for a user."""
+    """Persist the profile preferences sent in the payload.
+
+    Only fields present in the request are written; other stored keys are kept, so
+    a client that does not know a newer preference cannot erase it.
+    """
     user = await db.get(User, user_id)
     if not user:
         return {}
 
-    user.preferences = {
-        "default_tailoring_level": (
-            payload.default_tailoring_level.value
-            if payload.default_tailoring_level is not None
-            else None
-        ),
-        "job_locations": payload.job_locations,
-        "salary_expectation": (
-            payload.salary_expectation.model_dump()
-            if payload.salary_expectation is not None
-            else None
-        ),
-    }
+    updates = payload.model_dump(mode="json", exclude_unset=True)
+    user.preferences = {**(user.preferences or {}), **updates}
     user.updated_at = datetime.now(timezone.utc)
 
     await db.commit()

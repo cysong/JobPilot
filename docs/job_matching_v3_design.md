@@ -519,7 +519,7 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 | 4 | `job_matches` | 新建：匹配结果与判定队列 | 1 |
 | 5 | `match_labels` | 新建：管理员标注 | 1 |
 | 6 | `match_eval_datasets` / `match_eval_items` / `match_eval_runs` / `match_eval_predictions` | 新建：评估 | 1 |
-| 7 | `users.preferences` | 新增 `work_rights`、`security_clearance` 两个键（JSONB，无迁移） | 2 |
+| 7 | `users.preferences` | 新增 `work_rights`、`security_clearance`、`country`、`languages` 四个键（JSONB，无迁移） | 2 |
 | 8 | `user_job_matches`（v1，47 条） | 停止读写，数据保留 | 2 |
 
 **不改动**：`seek_jobs`（只读）、`job_analyses`、`documents`、`user_skills`、`resume_skills`、`applications`、`user_job_views`、`ai_calls`（`user_id` 已可空）。
@@ -869,6 +869,17 @@ backend/scripts/verify_matching_v3_migration.py
 | 数据库 | §9.1 #7–#8 |
 | 后端 | 三个定时任务、队列与重试、回填；匹配结果 API（默认排除 D）；标签 API；停用 v1；监控指标与告警 |
 | 前端 | 职位卡片档位徽标与原因；按档位筛选；"已拒绝"筛选；"地点未确认"标注；详情页技术对照与经验依据；简历页岗位族选择；偏好设置新增签证与安全许可（预填建议值）；管理员标注界面；后台职位名岗位族修正 |
+
+按以下顺序实施，每步单独验证、单独提交（2026-11-09 确认）：
+
+| 步骤 | 内容 |
+|---|---|
+| 2.1 偏好设置 | `UserPreferences` 新增 `work_rights` / `security_clearance` / `country` / `languages`；偏好更新改为合并写入（修复整体覆盖会丢键的问题）；设置页新增 4 项，签证状态缺省时用简历分析结果预填 |
+| 2.2 线上流水线 | 三个定时任务、队列、重试、每日上限、出队时检查在架、简历绑定岗位族后回填；总开关 `MATCH_V3_ENABLED`（默认关闭）；删除 v1 匹配任务 |
+| 2.3 API | `GET /jobs/matches` 改读 `job_matches`（默认 A+B，可选 C，D 不返回；"已拒绝"筛选）；匹配详情；简历岗位族设置；管理员标注与职位名岗位族修正；后台统计改用 `job_matches` |
+| 2.4 前端 | 档位徽标与原因、档位筛选、"已拒绝"筛选、"地点未确认"、详情页技术对照与经验依据、简历岗位族选择、仪表盘推荐改为 A 档 |
+| 2.5 管理员 | 标注界面（含对无匹配记录岗位的"应该匹配"）；职位名岗位族修正页 |
+| 2.6 监控与上线 | §10.4 指标、Grafana 面板与告警；VPS 配置 `OPENROUTER_API_KEY`；上线首次回填近 30 天在架岗位（预计判定 800–1,000 次，约 $20–25，归类后先报实际数量） |
 
 **验收**：新岗位在一小时内得到结果；标注正确入库且只追加；Grafana 上队列、失败率、档位分布、费用正常。
 

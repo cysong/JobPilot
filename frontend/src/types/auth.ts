@@ -19,10 +19,20 @@ export interface SalaryExpectation {
   value: number | null
 }
 
+export type WorkRights = 'citizen' | 'permanent_resident' | 'work_visa' | 'needs_sponsorship'
+export type SecurityClearance = 'holds' | 'eligible' | 'not_eligible'
+
 export interface UserPreferences {
   default_tailoring_level?: 'light' | 'moderate' | 'deep' | null
   job_locations?: string[]
   salary_expectation?: SalaryExpectation | null
+  // Matching conditions; unset means unknown and never causes a rejection.
+  work_rights?: WorkRights | null
+  security_clearance?: SecurityClearance | null
+  country?: string | null
+  languages?: string[]
+  // Read-only, returned by GET /users/profile/preferences.
+  work_right_hint?: string | null
 }
 
 export interface User {
