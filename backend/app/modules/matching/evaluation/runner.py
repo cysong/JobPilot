@@ -113,14 +113,21 @@ async def run_evaluation(
         users = {uid: await _frozen_user_context(db, uid, dataset.config.get("resumes", {})) for uid in user_ids}
         jobs: dict[int, JobContext] = {jid: await load_job_context(db, jid) for jid in job_ids}
 
-        def reaches_llm(item: MatchEvalItem) -> bool:
-            if item.item_kind == ItemKind.RANDOM_FILTERED:
-                return True
+        def llm_candidates(item: MatchEvalItem, user: UserContext) -> tuple[str, ...]:
+            """Resumes sent to the judge for this item; empty when it never reaches the LLM."""
             family = families.get(item.job_id)
-            if family is None:
-                return False
-            plan = plan_match(job_family=family, user=users[item.user_id], job=jobs[item.job_id], registry=registry)
-            return plan.prefilter in ("same", "adjacent")
+            if family is not None:
+                plan = plan_match(job_family=family, user=user, job=jobs[item.job_id], registry=registry)
+                if plan.prefilter in ("same", "adjacent"):
+                    return plan.candidate_ids
+                if plan.prefilter == "location_rejected":
+                    return ()
+            if item.item_kind == ItemKind.RANDOM_FILTERED:
+                return fallback_candidates(user)
+            return ()
+
+        def reaches_llm(item: MatchEvalItem) -> bool:
+            return bool(llm_candidates(item, users[item.user_id]))
 
         def rank(item: MatchEvalItem) -> str:
             return hashlib.sha256(f"{sample_seed}:{item.job_id}".encode()).hexdigest()
@@ -135,13 +142,28 @@ async def run_evaluation(
         reused: dict[tuple[int, int, int], dict[str, Any]] = {}
         if reuse_run_id:
             source = await db.get(MatchEvalRun, reuse_run_id)
-            if source is None or source.dataset_id != dataset.id:
-                raise ValueError(f"run {reuse_run_id} is not a run of {dataset_ref}")
+            if source is None:
+                raise ValueError(f"run {reuse_run_id} not found")
             if source.config.get("model") != override.model:
                 raise ValueError(
                     f"run {reuse_run_id} used {source.config.get('model')}, not {override.model}")
+            source_users = users
+            if source.dataset_id != dataset.id:
+                # Another dataset version may have a different resume snapshot: rebuild it so
+                # a result is only reused when the judge saw exactly the same candidates.
+                source_dataset = await get_dataset(db, source.dataset_id)
+                source_users = {
+                    uid: await _frozen_user_context(db, uid, source_dataset.config.get("resumes", {}))
+                    for uid in user_ids
+                }
+            by_key = {(i.user_id, i.job_id): i for i in items}
             for row in await load_run_rows(db, reuse_run_id):
-                if row["judged"] and row["status"] in ("rated", "rejected"):
+                item = by_key.get((row["user_id"], row["job_id"]))
+                if item is None or not row["judged"] or row["status"] not in ("rated", "rejected"):
+                    continue
+                now_cands = llm_candidates(item, users[item.user_id])
+                then_cands = llm_candidates(item, source_users[item.user_id])
+                if now_cands and set(now_cands) == set(then_cands):
                     reused[(row["user_id"], row["job_id"], row["repeat_index"])] = row
 
         run = MatchEvalRun(
@@ -184,16 +206,12 @@ async def run_evaluation(
             "reject_code": None, "resume_id": None, "tier_reason": None, "judged": False,
             "validation": None, "usage": [], "error": None, "judgment": None,
         }
-        candidates: tuple[str, ...] = ()
         if family is not None:
             plan = plan_match(job_family=family, user=user, job=job, registry=registry)
             row["prefilter"], row["location_check"] = plan.prefilter, plan.location.status
-            if plan.prefilter in ("same", "adjacent"):
-                candidates = plan.candidate_ids
-            elif plan.prefilter == "location_rejected":
+            if plan.prefilter == "location_rejected":
                 row["status"], row["reject_code"] = "rejected", "LOCATION"
-        if not candidates and item.item_kind == ItemKind.RANDOM_FILTERED:
-            candidates = fallback_candidates(user)
+        candidates = llm_candidates(item, user)
         previous = reused.get((item.user_id, item.job_id, repeat)) if candidates else None
         if previous is not None:
             row.update({k: previous[k] for k in (

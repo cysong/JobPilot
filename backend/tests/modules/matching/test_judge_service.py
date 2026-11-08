@@ -168,3 +168,12 @@ async def test_judge_pair_without_candidates_fails_fast():
         await judge_pair(gateway, user=USER, job=_job(), candidate_ids=["res_missing"])
     assert info.value.retryable is False
     gateway.call.assert_not_called()
+
+
+def test_fallback_candidates_skip_resumes_without_family():
+    import dataclasses
+    user = dataclasses.replace(USER, resume_refs=(
+        ResumeRef("res_unbound", None, NOW + timedelta(days=1)),
+        *USER.resume_refs,
+    ))
+    assert fallback_candidates(user) == ("res_java", "res_qa")

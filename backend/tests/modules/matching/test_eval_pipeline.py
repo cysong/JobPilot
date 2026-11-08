@@ -258,3 +258,34 @@ async def test_reuse_judges_only_failed_pairs(session_factory):
     with pytest.raises(ValueError, match="used"):
         await run_evaluation(session_factory, gateway, dataset_ref="main@v1", reuse_run_id=first.id,
                              model_override=ModelOverride(provider="openrouter", model="openai/gpt-6.1-sol"))
+
+
+@pytest.mark.asyncio
+async def test_reuse_across_datasets_only_when_candidates_unchanged(session_factory):
+    calls: list = []
+    gateway = _gateway(calls)
+    async with session_factory() as db:
+        await _seed(db)
+        await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=5,
+                                                      filtered_sample=2, seed="t"))
+    first = await run_evaluation(session_factory, gateway, dataset_ref="main@v1")
+
+    # The user stops using the Java resume: it no longer takes part in matching.
+    async with session_factory() as db:
+        java = await db.get(Resume, "res_java")
+        java.role_family, java.role_family_source = None, "user"
+        await db.commit()
+        await create_dataset(db, gateway, DatasetSpec(name="main", user_id=1, random_n=5,
+                                                      filtered_sample=2, seed="t"))
+
+    calls.clear()
+    second = await run_evaluation(session_factory, gateway, dataset_ref="main@v2", reuse_run_id=first.id)
+    judged_prompts = [c for c in calls if c[0] == "match_judge"]
+    async with session_factory() as db:
+        preds = {p.job_id: p for p in (await db.execute(
+            select(MatchEvalPrediction).where(MatchEvalPrediction.run_id == second.id))).scalars()}
+    # QA job keeps the same single candidate (res_qa) -> reused; software jobs lose res_java -> judged again.
+    assert second.config["reused_pairs"] >= 1
+    assert len(judged_prompts) == second.config["llm_pairs"] - second.config["reused_pairs"]
+    assert all(p.resume_id != "res_java" for p in preds.values())
+    assert preds[2].resume_id == "res_qa"

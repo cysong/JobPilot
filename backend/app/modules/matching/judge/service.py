@@ -200,8 +200,9 @@ def plan_match(
 
 
 def fallback_candidates(user: UserContext) -> tuple[str, ...]:
-    """Most recently updated resumes, used to judge prefilter-filtered samples in evaluation."""
-    refs = sorted(user.resume_refs, key=lambda r: r.updated_at, reverse=True)
+    """Most recently updated resumes bound to a family, used to judge prefilter-filtered
+    samples in evaluation. Resumes without a family are excluded from matching."""
+    refs = sorted((r for r in user.resume_refs if r.role_family), key=lambda r: r.updated_at, reverse=True)
     return tuple(r.id for r in refs[: settings.MATCH_MAX_CANDIDATE_RESUMES])
 
 
