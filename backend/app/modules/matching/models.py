@@ -80,6 +80,8 @@ class RejectCode:
     LOCATION = "LOCATION"
     WORK_RIGHTS = "WORK_RIGHTS"
     SECURITY_CLEARANCE = "SECURITY_CLEARANCE"
+    WORK_LOCATION = "WORK_LOCATION"  # judged by the LLM; LOCATION is the code-level city filter
+    LANGUAGE = "LANGUAGE"
 
 
 class JobMatch(Base, TimestampMixin):

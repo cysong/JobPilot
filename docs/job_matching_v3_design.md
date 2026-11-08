@@ -1,9 +1,11 @@
 # JobPilot 岗位匹配 v3 设计方案
 
-> **版本**: v3.2
+> **版本**: v3.3
 > **日期**: 2026-11-08
-> **状态**: 方案已确认，待实施
+> **状态**: 第 1 阶段实施中
 > **取代**: v1 匹配流水线（`backend/app/modules/matching/`）、[job_matching_algorithm_design.md](job_matching_algorithm_design.md)（v2，未实施）
+>
+> v3.3：第 1 阶段评估后调整——判定 prompt v2（A 档标准、非核心缺口不降级）、新增 `WORK_LOCATION` / `LANGUAGE` 拒绝与 `other_constraints` 提示、候选人所在国默认新西兰、岗位族 f2（拆出 `app_support`）。
 >
 > v3.1：合入独立评审（Fable）意见及确认结果——地点"未知不拒绝"、gateway 支持按调用指定模型、档位稳定性措施、评估标签定位、prompt 顺序、队列与重试、岗位族版本、标注只追加、新绑定回填、可观测性。
 
@@ -105,8 +107,13 @@
 | `LOCATION` | 岗位地点可以确定，且不在用户可接受范围内，且不是远程（§5.2） | LLM 调用之前，代码判定 |
 | `WORK_RIGHTS` | JD 的签证要求用户不满足 | LLM 判定（读正文 + 用户签证状态） |
 | `SECURITY_CLEARANCE` | JD 的安全许可要求用户不满足 | LLM 判定（读正文 + 用户安全许可状态） |
+| `WORK_LOCATION` | JD 要求在候选人所在国以外的国家现场办公，或要求居住在其他国家（含仅限某些国家居民的远程岗位） | LLM 判定（读正文 + 候选人所在国） |
+| `LANGUAGE` | JD 明确要求的语言（不含编程语言、"加分项"）不在用户语言中 | LLM 判定（读正文 + 用户语言） |
 
-- 用户未填写对应偏好时，该项不判定：地点不过滤；签证 / 安全许可在 prompt 中注明 `unknown`，LLM 不得据此拒绝。
+- 用户未填写对应偏好时：城市不过滤（`LOCATION` 不判定）；签证 / 安全许可 / 语言在 prompt 中注明 `unknown`，LLM 不得据此拒绝。
+- 候选人所在国取 `preferences.country`，未设置时默认新西兰（`MATCH_DEFAULT_COUNTRY`），因此 `WORK_LOCATION` 始终判定。
+- `WORK_LOCATION` 与代码层的 `LOCATION` 是两个代码：后者有"不调用 LLM"的数据库约束。
+- **其他硬性条件**（驾照、背景审查、经常出差、轮值待命等）由 LLM 列入 `other_constraints` 并附 JD 原文，只提示、不拒绝。
 - 被拒绝的记录保留 LLM 给出的档位（`LOCATION` 除外），在"已拒绝"筛选中显示原因与 JD 原文。
 
 ### 3.3 展示
@@ -126,7 +133,7 @@
 
 ### 4.1 岗位族定义（初版，依据线上职位名分布整理）
 
-配置文件：`backend/app/modules/matching/config/role_families.yaml`，顶层带 `version`（如 `f1`）。括号内为线上规范化职位名的岗位数。
+配置文件：`backend/app/modules/matching/config/role_families.yaml`，顶层带 `version`（当前 `f2`）。括号内为线上规范化职位名的岗位数。
 
 | 岗位族 | 名称 | 代表职位名 | 相邻族 |
 |---|---|---|---|
@@ -134,7 +141,8 @@
 | `qa_test` | 测试与质量 | test analyst (89)、test engineer (63)、quality assurance / qa engineer (100)、test automation / automation test engineer (71)、software tester、test manager | `software_dev`、`devops_platform` |
 | `devops_platform` | DevOps / 平台 / 云 | devops engineer (161)、cloud engineer (128)、platform engineer (105)、site reliability engineer (83)、cloud infrastructure / cloud platform engineer | `software_dev`、`qa_test`、`infrastructure`、`security`、`architecture` |
 | `infrastructure` | 系统与网络 | infrastructure engineer (82)、systems administrator (约 105)、network engineer (62)、it / ict systems engineer、database administrator、identity engineer | `devops_platform`、`security`、`it_support` |
-| `it_support` | IT 支持 | service desk analyst (195)、it support engineer / technician / specialist / analyst、application support analyst、technical support specialist、desktop support engineer | `infrastructure` |
+| `it_support` | IT 支持 | service desk analyst (195)、it support engineer / technician / specialist / analyst、technical support specialist、desktop support engineer | `infrastructure`、`app_support` |
+| `app_support` | 应用支持（f2 新增） | application support analyst / engineer、production support engineer、software implementation consultant、servicenow administrator、technical support engineer | `software_dev`、`it_support` |
 | `data_engineering` | 数据工程 | data engineer (374)、analytics engineer (36) | `software_dev`、`data_analytics`、`ml_ai` |
 | `data_analytics` | 数据分析 / BI | data analyst (163)、business intelligence analyst、data consultant | `data_engineering`、`business_analysis` |
 | `ml_ai` | AI / 机器学习 | ai engineer (73)、data scientist (72)、machine learning engineer (49) | `software_dev`、`data_engineering` |
@@ -151,9 +159,11 @@
 
 - 相邻关系在 YAML 中双向生效（写一边即可）。
 - 第 1 阶段对全部职位名归类后，按归类结果、初筛召回和抽样漏检（§8.4）复核一次。
+- **f2（2026-11-08）**：从 `it_support` 拆出 `app_support`（应用支持 / 实施类岗位，此前投递有命中）；`ai_data_work` 保持孤立，不再投递此类岗位。拆分时只对 `it_support` 下非管理员来源的职位名重新归类，再按新缓存刷新岗位归类（读正文归类的岗位只在管理员固定其职位名时跟随）。
 
 **版本与演化**：
 - 修改相邻关系、新增族：`version` 升级；只影响之后的新岗位，不改已有匹配和简历绑定。
+- **管理员修正**：`families set-title "TITLE" FAMILY|ambiguous` 写入 `source = admin` 的缓存行（之后不会被模型覆盖），再执行 `families refresh-jobs`。
 - **删除或拆分某个族**：必须附带迁移脚本，把引用该族的 `job_title_families`、`job_role_families`（未判定的）、`resumes.role_family` 映射到新族；已判定的 `job_matches` 保留原值。
 
 ### 4.2 职位名规范化（缓存键 `title_key`）
@@ -244,6 +254,8 @@ title_key 在 job_title_families 中？
 [CANDIDATE CONDITIONS]
 work_rights: citizen | permanent_resident | work_visa | needs_sponsorship | unknown
 security_clearance: holds | eligible | not_eligible | unknown
+located_in: <preferences.country，缺省 New Zealand>
+languages: <preferences.languages，如 English, Chinese> | unknown
 
 [CANDIDATE RESUMES]      1–3 份（大多数情况 1 份）
 resume_id, title, role_family
@@ -257,7 +269,7 @@ title, location_label, work_types_label, listed_at
 description: 去 HTML 后的 JD 全文（列表项保留为 "- " 行）
 ```
 
-地点已在调用前由代码过滤，不传给 LLM。
+城市已在调用前由代码过滤；`located_in` 只用于判断"是否要求在其他国家工作"。
 
 ### 6.2 输出（`MatchJudgment`）
 
@@ -286,8 +298,26 @@ class ClearanceCheck(BaseModel):
     satisfied: bool | None
 
 
+class WorkLocationCheck(BaseModel):
+    requirement: Literal["none", "onsite_outside_candidate_country", "resident_outside_candidate_country"]
+    country: str | None
+    quote: str | None
+    satisfied: bool | None
+
+
+class LanguageCheck(BaseModel):
+    required_languages: list[str]  # spoken/written languages the JD requires
+    quote: str | None
+    satisfied: bool | None         # None when the candidate languages are unknown
+
+
+class OtherConstraint(BaseModel):
+    requirement: str               # e.g. "full NZ driver licence"; never a rejection reason
+    quote: str
+
+
 class Rejection(BaseModel):
-    code: Literal["WORK_RIGHTS", "SECURITY_CLEARANCE"]
+    code: Literal["WORK_RIGHTS", "SECURITY_CLEARANCE", "WORK_LOCATION", "LANGUAGE"]
     reason: str                    # one sentence
     quote: str                     # verbatim JD sentence
 
@@ -297,6 +327,9 @@ class MatchJudgment(BaseModel):
     rejection: Rejection | None    # required when decision == "rejected"
     work_rights: WorkRightsCheck
     security_clearance: ClearanceCheck
+    work_location: WorkLocationCheck
+    languages: LanguageCheck
+    other_constraints: list[OtherConstraint]
     best_resume_id: str            # must be one of the candidate resume ids
     is_different_track: bool       # different career track -> tier D
     seniority_mismatch: bool       # severe mismatch -> tier C
@@ -313,7 +346,18 @@ class MatchJudgment(BaseModel):
 - 被拒绝时仍输出档位等字段，便于了解"不受签证限制时会是什么档位"。
 - 字段顺序有意安排为"先判断、后结论"，让模型先完成各项判定再给出档位。
 
-### 6.3 Prompt 规则（`agent_configs/config/match_judge.yaml`）
+### 6.3 Prompt 规则（`agent_configs/config/match_judge.yaml`，当前 v2）
+
+v2 依据第 1 阶段 50 条标注调整（v1 把 13/18 个应为 A 的岗位判成 B，原因是把非核心缺口当成降级理由）：
+- `is_core` 只限定义岗位的少数要求（主语言 / 平台、主框架或测试工具、主要工作类型）；具体工具、行业产品、"experience with X, Y, Z" 长列表不算核心。
+- `tech_level = strong`：核心要求全部 `same` 或用过的近似替代；**非核心缺口不降低 `tech_level`**。
+- 按角色判断而非逐词匹配（如 QA Lead / SDET 默认做过测试计划、回归和手工测试）。
+- 兼做其他职责的岗位（QA Lead 兼开发工具、全栈之于后端岗位）年限全额计入；`relevant_years >= required_years - 2` 即为 `strong`。
+- 职级严重不符：差约 4 年以上、Principal / Head / Director 岗位而候选人非 lead、或 graduate / junior 岗位而候选人 8 年以上。
+- 档位：A = 技术 strong 且经验 strong；B = 技术 strong 而经验不足，或经验 strong 而技术 partial；C = 技术 weak，或技术 partial 且经验非 strong，或职级严重不符；D = 不同方向。A / B 拿不准时，招聘方会给面试就选 A。
+- 替代技术补充 Cucumber / SpecFlow、Kafka / RabbitMQ、Jest / Vitest。
+
+以下为 v1 起的基本规则：
 
 1. **档位定义**：§3.1 原文写入 prompt。档位由 LLM 综合判断给出。
 2. **D 档**：岗位与候选人的职业方向完全不同时，`is_different_track = true`，档位为 D。
@@ -339,7 +383,9 @@ class MatchJudgment(BaseModel):
    | 安全许可 `must_hold` | 不是 `holds` |
    | 安全许可 `obtainable` | `not_eligible` |
 
-   不满足 → `decision = rejected` 并填写 `rejection`。候选人状态为 `unknown`、或 JD 没有明确写出要求时，不得拒绝。
+   另有两项（v2）：JD 要求在其他国家现场办公或居住 → `WORK_LOCATION`；JD 明确要求的语言不在候选人语言中 → `LANGUAGE`。
+
+   不满足 → `decision = rejected` 并填写 `rejection`。候选人状态为 `unknown`、或 JD 没有明确写出要求时，不得拒绝。代码校验（§6.4）会核对引用原文，找不到原文的拒绝不成立。
 9. **只依据原文**：所有 quote 必须逐字摘自 JD 或简历，不推测。
 10. **锚定示例**：A、B、C、D 各一个简短示例，随 prompt 版本维护。
 
@@ -356,7 +402,8 @@ class MatchJudgment(BaseModel):
 | `decision` 与 `rejection` 不一致（一个有一个无） | 同上 |
 | `decision = rejected` 但 `rejection.quote` 在 JD 中找不到 | 改为 `rated`，记录 `consistency_fixes`（防止凭空拒绝） |
 | `decision = rejected` 但对应候选人状态为 `unknown` | 改为 `rated`，记录 |
-| `work_rights.quote`、`security_clearance.quote` 在 JD 中找不到 | 该项要求视为 `none`，记录 |
+| `work_rights.quote`、`security_clearance.quote`、`work_location.quote`、`languages.quote` 在 JD 中找不到 | 该项要求视为 `none`，记录 |
+| `other_constraints` 的 quote 在 JD 中找不到 | 删除该条 |
 | `tech_items`、`experience_evidence` 中的 quote 找不到 | 保留，标记 `unverified`，计入质量统计 |
 | `relevant_years` 超过最佳简历工作经历时长之和（由 `analysis_result.work_experiences[].duration` 计算） | 保留，标记 `years_exceeds_history` |
 | `is_different_track = true` 但档位不是 D，或 `seniority_mismatch = true` 但档位不是 C | 保留 LLM 档位，记录 `tier_flag_conflict`，计入评估报告 |
@@ -563,7 +610,7 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 | `tier_reason` | `TEXT` | 是 | | |
 | `tech_level` | `VARCHAR(8)` | 是 | | `strong` / `partial` / `weak` |
 | `experience_level` | `VARCHAR(8)` | 是 | | `strong` / `partial` / `none` |
-| `reject_code` | `VARCHAR(24)` | 是 | | `LOCATION` / `WORK_RIGHTS` / `SECURITY_CLEARANCE` |
+| `reject_code` | `VARCHAR(24)` | 是 | | `LOCATION` / `WORK_RIGHTS` / `SECURITY_CLEARANCE` / `WORK_LOCATION` / `LANGUAGE` |
 | `reject_reason` | `TEXT` | 是 | | |
 | `reject_quote` | `TEXT` | 是 | | JD 原文引用 |
 | `judgment` | `JSONB` | 是 | | 完整的 `MatchJudgment`（校验后） |
@@ -684,6 +731,8 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 |---|---|---|
 | `work_rights` | `citizen` / `permanent_resident` / `work_visa` / `needs_sponsorship` | `null`，不判定 |
 | `security_clearance` | `holds` / `eligible` / `not_eligible` | `null`，不判定 |
+| `country` | 候选人所在国家 | `null`，按 `MATCH_DEFAULT_COUNTRY`（New Zealand） |
+| `languages` | 可工作语言列表，如 `["English", "Chinese"]` | `null`，不判定 |
 
 - 由 `UserPreferences` Pydantic schema 校验，无数据库迁移。
 - 用户未填写 `work_rights` 时，设置页用简历分析结果中的 `work_right` 作为建议值预填，以用户确认后的值为准。
@@ -694,7 +743,8 @@ uv run python -m app.modules.matching.cli labels import --file <csv> --labeled-b
 |---|---|---|
 | `JOB_EXPIRY_DAYS` | `30` | `expires_at` 为空时的在架天数；职位列表与匹配共用 |
 | `MATCH_JUDGE_MODEL` | `openai/gpt-6.1-terra` | 判定模型（经 `model_override` 生效） |
-| `MATCH_JUDGE_PROMPT_VERSION` | `v1` | |
+| `MATCH_JUDGE_PROMPT_VERSION` | `v2` | |
+| `MATCH_DEFAULT_COUNTRY` | `New Zealand` | 用户未设置 `country` 时的所在国 |
 | `TITLE_CLASSIFIER_MODEL` | `z-ai/glm-5.3-flash` | 职位名归类与读正文归类模型 |
 | `MATCH_MAX_CANDIDATE_RESUMES` | `3` | 每次判定的候选简历上限 |
 | `MATCH_DAILY_LLM_LIMIT_PER_USER` | `200` | 每用户每日判定调用上限 |

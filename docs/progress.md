@@ -11,9 +11,21 @@
 
 ## Work Log
 
-### 2026-11-08 - Matching v3 Stage 1 (code complete, not yet run on production)
+### 2026-11-08 - Matching v3 Stage 1: production runs, prompt v2, role families f2
 
-Design: `docs/job_matching_v3_design.md` (v3.2). Branch `feat/matching-v3-stage1`.
+- Production: migration `ce72214e3bd7` applied; 8,840 title keys classified (GLM-5.3 Flash); user 1 preferences set (work_visa, not_eligible, languages English/Chinese); resumes bound (Full Stack → software_dev, SDET → qa_test, DevOps → devops_platform; Java resume unbound and no longer used).
+- Evaluation datasets `main@v1`–`v4` (v4: 734 items, 13 interviewed, 50 labels from a Claude labeling pass); interviews counted from status history.
+- Terra prompt v1 on `main@v4` (`mer_b1f81ac6…`): interview recall 13/13, applied prefilter pass 97.6%, A precision 83%, A+B recall 90%, but A under-called (13 of 18 labeled A judged B). Sol on 200 pairs was no better than Terra, so Terra stays.
+- Judge prompt v2 (schema j2): core requirements limited to role-defining ones, non-core gaps don't lower tech level, ±2 years tolerance, new `WORK_LOCATION` / `LANGUAGE` rejections, candidate country defaults to New Zealand, `other_constraints` surfaced without rejecting.
+- Role families f2: `app_support` split out of `it_support` (adjacent to software_dev / it_support); `ai_data_work` stays isolated; admin title overrides; CLI `families reclassify / set-title / refresh-jobs`; `run --focus labeled`.
+- Prompt v2 on labeled + interviewed items (`mer_4fe56805…`, 39 pairs, $0.97): exact agreement 24/50 (v1 18/50), labeled-A recall 16/18 (v1 5/18), A precision 16/23 (v1 5/6; the 7 extra A are labeled B), A+B recall 26/29 (unchanged), interviewed jobs 10 A / 2 B / 1 C (v1 1 / 11 / 1); 3 correct new rejections (Polish required, Canada-only, San Francisco onsite); 1 regression (job 3948 labeled A → C, counted only lead years against a 10+ year requirement).
+- LLM spend so far ≈ $37 (OpenRouter).
+- Tests: 220 matching/core tests passing (incl. DB integration on local Postgres).
+- Next: decide whether v2's B→A drift is acceptable, then stage 2 (online tasks, UI, admin labeling). Set `OPENROUTER_API_KEY` on the VPS before deploying.
+
+### 2026-11-08 - Matching v3 Stage 1 (code complete)
+
+Design: `docs/job_matching_v3_design.md` (v3.2, now v3.3). Branch `feat/matching-v3-stage1`.
 
 - LLM layer:
   - new `openrouter` provider (chat completions, namespaced model ids passed through, `require_parameters` + `data_collection=deny`)
