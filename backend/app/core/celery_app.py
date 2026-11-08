@@ -68,12 +68,19 @@ _DEFAULT_BEAT_SCHEDULE = {
         'task': 'app.modules.jobs.tasks.poll_unanalyzed_jobs',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
     },
-    # DISABLED: job-user matching is paused. Uncomment the entry below to
-    # re-enable the periodic dispatcher (every 5 minutes).
-    # 'pull-unmatched-jobs': {
-    #     'task': 'app.modules.matching.pull.pull_unmatched_jobs',
-    #     'schedule': crontab(minute='*/5'),
-    # },
+    # Matching v3: the tasks are no-ops unless MATCH_V3_ENABLED=true.
+    'match-discover-new-jobs': {
+        'task': 'app.modules.matching.tasks.discover_new_jobs_task',
+        'schedule': crontab(minute='*/5'),
+    },
+    'match-classify-pending-titles': {
+        'task': 'app.modules.matching.tasks.classify_pending_titles_task',
+        'schedule': crontab(minute='1-59/5'),  # one minute after discover
+    },
+    'match-judge-queued': {
+        'task': 'app.modules.matching.tasks.judge_queued_matches_task',
+        'schedule': crontab(minute='*/2'),
+    },
 }
 
 celery_app.conf.beat_schedule = (

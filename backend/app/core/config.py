@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     MATCH_JUDGE_CONCURRENCY: int = 4
     MATCH_JUDGE_BATCH_SIZE: int = 40
     MATCH_RETRY_BACKOFF_MINUTES: List[int] = [5, 30, 180]
+    MATCH_V3_ENABLED: bool = False  # kill switch for the periodic matching tasks
+    MATCH_DISCOVER_LIMIT: int = 500  # new jobs registered per discover run
+    MATCH_JD_READ_LIMIT: int = 200  # pending jobs settled per classify run
+    MATCH_JUDGE_TIME_BUDGET_SECONDS: int = 90  # stop claiming new chunks after this
+    MATCH_JUDGE_LEASE_MINUTES: int = 20  # claimed rows are invisible to other runs this long
     TITLE_CLASSIFIER_BATCH_SIZE: int = 50
     JD_READ_CHAR_LIMIT: int = 1500  # Body excerpt used to classify ambiguous titles
 

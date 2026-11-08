@@ -113,6 +113,8 @@ class TaskType(Enum):
         timeout_seconds=180,
     )
 
+    # Matching v1 task types: their tasks were removed with matching v3; kept so
+    # historical task_executions rows still resolve.
     USER_JOB_MATCHING = TaskTypeInfo(
         value="user_job_matching",
         display_name="User-Job Matching",
