@@ -22,6 +22,7 @@ from pathlib import Path
 
 from sqlalchemy import distinct, select
 
+import app.models  # noqa: F401  register every ORM model before any query
 from app.core.config import settings
 from app.core.llm.types import ModelOverride
 
