@@ -5,11 +5,24 @@
 **Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
 **Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-11-08
+**Last Updated:** 2026-11-09
 
 ---
 
 ## Work Log
+
+### 2026-11-09 - Matching v3 Stage 2 (code complete, not deployed)
+
+Branch `feat/matching-v3-stage1`, design §12 stage 2 steps 2.1–2.6.
+
+- 2.1 Preferences: `work_rights`, `security_clearance`, `country`, `languages`; PATCH merges instead of replacing (fixed: saving the settings page erased keys it did not know); work rights hint from the latest resume analysis.
+- 2.2 Online pipeline (`matching/pipeline.py`, `matching/tasks.py`): discover → classify → enqueue → judge as three beat tasks behind `MATCH_V3_ENABLED` (default off). Judging claims rows newest-first with a lease, per-user daily limit, retry backoff, expiry check. Backfill has no trigger of its own: every run plans live jobs without a result, so a (re)bound resume is picked up on the next run. Matching v1 tasks, dispatcher, service and repository removed (`user_job_matches` kept, no longer read).
+- 2.3 API: `/jobs/matches` (recommended A+B by default, C on request, D admins only; rejected view; counts), `/jobs/matches/{job_id}` (full judgment), `/matching/role-families`, `PUT /matching/resumes/{id}/role-family`, `/admin/matching/labels` (append-only), `/admin/matching/title-families` (list, pin).
+- 2.4 UI: tier badges and reasons on job cards, tier toggles and rejected view, match result panel on job detail, role family select on resume cards, dashboard best matches = A tier.
+- 2.5 Admin: label popover on cards and detail (incl. "should match" for jobs without a result), title families page.
+- 2.6 Monitoring: matching counters (worker) and queue / 24h gauges (API observer), Grafana "Matching v3" row, alerts MatchQueueStale / MatchFailedFinalRatio / MatchNoATier with runbooks.
+- Verified: backend 269 tests passing (DB integration on local Postgres, LLM mocked; `test_enum_columns` still needs libgobject locally), frontend type-check + build, UI checked in a browser against a seeded local database (list, filters, rejected view, labeling, detail panel, resume family select, title families page, preferences save, dashboard).
+- Not done: merge / deploy, `OPENROUTER_API_KEY` on the VPS, enabling `MATCH_V3_ENABLED`, first production backfill (30 days).
 
 ### 2026-11-08 - Matching v3 Stage 1: production runs, prompt v2, role families f2
 
