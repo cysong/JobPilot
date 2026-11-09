@@ -2,7 +2,7 @@
 Job models for read-only access to seek_jobs table.
 This table is maintained by external crawler system.
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional, TYPE_CHECKING
 from uuid import uuid4
 
@@ -11,6 +11,7 @@ from sqlalchemy import Boolean, Integer, String, Text, DateTime, ForeignKey, JSO
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.config import settings
 from app.shared.base_model import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -198,14 +199,28 @@ class SeekJob(Base):
 
     @hybrid_property
     def effective_is_expired(self) -> bool:
-        """Return effective expiration status from source + manual override."""
-        return bool(self.is_expired or self.manual_expired)
+        """Expired when flagged (source or manual), past its expires_at, or - without
+        expires_at - listed more than ``JOB_EXPIRY_DAYS`` ago. The source flag is
+        rarely set, so the dates are the main signal.
+        """
+        if self.is_expired or self.manual_expired:
+            return True
+        now = datetime.now(timezone.utc)
+        if self.expires_at is not None:
+            return self.expires_at <= now
+        return self.listed_at is not None and self.listed_at <= now - timedelta(days=settings.JOB_EXPIRY_DAYS)
 
     @effective_is_expired.inplace.expression
     @classmethod
     def _effective_is_expired_expression(cls):
-        """SQL expression for effective expiration status."""
-        return cls.is_expired.is_(True) | cls.manual_expired.is_(True)
+        """SQL form of ``effective_is_expired`` (never NULL, so ``.is_(False)`` works)."""
+        return sa.or_(
+            cls.is_expired.is_(True),
+            cls.manual_expired.is_(True),
+            sa.and_(cls.expires_at.is_not(None), cls.expires_at <= sa.func.now()),
+            sa.and_(cls.expires_at.is_(None), cls.listed_at.is_not(None),
+                    cls.listed_at <= sa.func.now() - timedelta(days=settings.JOB_EXPIRY_DAYS)),
+        )
 
 
 class JobAnalysis(Base, TimestampMixin):

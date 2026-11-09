@@ -24,8 +24,8 @@ _SERVICE_OVERLAY_FIELDS = {"is_viewed", "last_viewed_at", "has_application"}
 # non-direct mappings (hybrid_property aliases, etc.).
 _FIELD_TO_COLUMNS = {
     # is_expired uses validation_alias="effective_is_expired", a
-    # hybrid_property that combines these two real columns.
-    "is_expired": {"is_expired", "manual_expired"},
+    # hybrid_property that combines these real columns.
+    "is_expired": {"is_expired", "manual_expired", "expires_at", "listed_at"},
 }
 
 

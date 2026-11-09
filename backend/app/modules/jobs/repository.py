@@ -38,7 +38,7 @@ BRIEF_COLUMNS = (
     SeekJob.sub_classification,
     SeekJob.listed_at,
     SeekJob.expires_at,
-    # `effective_is_expired` hybrid_property reads both of these:
+    # `effective_is_expired` hybrid_property reads these, expires_at and listed_at:
     SeekJob.is_expired,
     SeekJob.manual_expired,
     SeekJob.manual_expired_by,

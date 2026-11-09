@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     MATCHING_ALGORITHM_VERSION: str = "v1.0.0"
 
     # Job freshness (shared by job listing and matching v3)
-    JOB_EXPIRY_DAYS: int = 30  # When expires_at is missing, a job counts as live for N days after listed_at
+    JOB_EXPIRY_DAYS: int = 30  # Without expires_at, a job listed more than N days ago counts as expired
 
     # Matching v3 (docs/job_matching_v3_design.md)
     MATCH_LLM_PROVIDER: str = "openrouter"

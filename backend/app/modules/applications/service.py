@@ -9,7 +9,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.core.exceptions import BadRequestError, NotFoundError, JobPilotException
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError, JobPilotException
 from app.modules.applications.models import Application
 from app.modules.applications.repositories.application_repo import ApplicationRepository
 from app.modules.applications.repositories.status_history_repo import StatusHistoryRepository
@@ -459,6 +459,8 @@ class ApplicationService:
         )
         if existing:
             return await ApplicationRepository.get_by_id_for_user(db, existing.id, user.id)
+        if job.effective_is_expired:
+            raise ConflictError("This job has expired and can no longer be applied for")
 
         working_document = await ApplicationService._copy_resume_for_application(
             db, resume_template, user.id

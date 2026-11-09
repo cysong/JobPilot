@@ -498,10 +498,11 @@ export default function JobDetailPage() {
                   <Button
                     size="sm"
                     onClick={() => setIsApplicationDialogOpen(true)}
+                    disabled={job.is_expired}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add to Applications
+                    {job.is_expired ? "Job Expired" : "Add to Applications"}
                   </Button>
                 )}
 
