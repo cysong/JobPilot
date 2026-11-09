@@ -27,14 +27,17 @@ async def analyze_job_task(
     job_id: int,
     task_id: str,
 ) -> dict:
-    """Analyze a job using job_analyzer agent."""
+    """Analyze a job: load its text, translate and analyse it, save the result.
+
+    No session is open during the two model calls (load / call / save).
+    """
     # Only `content` and `abstract` are needed; skip the full row + analysis
     # relationship that ``get_by_id`` would pull in.
-    job = await JobRepository.get_content(self.db, job_id)
-    if not job:
-        raise ValueError(f"Job {job_id} not found")
-
-    content = job.content or job.abstract or ""
+    async with self.session() as db:
+        job = await JobRepository.get_content(db, job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        content = job.content or job.abstract or ""
     if not content:
         raise ValueError(f"Job {job_id} has no content to analyze")
 
@@ -51,25 +54,26 @@ async def analyze_job_task(
     translated = await AgentGateway.get().call(
         agent_id="universal_translator",
         input_data=translation_input,
-        context={"db": self.db, "task_id": task_id},
+        context={"task_id": task_id},
     )
     cn_content = _extract_translated_content(translated)
 
     result = await AgentGateway.get().call(
         agent_id="job_analyzer",
         input_data=content,
-        context={"db": self.db, "task_id": task_id},
+        context={"task_id": task_id},
     )
 
     analysis_data = result.model_dump() if isinstance(result, AnalyzedJob) else result
     analysis_data["cn_content"] = cn_content
-    analysis = await JobAnalysisRepository.upsert(
-        db=self.db,
-        job_id=job_id,
-        analysis_data=analysis_data,
-        analysis_version=AnalyzedJob.__version__,
-    )
-    await self.db.commit()
+    async with self.session() as db:
+        analysis = await JobAnalysisRepository.upsert(
+            db=db,
+            job_id=job_id,
+            analysis_data=analysis_data,
+            analysis_version=AnalyzedJob.__version__,
+        )
+        await db.commit()
 
     return {"output_data": {"analysis_id": analysis.id, "status": "completed", "job_id": job_id}}
 
@@ -83,18 +87,23 @@ async def poll_unanalyzed_jobs(self) -> dict:
     if availability.is_paused():
         # LLM work is paused: creating analysis tasks now would only park them.
         return {"status": "paused"}
+    async with self.session() as db:
+        return await _poll_unanalyzed_jobs(db)
+
+
+async def _poll_unanalyzed_jobs(db) -> dict:
     start_time = time.perf_counter()
     total_created = 0
     reanalysis_created = 0
 
     reanalysis_records = await JobAnalysisRepository.get_pending_reanalysis(
-        self.db,
+        db,
         limit=settings.MAX_JOBS_PER_POLL,
     )
 
     for analysis in reanalysis_records:
         await TaskService.submit_task(
-            db=self.db,
+            db=db,
             task_type=TaskType.JOB_ANALYSIS,
             entity_id=str(analysis.job_id),
             input_data={"job_id": analysis.job_id}
@@ -105,18 +114,18 @@ async def poll_unanalyzed_jobs(self) -> dict:
         reanalysis_created += 1
 
     # Commit the flag updates
-    await self.db.commit()
+    await db.commit()
     total_created += reanalysis_created
 
     remaining = settings.MAX_JOBS_PER_POLL - reanalysis_created
     if remaining > 0:
         jobs = await JobRepository.get_jobs_without_analysis_task(
-            self.db,
+            db,
             limit=remaining,
         )
         for job in jobs:
             await TaskService.submit_task(
-                db=self.db,
+                db=db,
                 task_type=TaskType.JOB_ANALYSIS,
                 entity_id=str(job.id),
                 input_data={"job_id": job.id},

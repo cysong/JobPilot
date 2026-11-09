@@ -38,7 +38,8 @@ async def discover_new_jobs_task(self) -> dict:
     """Every 5 minutes: register live jobs without a role family row."""
     if (skipped := _disabled()) is not None:
         return skipped
-    added = await discover_new_jobs(self.db)
+    async with self.session() as db:
+        added = await discover_new_jobs(db)
     logger.info("match_discover_completed", added=added)
     return {"added": added}
 
@@ -50,12 +51,14 @@ async def classify_pending_titles_task(self) -> dict:
         return skipped
     started = time.perf_counter()
     gateway = AgentGateway.get()
-    titles = await classify_missing_titles(self.db, gateway)
-    resolved = await resolve_pending_jobs(self.db, gateway, limit=settings.MATCH_JD_READ_LIMIT)
-    for outcome, count in resolved.items():
-        if count:
-            title_classify_total.labels(outcome=outcome).inc(count)
-    enqueued = await enqueue_matches(self.db)
+    # The classifier functions commit before each model call (no connection held).
+    async with self.session() as db:
+        titles = await classify_missing_titles(db, gateway)
+        resolved = await resolve_pending_jobs(db, gateway, limit=settings.MATCH_JD_READ_LIMIT)
+        for outcome, count in resolved.items():
+            if count:
+                title_classify_total.labels(outcome=outcome).inc(count)
+        enqueued = await enqueue_matches(db)
     result = {"titles": titles, "resolved": resolved, "enqueued": enqueued,
               "elapsed_ms": int((time.perf_counter() - started) * 1000)}
     logger.info("match_classify_completed", **result)

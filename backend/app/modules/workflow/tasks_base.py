@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from contextvars import ContextVar
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 from celery import Task
 from celery.exceptions import Ignore, Retry
@@ -20,7 +20,7 @@ from openai import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session_factory
+from app.core.database import async_session_factory, task_sessions
 from app.core.llm import availability
 from app.core.celery_lifecycle import run_coroutine_sync
 from app.modules.workflow.repositories import TaskRepository
@@ -28,17 +28,15 @@ from app.shared.enums import TaskStatus
 
 logger = logging.getLogger(__name__)
 
-# Celery keeps one Task instance per task type, shared by every concurrent execution
-# (threads pool). The session therefore lives in a context variable: each execution
-# runs as its own asyncio task on the worker loop, with its own copy of the context.
-_current_db_session: ContextVar[AsyncSession | None] = ContextVar("current_db_session", default=None)
-
-
 class AsyncBaseTask(Task):
-    """Async-aware Celery task that injects `self.db` session."""
+    """Async-aware Celery task.
+
+    Tasks open short database sessions with ``async with self.session() as db`` and
+    never keep one across an LLM or other external call: load, call, then save in
+    a new session. There is deliberately no task-long session.
+    """
 
     abstract = True
-    auto_commit = False
 
     # Native Celery retry configuration
     autoretry_for = (Exception,)    # Retry on any exception
@@ -56,56 +54,44 @@ class AsyncBaseTask(Task):
     retry_backoff_max = 600          # Max backoff time (10 minutes)
     retry_jitter = True              # Add random jitter to prevent thundering herd
 
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator[AsyncSession]:
+        """A short-lived session; commit inside the block, it closes on exit."""
+        async with async_session_factory() as db:
+            open_sessions = task_sessions.get()
+            if open_sessions is not None:
+                open_sessions.append(db)
+            try:
+                yield db
+            finally:
+                if open_sessions is not None:
+                    open_sessions.remove(db)
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         if asyncio.iscoroutinefunction(self.run):
-            return self._run_async_task(*args, **kwargs)
+            return run_coroutine_sync(self._execute(self.run(*args, **kwargs), kwargs))
 
         # Fallback: Celery may wrap run so iscoroutinefunction can return False.
-        # If the parent __call__ yields a coroutine, run it with a managed session.
         result = super().__call__(*args, **kwargs)
         if asyncio.iscoroutine(result):
-            async def _execute():
-                async with async_session_factory() as session:
-                    _current_db_session.set(session)
-                    try:
-                        retval = await result
-                        if self.auto_commit:
-                            await session.commit()
-                        return retval
-                    except Exception as exc:
-                        await session.rollback()
-                        if availability.is_unavailable(exc):
-                            await self._on_llm_unavailable(exc, kwargs)
-                        # Manual autoretry support for async tasks
-                        self._handle_async_autoretry(exc)
-                        raise
-                    finally:
-                        _current_db_session.set(None)
-
-            return run_coroutine_sync(_execute())
+            return run_coroutine_sync(self._execute(result, kwargs))
         return result
 
-    def _run_async_task(self, *args: Any, **kwargs: Any) -> Any:
-        async def _execute():
-            async with async_session_factory() as session:
-                _current_db_session.set(session)
-                try:
-                    result = await self.run(*args, **kwargs)
-                    if self.auto_commit:
-                        await session.commit()
-                    return result
-                except Exception as exc:
-                    await session.rollback()
-                    if availability.is_unavailable(exc):
-                        await self._on_llm_unavailable(exc, kwargs)
-                    # Manual autoretry support for async tasks (Celery's autoretry_for doesn't work with async)
-                    # This follows Celery's design by reusing self.retry() method and configuration
-                    self._handle_async_autoretry(exc)
-                    raise
-                finally:
-                    _current_db_session.set(None)
-
-        return run_coroutine_sync(_execute())
+    async def _execute(self, coro: Any, kwargs: dict) -> Any:
+        # Each execution runs as its own asyncio task on the worker loop, so this
+        # context variable (sessions opened by this execution) is not shared with
+        # concurrent executions of the same task type (threads pool).
+        task_sessions.set([])
+        try:
+            return await coro
+        except Exception as exc:
+            if availability.is_unavailable(exc):
+                await self._on_llm_unavailable(exc, kwargs)
+            # Manual autoretry support for async tasks (Celery's autoretry_for doesn't work with async)
+            self._handle_async_autoretry(exc)
+            raise
+        finally:
+            task_sessions.set(None)
 
     async def _on_llm_unavailable(self, exc: Exception, kwargs: dict) -> None:
         """LLM work is paused: stop without consuming a retry. Periodic tasks just skip
@@ -179,13 +165,6 @@ class AsyncBaseTask(Task):
         - Do not retry deterministic request/data errors (validation, auth, missing data).
         """
         return not isinstance(exc, getattr(self, "dont_autoretry_for", ()))
-
-    @property
-    def db(self) -> AsyncSession:
-        session = _current_db_session.get()
-        if session is None:
-            raise RuntimeError("Database session is not available")
-        return session
 
 
 class DBTrackingTask(AsyncBaseTask):

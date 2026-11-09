@@ -61,6 +61,12 @@ llm_call_duration_seconds = Histogram(
     buckets=(0.5, 1, 2.5, 5, 10, 20, 30, 60, 120, 300),
 )
 
+llm_db_held_total = Counter(
+    "jobpilot_llm_db_held_total",
+    "LLM calls made while the calling task held an open DB transaction (a pinned connection).",
+    labelnames=("agent_id",),
+)
+
 llm_tokens_total = Counter(
     "jobpilot_llm_tokens_total",
     "LLM token usage by direction.",

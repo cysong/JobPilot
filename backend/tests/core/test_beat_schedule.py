@@ -2,8 +2,10 @@
 from app.core.celery_app import _DEFAULT_BEAT_SCHEDULE
 
 
-def _min_interval_seconds(schedule) -> int:
-    """Shortest gap between runs of an every-hour crontab (minute field only)."""
+def _min_interval_seconds(schedule) -> float:
+    """Shortest gap between runs: a plain interval, or an every-hour crontab (minute field only)."""
+    if isinstance(schedule, (int, float)):
+        return schedule
     minutes = sorted(schedule.minute)
     gaps = [b - a for a, b in zip(minutes, minutes[1:])] + [minutes[0] + 60 - minutes[-1]]
     return min(gaps) * 60

@@ -12,7 +12,7 @@ from agents import Usage
 from agents.model_settings import ModelSettings
 from agents.run_config import RunConfig
 
-from app.core.database import async_session_factory
+from app.core.database import async_session_factory, sessions_in_transaction
 from app.core.llm import availability
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
@@ -22,6 +22,7 @@ from app.core.llm.types import GatewayContext, ModelOverride
 from app.core.metrics import (
     llm_call_duration_seconds,
     llm_call_total,
+    llm_db_held_total,
     llm_tokens_total,
 )
 from app.modules.workflow import AICallRepository
@@ -86,6 +87,7 @@ class AgentGateway:
                 f"LLM calls paused [{paused['scope']}] ({paused.get('kind')}): {paused.get('reason', '')}",
                 kind=paused.get("kind", "unknown"), scope=paused["scope"])
         self._log_start(agent_id, agent, context)
+        self._check_no_open_transaction(agent_id)
 
         try:
             result, usage = await self._execute_agent(agent, input_data)
@@ -128,6 +130,17 @@ class AgentGateway:
             )
             self._handle_unavailability(exc, agent_id=agent_id, model=model)
             raise
+
+    @staticmethod
+    def _check_no_open_transaction(agent_id: str) -> None:
+        """Model calls take 30-100 s. A task that still holds an open transaction pins a
+        pooled connection for all of it (Supabase's pooler allows 15): tasks must load,
+        close their session, call, then save in a new one. Report violations; tests
+        require none."""
+        held = sessions_in_transaction()
+        if held:
+            llm_db_held_total.labels(agent_id=agent_id).inc()
+            logger.warning("llm_call_inside_transaction", agent_id=agent_id, sessions=len(held))
 
     @staticmethod
     def _handle_unavailability(exc: Exception, *, agent_id: str, model: Optional[str]) -> None:

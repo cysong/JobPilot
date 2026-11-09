@@ -126,7 +126,9 @@ async def classify_titles(
 ) -> int:
     """Classify title keys in batches and upsert the cache. Returns rows written.
 
-    Admin-sourced rows are never overwritten.
+    Admin-sourced rows are never overwritten. Commits as it goes and ends the
+    session's transaction before every model call, so no connection is held while
+    the model answers (load / call / save per batch).
     """
     registry = registry or get_registry()
     size = batch_size or settings.TITLE_CLASSIFIER_BATCH_SIZE
@@ -137,6 +139,7 @@ async def classify_titles(
         context: dict = {"operation": "title_family_classification"}
         if task_id:
             context["task_id"] = task_id
+        await db.commit()  # end the caller's read transaction before the model call
         try:
             output = await gateway.call(
                 TITLE_CLASSIFIER_AGENT, build_title_batch_input(registry, batch),
@@ -223,7 +226,11 @@ async def resolve_pending_jobs(
     db: AsyncSession, gateway: Gateway, *, task_id: str | None = None,
     registry: RoleFamilyRegistry | None = None, limit: int | None = None,
 ) -> dict[str, int]:
-    """Settle pending jobs from the title cache; read the JD for ambiguous titles."""
+    """Settle pending jobs from the title cache; read the JD for ambiguous titles.
+
+    Commits as it goes: each JD read persists its attempt first, so no transaction
+    is open during the model call.
+    """
     registry = registry or get_registry()
     stmt = (
         select(JobRoleFamily, JobTitleFamily, SeekJob.title, SeekJob.content, SeekJob.abstract)
@@ -249,6 +256,7 @@ async def resolve_pending_jobs(
         if task_id:
             context["task_id"] = task_id
         job_family.attempts += 1
+        await db.commit()
         try:
             output = await gateway.call(
                 JOB_FAMILY_READER_AGENT, build_jd_read_input(registry, title, content, abstract),

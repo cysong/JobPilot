@@ -268,6 +268,7 @@ async def _judge_one(
     session_factory: SessionFactory, gateway: Gateway, match_id: str, users: dict[int, UserContext],
     clock: Callable[[], datetime],
 ) -> str:
+    """Load / call / save: the model call (up to ~100 s) runs with no DB session open."""
     async with session_factory() as db:
         match = await db.get(JobMatch, match_id)
         if match is None or match.status not in (JobMatchStatus.QUEUED, JobMatchStatus.FAILED_RETRYABLE):
@@ -280,37 +281,54 @@ async def _judge_one(
         if match.user_id not in users:
             users[match.user_id] = await load_user_context(db, match.user_id)
         user = users[match.user_id]
-        override = judge_override()
+        candidate_ids = list(match.candidate_resume_ids)
         match.attempts += 1
-        started = time.monotonic()
-        try:
-            outcome, ctx = await judge_pair(
-                gateway, user=user, job=job, candidate_ids=match.candidate_resume_ids, model_override=override,
-                context={"operation": "match_judge", "user_id": match.user_id},
-            )
-        except availability.LLMUnavailableError:
-            # LLM work is paused: not this pair's fault. Undo the attempt, release the lease
-            # and leave the row as it was; judging resumes when credit is back.
-            match.attempts -= 1
-            match.next_attempt_at = None
-            await db.commit()
-            return "paused"
-        except JudgeFailure as exc:
-            match_judge_duration_seconds.observe(time.monotonic() - started)
-            backoff = settings.MATCH_RETRY_BACKOFF_MINUTES
+        attempts = match.attempts
+        await db.commit()
+
+    override = judge_override()
+    started = time.monotonic()
+    try:
+        outcome, ctx = await judge_pair(
+            gateway, user=user, job=job, candidate_ids=candidate_ids, model_override=override,
+            context={"operation": "match_judge", "user_id": user.user_id},
+        )
+    except availability.LLMUnavailableError:
+        # LLM work is paused: not this pair's fault. Undo the attempt, release the lease
+        # and leave the row as it was; judging resumes when the LLM is back.
+        async with session_factory() as db:
+            match = await db.get(JobMatch, match_id)
+            if match is not None:
+                match.attempts -= 1
+                match.next_attempt_at = None
+                await db.commit()
+        return "paused"
+    except JudgeFailure as exc:
+        match_judge_duration_seconds.observe(time.monotonic() - started)
+        backoff = settings.MATCH_RETRY_BACKOFF_MINUTES
+        async with session_factory() as db:
+            match = await db.get(JobMatch, match_id)
+            if match is None:
+                return "skipped"
             match.error = str(exc)[:2000]
             match.judged_at = clock()
-            if exc.retryable and match.attempts <= len(backoff):
+            if exc.retryable and attempts <= len(backoff):
                 match.status = JobMatchStatus.FAILED_RETRYABLE
-                match.next_attempt_at = clock() + timedelta(minutes=backoff[match.attempts - 1])
+                match.next_attempt_at = clock() + timedelta(minutes=backoff[attempts - 1])
             else:
                 match.status, match.next_attempt_at = JobMatchStatus.FAILED_FINAL, None
             await db.commit()
             logger.warning("match_judge_failed", match_id=match_id, status=match.status, error=match.error)
             return match.status
-        match_judge_duration_seconds.observe(time.monotonic() - started)
-        _count_validation(outcome.validation)
-        resume = next(r for r in user.resumes if r.id == outcome.resume_id)
+    match_judge_duration_seconds.observe(time.monotonic() - started)
+    _count_validation(outcome.validation)
+    resume = next(r for r in user.resumes if r.id == outcome.resume_id)
+    async with session_factory() as db:
+        match = await db.get(JobMatch, match_id)
+        # Re-check: the row must still be waiting for this judgment (not judged by an
+        # overlapping run whose lease expired, not removed).
+        if match is None or match.status not in (JobMatchStatus.QUEUED, JobMatchStatus.FAILED_RETRYABLE):
+            return "skipped"
         match.status = outcome.status
         match.resume_id = outcome.resume_id
         match.resume_content_hash = sha256_hex(resume.content)
@@ -331,7 +349,7 @@ async def _judge_one(
         match.next_attempt_at = None
         match.error = None
         await db.commit()
-        return outcome.status
+    return outcome.status
 
 
 def _count_validation(validation: dict[str, Any]) -> None:

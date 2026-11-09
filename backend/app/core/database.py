@@ -1,6 +1,8 @@
 """Database connection and session management"""
 from uuid import uuid4
 
+from contextvars import ContextVar
+
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -31,8 +33,12 @@ if is_supabase_transaction_pooler:
     if "prepared_statement_cache_size" not in database_url_parsed.query:
         connect_args["prepared_statement_cache_size"] = 0
 else:
-    engine_kwargs["pool_size"] = 10
-    engine_kwargs["max_overflow"] = 20
+    # Supabase's session pooler caps clients per project (15 on this plan) and every
+    # pooled connection holds one slot: size each process so api + worker + a
+    # migration fit. A full pool makes callers wait (pool_timeout) instead of erroring.
+    engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+    engine_kwargs["pool_timeout"] = settings.DB_POOL_TIMEOUT
 
 # Create async engine
 engine = create_async_engine(
@@ -64,3 +70,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
+
+
+# Sessions opened by the workflow task running in this context (AsyncBaseTask.session).
+# The LLM gateway checks them: none may hold an open transaction during a model call.
+task_sessions: ContextVar[list[AsyncSession] | None] = ContextVar("task_sessions", default=None)
+
+
+def sessions_in_transaction() -> list[AsyncSession]:
+    """This task's sessions that currently hold an open transaction (a pinned connection)."""
+    return [db for db in (task_sessions.get() or ()) if db.in_transaction()]

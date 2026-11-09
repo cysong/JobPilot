@@ -32,8 +32,13 @@ async def aggregate_user_skills_task(self, user_id: int, resume_id: str, task_id
     Returns:
         dict: Result with aggregation status and skill count
     """
+    async with self.session() as db:
+        return await _aggregate_user_skills(db, user_id=user_id, resume_id=resume_id, task_id=task_id)
+
+
+async def _aggregate_user_skills(db, *, user_id: int, resume_id: str, task_id: str) -> dict:
     # Get current task to access depends_on
-    current_task = await self.db.get(TaskExecution, task_id)
+    current_task = await db.get(TaskExecution, task_id)
     if not current_task:
         raise ValueError(f"Task {task_id} not found")
 
@@ -44,7 +49,7 @@ async def aggregate_user_skills_task(self, user_id: int, resume_id: str, task_id
 
     if previous_task_id:
         # Direct lookup of previous task
-        resume_analysis_task = await self.db.get(TaskExecution, previous_task_id)
+        resume_analysis_task = await db.get(TaskExecution, previous_task_id)
 
     # Scenario 1: Part of resume analysis workflow - check conditions
     if resume_analysis_task and resume_analysis_task.output_data:
@@ -70,7 +75,7 @@ async def aggregate_user_skills_task(self, user_id: int, resume_id: str, task_id
     # No previous RESUME_ANALYSIS task found - proceed with aggregation
 
     # Perform aggregation
-    result = await aggregate_user_skills(self.db, user_id)
+    result = await aggregate_user_skills(db, user_id)
 
     return {
         "output_data": {

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,31 +20,30 @@ from app.modules.users.repository import UserSkillRepository
 logger = logging.getLogger(__name__)
 
 
-async def run_resume_tailoring(
+@dataclass(frozen=True)
+class TailoringInput:
+    """Everything the tailoring call needs, loaded up front (no ORM objects)."""
+    application_id: str
+    user_id: int
+    job_id: int
+    tailoring_level: str
+    parent_document_id: str
+    prompt: str
+
+
+async def load_tailoring_input(
     db: AsyncSession,
     application_id: str,
     resume_id: str,
     job_id: int,
     tailoring_level: str,
-    task_id: str,
-    is_retry: bool = False
-) -> dict:
+    is_retry: bool = False,
+) -> TailoringInput:
+    """Load job analysis, source resume, skills and the parent document, and build the prompt.
+
+    Always reads from the source resume. The parent of the new version is the
+    application's previous tailored document (retry) or the source document.
     """
-    Execute resume tailoring task.
-
-    Always reads from source resume and creates a new versioned document.
-
-    Args:
-        resume_id: Source resume ID (not working document ID)
-        is_retry: If True, indicates retry attempt (creates new version chain from previous)
-
-    Process:
-    1. Fetch Job Analysis and Source Resume.
-    2. Call LLM to tailor resume content.
-    3. Save tailored resume as new versioned Document.
-    4. Update Application to point to new version.
-    """
-    # 1. Gather Context
     job_analysis_model = await JobAnalysisRepository.get_by_job_id(db, job_id)
     if not job_analysis_model:
         raise ValueError(f"Job analysis not found for job {job_id}")
@@ -71,8 +71,6 @@ async def run_resume_tailoring(
         raise ValueError(
             f"Source resume {resume_id} or its document not found")
 
-    source_content = source_resume.document.content
-
     if is_retry:
         logger.info(
             f"Retry mode: Reading from source resume {resume_id} for application {application_id}")
@@ -87,52 +85,71 @@ async def run_resume_tailoring(
     # Determine parent document for versioning
     # If application already has a resume document, it becomes the parent (for retry)
     # Otherwise, the source resume document is the parent (for initial creation)
+    parent_document_id = source_resume.document.id
     if application.resume_document_id:
         parent_doc = await DocumentRepository.get_by_id(db, application.resume_document_id)
-        if not parent_doc:
+        if parent_doc:
+            parent_document_id = parent_doc.id
+        else:
             logger.warning(
                 f"Previous resume document {application.resume_document_id} not found, using source as parent")
-            parent_doc = source_resume.document
-    else:
-        parent_doc = source_resume.document
-    
-    # 2. Call LLM
-    prompt_input = _build_tailoring_prompt(
-        source_content=source_content,
-        job_analysis=job_analysis,
+
+    return TailoringInput(
+        application_id=application_id,
+        user_id=application.user_id,
+        job_id=job_id,
         tailoring_level=tailoring_level,
-        user_skills=user_skills,
+        parent_document_id=parent_document_id,
+        prompt=_build_tailoring_prompt(
+            source_content=source_resume.document.content,
+            job_analysis=job_analysis,
+            tailoring_level=tailoring_level,
+            user_skills=user_skills,
+        ),
     )
 
+
+async def call_resume_tailor(tailoring: TailoringInput, task_id: str) -> str:
+    """Run the resume_tailor agent (no DB session involved)."""
     tailored_content = await AgentGateway.get().call(
         agent_id="resume_tailor",
-        input_data=prompt_input,
-        context={
-            "db": db,
-            "task_id": task_id,
-            "user_id": application.user_id
-        },
+        input_data=tailoring.prompt,
+        context={"task_id": task_id, "user_id": tailoring.user_id},
     )
-    
     if isinstance(tailored_content, TailoredResume):
-        final_content = tailored_content.content
-    elif isinstance(tailored_content, dict) and "content" in tailored_content:
-        final_content = tailored_content["content"]
-    else:
-        final_content = str(tailored_content)
+        return tailored_content.content
+    if isinstance(tailored_content, dict) and "content" in tailored_content:
+        return tailored_content["content"]
+    return str(tailored_content)
 
-    # 3. Create new versioned Document
+
+async def save_tailored_resume(
+    db: AsyncSession,
+    tailoring: TailoringInput,
+    final_content: str,
+    task_id: str,
+    is_retry: bool = False,
+) -> dict:
+    """Save the tailored resume as a new document version and point the application at it."""
+    parent_doc = await DocumentRepository.get_by_id(db, tailoring.parent_document_id)
+    if not parent_doc:
+        raise ValueError(f"Parent document {tailoring.parent_document_id} not found")
+    application = await ApplicationRepository.get_by_id(db, tailoring.application_id)
+    if not application:
+        raise ValueError(f"Application {tailoring.application_id} not found")
+
     # parent_doc is either the previous tailored version (retry) or source document (initial)
+    job_id, tailoring_level = tailoring.job_id, tailoring.tailoring_level
     change_comment = f"Retry: Tailored from source for Job {job_id} ({tailoring_level})" if is_retry else f"Tailored for Job {job_id} ({tailoring_level})"
 
     tailored_doc = await DocumentRepository.create_new_version(
         db=db,
         parent_document=parent_doc,
         content=final_content,
-        created_by=application.user_id,
+        created_by=tailoring.user_id,
         change_comments=change_comment,
         extra_metadata={
-            "application_id": application_id,
+            "application_id": tailoring.application_id,
             "job_id": job_id,
             "tailoring_level": tailoring_level,
             "is_retry": is_retry,
@@ -145,8 +162,8 @@ async def run_resume_tailoring(
         f"Created new resume document version {doc_id} "
         f"(parent: {parent_doc.id}, root: {tailored_doc.root_id}, is_retry: {is_retry})"
     )
-    
-    # 4. Update Application to point to new version
+
+    # Point the application at the new version
     application.resume_document_id = doc_id
 
     await db.commit()

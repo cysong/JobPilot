@@ -71,4 +71,5 @@ async def watch_availability(db) -> dict:
 @celery_app.task(base=AsyncBaseTask, bind=True, ignore_result=True, autoretry_for=(), max_retries=0)
 async def llm_availability_watch(self) -> dict:
     """Every 5 minutes, see ``watch_availability``."""
-    return await watch_availability(self.db)
+    async with self.session() as db:
+        return await watch_availability(db)

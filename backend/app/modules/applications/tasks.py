@@ -26,7 +26,9 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(
         interval,
         run_outbox_consumer.s(),
-        name=f"applications.outbox-consumer-{interval}s"
+        name=f"applications.outbox-consumer-{interval}s",
+        # Drop runs a busy worker could not start before the next one is due.
+        expires=max(interval - 1, 1),
     )
 
 
@@ -35,7 +37,8 @@ async def run_outbox_consumer(self):
     """Periodic task to drain application outbox events."""
     from app.modules.applications.outbox_consumer import process_outbox_batch
     batch_size = app_module_settings.OUTBOX_BATCH_SIZE
-    await process_outbox_batch(self.db, batch_size=batch_size)
+    async with self.session() as db:
+        await process_outbox_batch(db, batch_size=batch_size)
 
 
 async def update_tailoring_progress(
@@ -117,8 +120,23 @@ async def application_initialization_task(
     Args:
         is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
-    db = self.db
+    # No model call here: the whole planning step fits in one short session.
+    async with self.session() as db:
+        return await _initialize_application(
+            db, application_id=application_id, job_id=job_id, resume_id=resume_id,
+            tailoring_level=tailoring_level, is_retry=is_retry,
+        )
 
+
+async def _initialize_application(
+    db: AsyncSession,
+    *,
+    application_id: str,
+    job_id: int,
+    resume_id: str,
+    tailoring_level: str,
+    is_retry: bool,
+):
     try:
         # Adjust logging and progress message based on retry status
         if is_retry:
@@ -240,57 +258,62 @@ async def resume_tailoring_task(
     Generate tailored resume content based on job and resume analysis.
 
     Always reads from source resume and creates a new versioned document.
+    Load / call / save: no DB session is open while the model works.
 
     Args:
         resume_id: Source resume ID (not working document ID)
         is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
-    app = await ApplicationRepository.get_by_id(self.db, application_id)
-    if app:
-        await ApplicationRepository.mark_tailoring(self.db, app)
-        await self.db.commit()
-
-    await update_tailoring_progress(
-        self.db, application_id, "resume_tailoring", "Tailoring resume...", "in_progress"
+    from app.modules.applications.llm.resume_tailor import (
+        call_resume_tailor,
+        load_tailoring_input,
+        save_tailored_resume,
     )
 
-    from app.modules.applications.llm.resume_tailor import run_resume_tailoring
+    async with self.session() as db:
+        app = await ApplicationRepository.get_by_id(db, application_id)
+        if app:
+            await ApplicationRepository.mark_tailoring(db, app)
+            await db.commit()
+        await update_tailoring_progress(
+            db, application_id, "resume_tailoring", "Tailoring resume...", "in_progress"
+        )
 
     try:
-        result = await run_resume_tailoring(
-            db=self.db,
-            application_id=application_id,
-            resume_id=resume_id,
-            job_id=job_id,
-            tailoring_level=tailoring_level,
-            task_id=task_id,
-            is_retry=is_retry
-        )
-
-        await update_tailoring_progress(
-            self.db, application_id, "resume_tailoring", "Resume tailored successfully", "completed"
-        )
+        async with self.session() as db:
+            tailoring = await load_tailoring_input(
+                db, application_id=application_id, resume_id=resume_id, job_id=job_id,
+                tailoring_level=tailoring_level, is_retry=is_retry,
+            )
+        content = await call_resume_tailor(tailoring, task_id)
+        async with self.session() as db:
+            result = await save_tailored_resume(db, tailoring, content, task_id, is_retry=is_retry)
+            await update_tailoring_progress(
+                db, application_id, "resume_tailoring", "Resume tailored successfully", "completed"
+            )
         return result
     except LLMUnavailableError:
-        # Not a failure: the task parks itself and resumes when credit is back.
-        await update_tailoring_progress(
-            self.db, application_id, "resume_tailoring",
-            "Paused: AI service unavailable, will resume automatically", "paused",
-        )
+        # Not a failure: the task parks itself and resumes when the LLM is back.
+        async with self.session() as db:
+            await update_tailoring_progress(
+                db, application_id, "resume_tailoring",
+                "Paused: AI service unavailable, will resume automatically", "paused",
+            )
         raise
     except Exception as exc:
-        await update_tailoring_progress(
-            self.db,
-            application_id,
-            "resume_tailoring",
-            f"Resume tailoring failed: {str(exc)[:180]}",
-            "failed",
-        )
-        await mark_application_failed(
-            self.db,
-            application_id,
-            f"Resume tailoring failed: {str(exc)}",
-        )
+        async with self.session() as db:
+            await update_tailoring_progress(
+                db,
+                application_id,
+                "resume_tailoring",
+                f"Resume tailoring failed: {str(exc)[:180]}",
+                "failed",
+            )
+            await mark_application_failed(
+                db,
+                application_id,
+                f"Resume tailoring failed: {str(exc)}",
+            )
         raise
 
 
@@ -305,50 +328,53 @@ async def cover_letter_generation_task(
     """
     Generate cover letter using tailored resume and job analysis.
 
-    Always creates a new versioned document.
+    Always creates a new versioned document. Load / call (writer, polisher) /
+    save: no DB session is open while the models work.
 
     Args:
         is_retry: Indicates if this is a retry attempt (affects logging and versioning)
     """
-    await update_tailoring_progress(
-        self.db, application_id, "cover_letter_generation", "Drafting cover letter...", "in_progress"
+    from app.modules.applications.llm.cover_letter_task import (
+        call_cover_letter_agents,
+        load_cover_letter_input,
+        save_cover_letter,
     )
 
-    from app.modules.applications.llm.cover_letter_task import run_cover_letter_task
-    from app.modules.applications.repositories.application_repo import ApplicationRepository
+    async with self.session() as db:
+        await update_tailoring_progress(
+            db, application_id, "cover_letter_generation", "Drafting cover letter...", "in_progress"
+        )
 
     try:
-        application = await ApplicationRepository.get_with_dependencies(self.db, application_id)
-
-        result = await run_cover_letter_task(
-            db=self.db,
-            application=application,
-            task_id=task_id,
-            is_retry=is_retry,
-        )
-
-        await update_tailoring_progress(
-            self.db, application_id, "cover_letter_generation", "Cover letter generated", "completed"
-        )
+        async with self.session() as db:
+            cover = await load_cover_letter_input(db, application_id)
+        content = await call_cover_letter_agents(cover, task_id)
+        async with self.session() as db:
+            result = await save_cover_letter(db, cover, content, task_id, is_retry=is_retry)
+            await update_tailoring_progress(
+                db, application_id, "cover_letter_generation", "Cover letter generated", "completed"
+            )
         return result
     except LLMUnavailableError:
-        # Not a failure: the task parks itself and resumes when credit is back.
-        await update_tailoring_progress(
-            self.db, application_id, "cover_letter_generation",
-            "Paused: AI service unavailable, will resume automatically", "paused",
-        )
+        # Not a failure: the task parks itself and resumes when the LLM is back.
+        async with self.session() as db:
+            await update_tailoring_progress(
+                db, application_id, "cover_letter_generation",
+                "Paused: AI service unavailable, will resume automatically", "paused",
+            )
         raise
     except Exception as exc:
-        await update_tailoring_progress(
-            self.db,
-            application_id,
-            "cover_letter_generation",
-            f"Cover letter generation failed: {str(exc)[:180]}",
-            "failed",
-        )
-        await mark_application_failed(
-            self.db,
-            application_id,
-            f"Cover letter generation failed: {str(exc)}",
-        )
+        async with self.session() as db:
+            await update_tailoring_progress(
+                db,
+                application_id,
+                "cover_letter_generation",
+                f"Cover letter generation failed: {str(exc)[:180]}",
+                "failed",
+            )
+            await mark_application_failed(
+                db,
+                application_id,
+                f"Cover letter generation failed: {str(exc)}",
+            )
         raise

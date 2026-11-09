@@ -121,12 +121,14 @@ async def test_failed_step_marks_owning_application_failed(session):  # noqa: F8
 
 
 def test_concurrent_executions_of_one_task_type_get_their_own_session(monkeypatch):
-    """Celery shares one Task instance across threads; each execution must see its own session."""
+    """Celery shares one Task instance across threads; each execution must get its own
+    sessions and its own tracking of them."""
+    from app.core.database import task_sessions
     from app.modules.workflow import tasks_base
 
     class FakeSession:
-        async def rollback(self):
-            pass
+        def in_transaction(self):
+            return False
 
     class FakeFactory:
         def __call__(self):
@@ -144,17 +146,18 @@ def test_concurrent_executions_of_one_task_type_get_their_own_session(monkeypatc
         name = "tests.probe"
 
         async def run(self, delay):
-            first = self.db
-            await asyncio.sleep(delay)  # let the other execution switch sessions meanwhile
-            assert self.db is first
-            return id(first)
+            async with self.session() as db:
+                await asyncio.sleep(delay)  # let the other execution open its own meanwhile
+                assert task_sessions.get() == [db]
+            assert task_sessions.get() == []
+            return id(db)
 
     task = Probe()
     results, errors = [], []
 
     def worker(delay):
         try:
-            results.append(task._run_async_task(delay))
+            results.append(task(delay))
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
 

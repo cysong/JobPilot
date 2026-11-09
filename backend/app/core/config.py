@@ -121,6 +121,10 @@ class Settings(BaseSettings):
 
     # Workflow task retry
     TASK_RETRY_STALE_TIMEOUT_MINUTES: int = 10
+    # SQLAlchemy pool per process (session pooler only; the transaction pooler uses NullPool)
+    DB_POOL_SIZE: int = 4
+    DB_MAX_OVERFLOW: int = 2
+    DB_POOL_TIMEOUT: int = 30  # seconds to wait for a free connection
     LLM_QUOTA_PAUSE_THRESHOLD_USD: float = 2.0  # pause LLM work when the OpenRouter key has less left than this
     # Provider outage circuit breaker (app.core.llm.availability)
     LLM_OUTAGE_FAILURE_THRESHOLD: int = 5      # consecutive outage-type failures that open the breaker
