@@ -244,3 +244,21 @@ export interface TasksExecutionTimeResponse {
   taskTypes: string[]
   series: TasksExecutionTimeSeries[]
 }
+
+export interface LLMQuotaStatus {
+  paused: boolean
+  reason: string | null
+  source: string | null
+  since: number | null // unix seconds
+  threshold_usd: number
+  key_limit: number | null
+  key_remaining: number | null
+  key_usage: number | null
+}
+
+export interface LLMQuotaResumeResponse {
+  resubmitted: number
+  in_broker: number
+  skipped_failed: number
+  errors: number
+}

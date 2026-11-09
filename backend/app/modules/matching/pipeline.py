@@ -22,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.llm import quota
 from app.core.metrics import match_judge_duration_seconds, match_judge_total, match_validation_total
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.families.classifier import register_jobs
@@ -238,6 +239,9 @@ async def judge_queued_matches(
     stats = JudgeRunStats()
     users: dict[int, UserContext] = {}
     while stats.claimed < settings.MATCH_JUDGE_BATCH_SIZE and time.monotonic() - started < budget:
+        if quota.is_paused():
+            stats.add("paused")
+            break
         async with session_factory() as db:
             size = min(concurrency, settings.MATCH_JUDGE_BATCH_SIZE - stats.claimed)
             ids = await _claim(db, clock(), size, stats)
@@ -255,6 +259,8 @@ async def judge_queued_matches(
                 result = "error"
             stats.add(result)
             match_judge_total.labels(outcome=result).inc()
+        if "paused" in results:
+            break  # out of LLM credit: leave the rest queued
     return stats.as_dict()
 
 
@@ -282,6 +288,13 @@ async def _judge_one(
                 gateway, user=user, job=job, candidate_ids=match.candidate_resume_ids, model_override=override,
                 context={"operation": "match_judge", "user_id": match.user_id},
             )
+        except quota.QuotaExhaustedError:
+            # Out of credit: not this pair's fault. Undo the attempt, release the lease
+            # and leave the row as it was; judging resumes when credit is back.
+            match.attempts -= 1
+            match.next_attempt_at = None
+            await db.commit()
+            return "paused"
         except JudgeFailure as exc:
             match_judge_duration_seconds.observe(time.monotonic() - started)
             backoff = settings.MATCH_RETRY_BACKOFF_MINUTES

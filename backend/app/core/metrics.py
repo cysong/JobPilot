@@ -136,3 +136,11 @@ match_tier_24h = Gauge(
     "Rated matches judged in the last 24h by tier.",
     labelnames=("tier",),
 )
+
+
+# ===== LLM quota =====
+
+llm_paused = Gauge(
+    "jobpilot_llm_paused",
+    "1 while LLM work is paused because the provider is out of credit (app.core.llm.quota).",
+)

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.llm.quota import QuotaExhaustedError, is_quota_error
 from app.core.llm.types import ModelOverride
 from app.modules.auth.models import User
 from app.modules.jobs.models import SeekJob
@@ -249,6 +250,8 @@ async def judge_pair(
         try:
             raw = await gateway.call(MATCH_JUDGE_AGENT, prompt, context=call_context, model_override=override)
         except Exception as exc:  # noqa: BLE001
+            if is_quota_error(exc):
+                raise QuotaExhaustedError(str(exc)) from exc  # not a judging failure
             raise JudgeFailure(f"gateway error: {exc}", retryable=True) from exc
         try:
             outcome = validate_judgment(

@@ -13,6 +13,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.core.metrics import title_classify_total
+from app.core.llm import quota
 from app.core.llm.gateway import AgentGateway
 from app.modules.matching.families.classifier import classify_missing_titles, resolve_pending_jobs
 from app.modules.matching.pipeline import discover_new_jobs, enqueue_matches, judge_queued_matches
@@ -25,6 +26,11 @@ _PERIODIC = {"base": AsyncBaseTask, "bind": True, "ignore_result": True, "autore
 
 def _disabled() -> dict | None:
     return None if settings.MATCH_V3_ENABLED else {"status": "disabled"}
+
+
+def _paused() -> dict | None:
+    """LLM work waits while the provider is out of credit (app.core.llm.quota)."""
+    return {"status": "paused"} if quota.is_paused() else None
 
 
 @celery_app.task(**_PERIODIC)
@@ -40,7 +46,7 @@ async def discover_new_jobs_task(self) -> dict:
 @celery_app.task(**_PERIODIC)
 async def classify_pending_titles_task(self) -> dict:
     """Every 5 minutes: classify new titles, settle pending jobs, queue matches."""
-    if (skipped := _disabled()) is not None:
+    if (skipped := _disabled() or _paused()) is not None:
         return skipped
     started = time.perf_counter()
     gateway = AgentGateway.get()
@@ -59,7 +65,7 @@ async def classify_pending_titles_task(self) -> dict:
 @celery_app.task(**_PERIODIC)
 async def judge_queued_matches_task(self) -> dict:
     """Every 2 minutes: judge queued and due retry rows, newest jobs first."""
-    if (skipped := _disabled()) is not None:
+    if (skipped := _disabled() or _paused()) is not None:
         return skipped
     result = await judge_queued_matches(async_session_factory, AgentGateway.get())
     logger.info("match_judge_completed", **result)

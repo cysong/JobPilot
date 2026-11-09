@@ -21,6 +21,7 @@ from openai import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
+from app.core.llm.quota import is_quota_error
 from app.core.celery_lifecycle import run_coroutine_sync
 from app.modules.workflow.repositories import TaskRepository
 from app.shared.enums import TaskStatus
@@ -73,6 +74,8 @@ class AsyncBaseTask(Task):
                         return retval
                     except Exception as exc:
                         await session.rollback()
+                        if is_quota_error(exc):
+                            await self._on_quota_exhausted(exc, kwargs)
                         # Manual autoretry support for async tasks
                         self._handle_async_autoretry(exc)
                         raise
@@ -93,6 +96,8 @@ class AsyncBaseTask(Task):
                     return result
                 except Exception as exc:
                     await session.rollback()
+                    if is_quota_error(exc):
+                        await self._on_quota_exhausted(exc, kwargs)
                     # Manual autoretry support for async tasks (Celery's autoretry_for doesn't work with async)
                     # This follows Celery's design by reusing self.retry() method and configuration
                     self._handle_async_autoretry(exc)
@@ -101,6 +106,12 @@ class AsyncBaseTask(Task):
                     _current_db_session.set(None)
 
         return run_coroutine_sync(_execute())
+
+    async def _on_quota_exhausted(self, exc: Exception, kwargs: dict) -> None:
+        """Out of LLM credit: stop without consuming a retry. Periodic tasks just skip
+        this run; DBTrackingTask also parks its workflow row (see there)."""
+        logger.warning("Task stopped: LLM quota exhausted", extra={"task_name": self.name, "error": str(exc)[:200]})
+        raise Ignore()
 
     def _handle_async_autoretry(self, exc: Exception) -> None:
         """
@@ -194,6 +205,25 @@ class DBTrackingTask(AsyncBaseTask):
     retry_backoff = True
     retry_backoff_max = 600
     retry_jitter = True
+
+    PARKED_MESSAGE = "Paused: LLM quota exhausted, resumes automatically when credit is back"
+
+    async def _on_quota_exhausted(self, exc: Exception, kwargs: dict) -> None:
+        """Put the workflow row back to PENDING (the chain stops here) and ignore the
+        message. ``llm_quota_watch`` resubmits parked workflows once credit returns."""
+        db_task_id = kwargs.get("task_id")
+        if db_task_id:
+            async with async_session_factory() as session:
+                task = await TaskRepository.get_by_id(session, db_task_id)
+                if task and task.status != TaskStatus.SUCCESS:
+                    task.status = TaskStatus.PENDING
+                    task.started_at = None
+                    task.worker_id = None
+                    task.error_message = self.PARKED_MESSAGE
+                    await session.commit()
+        logger.warning("Task parked: LLM quota exhausted",
+                       extra={"task_id": db_task_id, "task_name": self.name, "error": str(exc)[:200]})
+        raise Ignore()
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         # Capture start time for duration calculation. Stored on the request (one

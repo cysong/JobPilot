@@ -13,6 +13,7 @@ from agents.model_settings import ModelSettings
 from agents.run_config import RunConfig
 
 from app.core.database import async_session_factory
+from app.core.llm import quota
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
 from app.core.llm.output_schemas import CleaningOutputSchema, should_use_cleaning_schema
@@ -72,6 +73,10 @@ class AgentGateway:
             Agent output (final_output)
         """
         context = context if context is not None else {}
+        paused = quota.pause_state()
+        if paused:
+            # Out of credit: fail fast without calling (and paying for) the provider.
+            raise quota.QuotaExhaustedError(f"LLM calls paused: {paused.get('reason', 'quota exhausted')}")
         start_time = time.time()
 
         agent = await self.loader.load_agent(agent_id)
@@ -117,6 +122,9 @@ class AgentGateway:
             exc.add_note(
                 f"provider={getattr(agent, 'provider', 'unknown')}, agent_id={agent_id}"
             )
+            if quota.is_quota_error(exc):
+                quota.pause(str(exc), source=f"gateway:{agent_id}")
+                raise quota.QuotaExhaustedError(str(exc)) from exc
             raise
 
     async def _execute_agent(
@@ -364,12 +372,10 @@ class AgentGateway:
         Returns:
             The created AICall id, or None when nothing was recorded.
         """
+        # Calls outside workflow tasks (matching jobs) are recorded too, with no
+        # task_id, so their cost shows up alongside everything else.
         task_id = context.get("task_id")
         user_id = context.get("user_id")
-
-        # Skip recording if missing required task context
-        if not task_id:
-            return None
 
         # Map status string to AICallStatus enum
         status_map = {

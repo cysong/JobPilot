@@ -121,6 +121,7 @@ class Settings(BaseSettings):
 
     # Workflow task retry
     TASK_RETRY_STALE_TIMEOUT_MINUTES: int = 10
+    LLM_QUOTA_PAUSE_THRESHOLD_USD: float = 2.0  # pause LLM work when the OpenRouter key has less left than this
     TASK_RECONCILE_ON_STARTUP: bool = True
     TASK_RECONCILE_LOOKBACK_HOURS: int = 72  # worker startup resubmits unfinished tasks created within this window
 

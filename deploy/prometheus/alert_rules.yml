@@ -99,6 +99,19 @@ groups:
           description: "Non-deliverable rate is {{ $value | humanizePercentage }} — user signup / reset flows are degraded."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#resenddeliveryfailure"
 
+  # ===== LLM quota =====
+  - name: jobpilot_llm_quota
+    rules:
+      - alert: LLMQuotaPaused
+        expr: max(jobpilot_llm_paused) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LLM work is paused: provider out of credit"
+          description: "All AI generation, analysis and matching is on hold until the OpenRouter key has credit again."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmquotapaused"
+
   # ===== Matching v3 =====
   # Gauges come from job_matches via the API process, so they stay correct across
   # worker restarts. All read 0 while MATCH_V3_ENABLED is off.

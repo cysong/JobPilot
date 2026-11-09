@@ -185,6 +185,23 @@ sum by (kind, outcome) (increase(jobpilot_resend_email_total[1h]))
 
 ---
 
+## LLMQuotaPaused
+
+**含义：** OpenRouter 额度用完（403 "Key limit exceeded" / 402 余额不足），或 key 剩余额度低于 `LLM_QUOTA_PAUSE_THRESHOLD_USD`（默认 $2），所有大模型工作已暂停。**critical**
+
+**影响：** 申请生成、岗位分析、简历分析、匹配判定全部挂起；新提交的申请会创建但不执行。不消耗重试次数，不会把任务标为失败。
+
+**排查：**
+1. 管理后台 Dashboard 的 "LLM quota" 卡片：暂停原因、时间、key 剩余额度。
+2. 或调用 `GET /api/v1/admin/llm/quota`。
+
+**处理：**
+- 在 OpenRouter 提高 key 额度或充值。`llm_quota_watch` 每 5 分钟检查一次，额度恢复后自动解除暂停并重新提交挂起的任务。
+- 想立即恢复：后台卡片点 "Resume"（或 `POST /api/v1/admin/llm/quota/resume`）。
+- 额度未恢复就手动恢复，下一次调用会再次触发暂停。
+
+---
+
 ## MatchQueueStale
 
 **含义：** 有新岗位的匹配排队超过 24 小时，持续 15 分钟（回填不计）。**warning**

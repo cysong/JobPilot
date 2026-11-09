@@ -23,6 +23,12 @@ from app.shared.enums import TaskStatus
 logger = logging.getLogger(__name__)
 
 UNFINISHED = (TaskStatus.PENDING, TaskStatus.RUNNING)
+# error_message prefixes of work held back while LLM credit was exhausted.
+PARKED_PREFIXES = ("Paused: LLM quota", "Waiting: LLM quota")
+
+
+def is_parked(task: TaskExecution) -> bool:
+    return task.status == TaskStatus.PENDING and (task.error_message or "").startswith(PARKED_PREFIXES)
 LOCK_KEY = "jobpilot:workflow-reconcile"
 
 
@@ -71,12 +77,14 @@ async def reconcile_unfinished_tasks(
     started_before: datetime,
     lookback: timedelta,
     resubmit,
+    only_parked: bool = False,
 ) -> ReconcileResult:
     """Resubmit unfinished workflows.
 
     ``started_before``: rows touched after this instant belong to the worker that is
     starting now and are left alone. ``resubmit(db, tasks)`` dispatches the given
-    consecutive steps (``TaskService.resubmit_tasks``).
+    consecutive steps (``TaskService.resubmit_tasks``). ``only_parked`` restricts it
+    to workflows held back by the LLM quota pause: safe while other work is running.
     """
     result = ReconcileResult()
     workflow_ids = list((await db.execute(
@@ -100,6 +108,8 @@ async def reconcile_unfinished_tasks(
             # A failed step stops its workflow; the steps after it stay PENDING on purpose.
             result.skipped_failed.append(workflow_id)
             continue
+        if only_parked and not is_parked(tasks[anchor_idx]):
+            continue
         try:
             await resubmit(db, tasks[anchor_idx:])
             result.resubmitted.append(workflow_id)
@@ -110,6 +120,23 @@ async def reconcile_unfinished_tasks(
     return result
 
 
+async def reconcile_now(
+    db: AsyncSession, redis_client, *, started_before: datetime | None = None, only_parked: bool = False,
+) -> ReconcileResult:
+    """Resubmit unfinished workflows right now (async callers: quota resume, admin)."""
+    from app.core.config import settings
+    from app.core.queue_observer import CELERY_QUEUES
+    from app.modules.workflow.service import TaskService
+
+    return await reconcile_unfinished_tasks(
+        db, broker_ids=broker_task_ids(redis_client, CELERY_QUEUES),
+        started_before=started_before or datetime.now(timezone.utc),
+        lookback=timedelta(hours=settings.TASK_RECONCILE_LOOKBACK_HOURS),
+        resubmit=TaskService.resubmit_tasks,
+        only_parked=only_parked,
+    )
+
+
 def run_startup_reconcile(started_before: datetime | None = None) -> ReconcileResult | None:
     """Entry point for the worker startup hook. Only one worker runs it at a time."""
     import redis
@@ -117,8 +144,6 @@ def run_startup_reconcile(started_before: datetime | None = None) -> ReconcileRe
     from app.core.celery_lifecycle import run_coroutine_sync
     from app.core.config import settings
     from app.core.database import async_session_factory
-    from app.core.queue_observer import CELERY_QUEUES
-    from app.modules.workflow.service import TaskService
 
     started_before = started_before or datetime.now(timezone.utc)
     client = redis.Redis.from_url(settings.REDIS_URL)
@@ -126,15 +151,9 @@ def run_startup_reconcile(started_before: datetime | None = None) -> ReconcileRe
         logger.info("workflow_reconcile_skipped reason=another_worker_running_it")
         return None
     try:
-        broker_ids = broker_task_ids(client, CELERY_QUEUES)
-
         async def _run() -> ReconcileResult:
             async with async_session_factory() as db:
-                return await reconcile_unfinished_tasks(
-                    db, broker_ids=broker_ids, started_before=started_before,
-                    lookback=timedelta(hours=settings.TASK_RECONCILE_LOOKBACK_HOURS),
-                    resubmit=TaskService.resubmit_tasks,
-                )
+                return await reconcile_now(db, client, started_before=started_before)
 
         result = run_coroutine_sync(_run())
         logger.info("workflow_reconcile_completed %s", result.summary())

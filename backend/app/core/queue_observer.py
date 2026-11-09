@@ -14,7 +14,8 @@ import logging
 from redis import asyncio as aioredis
 
 from app.core.config import settings
-from app.core.metrics import celery_queue_length
+from app.core.llm.quota import PAUSE_KEY
+from app.core.metrics import celery_queue_length, llm_paused
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,10 @@ async def observe_queue_lengths(interval_seconds: int = 30) -> None:
                     logger.warning("queue_observer_llen_failed queue=%s err=%s", queue, exc)
                     continue
                 celery_queue_length.labels(queue_name=queue).set(length)
+            try:
+                llm_paused.set(1 if await redis.exists(PAUSE_KEY) else 0)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("queue_observer_llm_pause_failed err=%s", exc)
             await asyncio.sleep(interval_seconds)
     finally:
         await redis.aclose()

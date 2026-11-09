@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.llm.quota import QuotaExhaustedError
 from app.core.llm.types import ModelOverride
 from app.modules.matching.evaluation.dataset import get_dataset
 from app.modules.matching.evaluation.metrics import compare_runs, compute_metrics
@@ -245,7 +246,8 @@ async def run_evaluation(
                         validation=outcome.validation, judgment=outcome.judgment,
                         usage=[ctx["usage"]] if ctx.get("usage") else [],
                     )
-                except JudgeFailure as exc:
+                except (JudgeFailure, QuotaExhaustedError) as exc:
+                    # Out of credit fails the pair here; ``reuse_run_id`` resumes the run later.
                     row.update(judged=True, status="failed_final", error=str(exc)[:2000])
                     logger.warning("eval_judge_failed", job_id=item.job_id, error=str(exc))
             progress["done"] += 1

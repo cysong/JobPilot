@@ -4,6 +4,7 @@ import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useWorkerStatus } from '../hooks/useWorkerStatus'
 import { DashboardStats } from '../components/DashboardStats'
 import { WorkerMonitor } from '../components/WorkerMonitor'
+import { LLMQuotaCard } from '../components/LLMQuotaCard'
 
 export default function AdminDashboardPage() {
   const statsQuery = useDashboardStats()
@@ -29,6 +30,7 @@ export default function AdminDashboardPage() {
         </Button>
       </div>
 
+      <LLMQuotaCard />
       <DashboardStats data={statsQuery.data} isLoading={statsQuery.isLoading} />
       <WorkerMonitor data={workerQuery.data} isLoading={workerQuery.isLoading} />
     </div>

@@ -53,3 +53,6 @@ include = ["app*"]
 [tool.pytest.ini_options]
 # agent_configs lives next to app/ but is not an installed package.
 pythonpath = ["."]
+markers = [
+    "real_quota: use the real LLM quota pause flag instead of the suite-wide stub",
+]
