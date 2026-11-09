@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 
-from sqlalchemy import case, select, func, delete, Integer
+from sqlalchemy import case, select, func, delete, Integer, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import User
@@ -23,6 +23,9 @@ from app.shared.enums import ProficiencyLevel
 # ============================================
 # Skill Aggregation
 # ============================================
+
+SKILL_AGGREGATION_LOCK_NS = 731001  # pg advisory lock namespace for per-user skill aggregation
+
 
 async def aggregate_user_skills(
     db: AsyncSession,
@@ -47,6 +50,12 @@ async def aggregate_user_skills(
     Returns:
         dict: Summary with total_skills, manual_skills, auto_skills counts
     """
+    # Concurrent workers can aggregate the same user at once (e.g. several resumes
+    # analysed together); serialise per user so the read-then-insert below cannot
+    # race on uk_user_skill. Released when this transaction commits.
+    await db.execute(text("SELECT pg_advisory_xact_lock(:ns, :user_id)"),
+                     {"ns": SKILL_AGGREGATION_LOCK_NS, "user_id": user_id})
+
     # Step 1: Query resume_skills aggregated by skill_name
     query = (
         select(
