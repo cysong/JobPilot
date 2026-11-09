@@ -11,6 +11,19 @@
 
 ## Work Log
 
+### 2026-11-09 - Production deploy and task scheduling fixes
+
+- Deployed matching v3 stage 2 (first by hand over ssh while GitHub Actions was locked by billing, then via Actions). Fixed 14 applications stuck PENDING: production job analysis still used the retired MiniMax-M2.5; resumed their workflows and later regenerated all 15 from the updated resumes.
+- Turned on beat (`DISABLE_BEAT_TASKS=false`); job analysis limited to jobs listed within 30 days (`JOB_ANALYSIS_LOOKBACK_DAYS=30`, existing setting), `MAX_JOBS_PER_POLL=20`.
+- Scheduling fixes:
+  - periodic beat tasks expire before their next run (copies no longer pile up behind user work);
+  - worker uses the threads pool (solo ran one task at a time despite concurrency 4); task base keeps the DB session and timing per execution;
+  - worker startup reconcile resubmits PENDING / RUNNING workflows lost with the broker or cut off by a restart (Redis stays without persistence by choice);
+  - a failed workflow step marks its application FAILED instead of leaving it PENDING;
+  - Redis image pinned (`redis:7.4.12-alpine`) so deploys stop recreating the broker; worker stop grace period 90s.
+- Verified in production: 34 tasks in 12 minutes with 61 overlapping pairs, no failures; reconcile runs on every worker start.
+- Next: scheduling group 2/3 leftovers (queue separation by priority, LLM call timeouts, stuck-task alerts, outbox dead code), reset `MATCH_DAILY_LLM_LIMIT_PER_USER` to 200 after the backfill, matching adjacency review.
+
 ### 2026-11-09 - Matching v3 Stage 2 (code complete, not deployed)
 
 Branch `feat/matching-v3-stage1`, design §12 stage 2 steps 2.1–2.6.
