@@ -23,12 +23,13 @@ from app.shared.enums import TaskStatus
 logger = logging.getLogger(__name__)
 
 UNFINISHED = (TaskStatus.PENDING, TaskStatus.RUNNING)
-# error_message prefixes of work held back while LLM credit was exhausted.
-PARKED_PREFIXES = ("Paused: LLM quota", "Waiting: LLM quota")
 
 
-def is_parked(task: TaskExecution) -> bool:
-    return task.status == TaskStatus.PENDING and (task.error_message or "").startswith(PARKED_PREFIXES)
+def parked_scope(task: TaskExecution) -> str | None:
+    """Pause scope a task is parked on (app.core.llm.availability), or None."""
+    from app.core.llm.availability import parked_scope as scope_of
+
+    return scope_of(task.error_message) if task.status == TaskStatus.PENDING else None
 LOCK_KEY = "jobpilot:workflow-reconcile"
 
 
@@ -78,13 +79,15 @@ async def reconcile_unfinished_tasks(
     lookback: timedelta,
     resubmit,
     only_parked: bool = False,
+    blocked_scopes: frozenset[str] | set[str] = frozenset(),
 ) -> ReconcileResult:
     """Resubmit unfinished workflows.
 
     ``started_before``: rows touched after this instant belong to the worker that is
     starting now and are left alone. ``resubmit(db, tasks)`` dispatches the given
     consecutive steps (``TaskService.resubmit_tasks``). ``only_parked`` restricts it
-    to workflows held back by the LLM quota pause: safe while other work is running.
+    to workflows parked by an LLM pause whose scope is not in ``blocked_scopes``
+    (still paused): safe while other work is running.
     """
     result = ReconcileResult()
     workflow_ids = list((await db.execute(
@@ -108,8 +111,10 @@ async def reconcile_unfinished_tasks(
             # A failed step stops its workflow; the steps after it stay PENDING on purpose.
             result.skipped_failed.append(workflow_id)
             continue
-        if only_parked and not is_parked(tasks[anchor_idx]):
-            continue
+        if only_parked:
+            scope = parked_scope(tasks[anchor_idx])
+            if scope is None or scope in blocked_scopes:
+                continue
         try:
             await resubmit(db, tasks[anchor_idx:])
             result.resubmitted.append(workflow_id)
@@ -122,6 +127,7 @@ async def reconcile_unfinished_tasks(
 
 async def reconcile_now(
     db: AsyncSession, redis_client, *, started_before: datetime | None = None, only_parked: bool = False,
+    blocked_scopes: frozenset[str] | set[str] = frozenset(),
 ) -> ReconcileResult:
     """Resubmit unfinished workflows right now (async callers: quota resume, admin)."""
     from app.core.config import settings
@@ -134,6 +140,7 @@ async def reconcile_now(
         lookback=timedelta(hours=settings.TASK_RECONCILE_LOOKBACK_HOURS),
         resubmit=TaskService.resubmit_tasks,
         only_parked=only_parked,
+        blocked_scopes=blocked_scopes,
     )
 
 

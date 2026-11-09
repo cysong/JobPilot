@@ -13,15 +13,16 @@ import type {
   JobsTimeScatterResponse,
   TasksDailyTrendResponse,
   TasksExecutionTimeResponse,
-  LLMQuotaStatus,
-  LLMQuotaResumeResponse,
+  LLMAvailability,
+  LLMResumeResult,
 } from '@/features/admin/types'
 
 export const adminApi = {
   getDashboardStats: () => apiClient.get<DashboardStats>('/admin/dashboard/stats'),
-  getLLMQuota: () => apiClient.get<LLMQuotaStatus, LLMQuotaStatus>('/admin/llm/quota'),
-  pauseLLMWork: () => apiClient.post<LLMQuotaStatus, LLMQuotaStatus>('/admin/llm/quota/pause'),
-  resumeLLMWork: () => apiClient.post<LLMQuotaResumeResponse, LLMQuotaResumeResponse>('/admin/llm/quota/resume'),
+  getLLMAvailability: () => apiClient.get<LLMAvailability, LLMAvailability>('/admin/llm/availability'),
+  pauseLLMWork: () => apiClient.post<LLMAvailability, LLMAvailability>('/admin/llm/availability/pause'),
+  resumeLLMWork: (scope?: string) =>
+    apiClient.post<LLMResumeResult, LLMResumeResult>('/admin/llm/availability/resume', { scope: scope ?? null }),
   getJobsDailyTrend: (params?: { days?: number }) =>
     apiClient.get<JobsDailyTrendResponse>('/admin/jobs/daily-trend', { params }),
   getJobsTimeScatter: (params?: { days?: number }) =>

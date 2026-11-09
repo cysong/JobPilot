@@ -1,4 +1,4 @@
-"""Quota pause on a real Postgres: parked tasks, parked submissions, resume, matching."""
+"""LLM pauses on a real Postgres: parked tasks, parked submissions, resume by scope, matching."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -12,7 +12,7 @@ from tests.modules.matching.conftest import LOCAL_DB, requires_db, session, sess
 pytestmark = requires_db
 
 if LOCAL_DB:
-    from app.core.llm import quota
+    from app.core.llm import availability
     from app.modules.matching.models import JobMatch
     from app.modules.matching.pipeline import enqueue_matches, judge_queued_matches
     from app.modules.workflow import tasks_base
@@ -42,28 +42,32 @@ async def test_task_parks_itself_back_to_pending(session_factory, monkeypatch): 
     class Probe(tasks_base.DBTrackingTask):
         name = "tests.quota_probe"
 
+    error = availability.LLMUnavailableError("model gone", kind="model", scope="model=z-ai/glm-5.3-flash")
     with pytest.raises(Ignore):
-        await Probe()._on_quota_exhausted(quota.QuotaExhaustedError("Key limit exceeded"), {"task_id": "w1-1"})
+        await Probe()._on_llm_unavailable(error, {"task_id": "w1-1"})
     async with session_factory() as db:
         parked = await db.get(TaskExecution, "w1-1")
-        assert parked.status == TaskStatus.PENDING and parked.error_message.startswith("Paused: LLM quota")
+        assert parked.status == TaskStatus.PENDING
+        assert availability.parked_scope(parked.error_message) == "model=z-ai/glm-5.3-flash"
 
 
 @pytest.mark.asyncio
 async def test_submissions_are_recorded_but_not_dispatched_while_paused(session, monkeypatch):  # noqa: F811
-    monkeypatch.setattr(quota, "pause_state", lambda: {"reason": "Key limit exceeded"})
+    monkeypatch.setattr(availability, "global_pause", lambda: {"kind": "quota", "reason": "Key limit exceeded"})
     task = await TaskService.submit_task(session, task_type=TaskType.JOB_ANALYSIS, entity_id="1",
                                          input_data={"job_id": 1})
     assert task.status == TaskStatus.PENDING and task.celery_task_id is None
-    assert task.error_message.startswith("Waiting: LLM quota")
+    assert availability.parked_scope(task.error_message) == "global" and "(quota)" in task.error_message
 
 
 @pytest.mark.asyncio
-async def test_resume_resubmits_only_parked_workflows(session):  # noqa: F811
+async def test_resume_resubmits_only_parked_workflows_whose_pause_is_gone(session):  # noqa: F811
     session.add_all([
-        _row("parked", 1, TaskStatus.PENDING, error="Paused: LLM quota exhausted, resumes automatically"),
+        _row("parked", 1, TaskStatus.PENDING, error=availability.parked_message("global", "quota")),
         _row("parked", 2, TaskStatus.PENDING),
-        _row("waiting", 1, TaskStatus.PENDING, error="Waiting: LLM quota exhausted, starts automatically", total=1),
+        _row("waiting", 1, TaskStatus.PENDING, error=availability.parked_message("global", "quota", waiting=True),
+             total=1),
+        _row("model", 1, TaskStatus.PENDING, error=availability.parked_message("model=x", "model"), total=1),
         _row("live", 1, TaskStatus.RUNNING, total=1),  # running right now: must not be duplicated
         _row("plain", 1, TaskStatus.PENDING, total=1),
     ])
@@ -75,12 +79,12 @@ async def test_resume_resubmits_only_parked_workflows(session):  # noqa: F811
 
     await reconcile_unfinished_tasks(
         session, broker_ids=set(), started_before=datetime.now(timezone.utc) + timedelta(seconds=5),
-        lookback=timedelta(hours=72), resubmit=resubmit, only_parked=True)
-    assert sorted(calls) == [["parked-1", "parked-2"], ["waiting-1"]]
+        lookback=timedelta(hours=72), resubmit=resubmit, only_parked=True, blocked_scopes={"model=x"})
+    assert sorted(calls) == [["parked-1", "parked-2"], ["waiting-1"]]  # "model" waits: its pause is active
 
 
 @pytest.mark.asyncio
-async def test_judging_does_not_burn_attempts_when_out_of_credit(session_factory):  # noqa: F811
+async def test_judging_does_not_burn_attempts_when_llm_unavailable(session_factory):  # noqa: F811
     calls: list = []
     gateway = _gateway(calls)
     async with session_factory() as db:
@@ -90,7 +94,8 @@ async def test_judging_does_not_burn_attempts_when_out_of_credit(session_factory
 
     async def broke(agent_id, input_data, context=None, model_override=None):
         calls.append(agent_id)
-        raise Exception("Error code: 403 - {'error': {'message': 'Key limit exceeded (total limit)'}}")
+        # What AgentGateway raises after classifying a 403 "Key limit exceeded".
+        raise availability.LLMUnavailableError("Key limit exceeded (total limit)", kind="quota")
 
     out_of_credit = AsyncMock()
     out_of_credit.call = AsyncMock(side_effect=broke)

@@ -122,6 +122,11 @@ class Settings(BaseSettings):
     # Workflow task retry
     TASK_RETRY_STALE_TIMEOUT_MINUTES: int = 10
     LLM_QUOTA_PAUSE_THRESHOLD_USD: float = 2.0  # pause LLM work when the OpenRouter key has less left than this
+    # Provider outage circuit breaker (app.core.llm.availability)
+    LLM_OUTAGE_FAILURE_THRESHOLD: int = 5      # consecutive outage-type failures that open the breaker
+    LLM_OUTAGE_WINDOW_SECONDS: int = 120       # ... counted within this window
+    LLM_OUTAGE_COOLDOWN_SECONDS: int = 300     # first pause; doubles on each reopen
+    LLM_OUTAGE_MAX_COOLDOWN_SECONDS: int = 1800
     TASK_RECONCILE_ON_STARTUP: bool = True
     TASK_RECONCILE_LOOKBACK_HOURS: int = 72  # worker startup resubmits unfinished tasks created within this window
 

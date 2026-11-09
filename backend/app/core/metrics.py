@@ -138,9 +138,10 @@ match_tier_24h = Gauge(
 )
 
 
-# ===== LLM quota =====
+# ===== LLM availability =====
 
 llm_paused = Gauge(
     "jobpilot_llm_paused",
-    "1 while LLM work is paused because the provider is out of credit (app.core.llm.quota).",
+    "Active LLM pauses (app.core.llm.availability) by kind and scope type (global / model).",
+    labelnames=("kind", "scope"),
 )

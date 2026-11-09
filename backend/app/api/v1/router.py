@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from app.core.custom_route import CustomAPIRoute
 
 # Import module routers
-from app.modules.admin.llm_quota_router import router as admin_llm_quota_router
+from app.modules.admin.llm_availability_router import router as admin_llm_availability_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.api_key_router import router as api_keys_router
 from app.modules.auth.router import router as auth_router
@@ -22,7 +22,7 @@ api_router = APIRouter(route_class=CustomAPIRoute)
 
 # Include module routers
 api_router.include_router(admin_router)
-api_router.include_router(admin_llm_quota_router)
+api_router.include_router(admin_llm_availability_router)
 api_router.include_router(auth_router)
 api_router.include_router(jobs_router)
 api_router.include_router(matching_router)

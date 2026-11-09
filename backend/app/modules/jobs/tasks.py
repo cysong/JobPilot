@@ -4,7 +4,7 @@ import time
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.core.llm import quota
+from app.core.llm import availability
 from app.core.llm.gateway import AgentGateway
 from app.modules.jobs.repository import JobRepository, JobAnalysisRepository
 from app.modules.workflow import DBTrackingTask, AsyncBaseTask, TaskService
@@ -80,8 +80,8 @@ async def poll_unanalyzed_jobs(self) -> dict:
     Periodic task: find jobs needing analysis and create tasks.
     Priority: re-analysis first, then missing analyses.
     """
-    if quota.is_paused():
-        # Out of LLM credit: creating analysis tasks now would only park them.
+    if availability.is_paused():
+        # LLM work is paused: creating analysis tasks now would only park them.
         return {"status": "paused"}
     start_time = time.perf_counter()
     total_created = 0

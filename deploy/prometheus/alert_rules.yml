@@ -99,18 +99,28 @@ groups:
           description: "Non-deliverable rate is {{ $value | humanizePercentage }} — user signup / reset flows are degraded."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#resenddeliveryfailure"
 
-  # ===== LLM quota =====
-  - name: jobpilot_llm_quota
+  # ===== LLM availability =====
+  - name: jobpilot_llm_availability
     rules:
-      - alert: LLMQuotaPaused
-        expr: max(jobpilot_llm_paused) == 1
+      - alert: LLMPaused
+        expr: max by (kind, scope) (jobpilot_llm_paused{kind!="outage"}) > 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "LLM work is paused: provider out of credit"
-          description: "All AI generation, analysis and matching is on hold until the OpenRouter key has credit again."
-          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmquotapaused"
+          summary: "LLM work paused ({{ $labels.kind }}, {{ $labels.scope }})"
+          description: "AI work is parked until the cause is fixed: quota = top up, auth = fix the API key, model = change the model in the agent config, manual = resume in the admin dashboard."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmpaused"
+
+      - alert: LLMOutageBreakerOpen
+        expr: max(jobpilot_llm_paused{kind="outage"}) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider looks down: circuit breaker open"
+          description: "Calls are paused for a cooldown (5 min, doubling up to 30 min) and probed again automatically."
+          runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmoutagebreakeropen"
 
   # ===== Matching v3 =====
   # Gauges come from job_matches via the API process, so they stay correct across

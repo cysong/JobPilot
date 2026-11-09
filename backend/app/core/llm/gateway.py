@@ -13,7 +13,7 @@ from agents.model_settings import ModelSettings
 from agents.run_config import RunConfig
 
 from app.core.database import async_session_factory
-from app.core.llm import quota
+from app.core.llm import availability
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
 from app.core.llm.output_schemas import CleaningOutputSchema, should_use_cleaning_schema
@@ -73,21 +73,25 @@ class AgentGateway:
             Agent output (final_output)
         """
         context = context if context is not None else {}
-        paused = quota.pause_state()
-        if paused:
-            # Out of credit: fail fast without calling (and paying for) the provider.
-            raise quota.QuotaExhaustedError(f"LLM calls paused: {paused.get('reason', 'quota exhausted')}")
         start_time = time.time()
 
         agent = await self.loader.load_agent(agent_id)
         if model_override is not None:
             agent = self._apply_model_override(agent, model_override)
+        model = getattr(agent, "model", None)
+        paused = availability.blocking_pause(model)
+        if paused:
+            # Retrying cannot help right now: fail fast without calling the provider.
+            raise availability.LLMUnavailableError(
+                f"LLM calls paused [{paused['scope']}] ({paused.get('kind')}): {paused.get('reason', '')}",
+                kind=paused.get("kind", "unknown"), scope=paused["scope"])
         self._log_start(agent_id, agent, context)
 
         try:
             result, usage = await self._execute_agent(agent, input_data)
             latency_ms = int((time.time() - start_time) * 1000)
 
+            availability.record_success()
             self._log_success(agent_id, agent, usage, latency_ms, context)
             context["usage"] = self._usage_summary(agent, usage)
             ai_call_id = await self._record_ai_call(
@@ -122,10 +126,24 @@ class AgentGateway:
             exc.add_note(
                 f"provider={getattr(agent, 'provider', 'unknown')}, agent_id={agent_id}"
             )
-            if quota.is_quota_error(exc):
-                quota.pause(str(exc), source=f"gateway:{agent_id}")
-                raise quota.QuotaExhaustedError(str(exc)) from exc
+            self._handle_unavailability(exc, agent_id=agent_id, model=model)
             raise
+
+    @staticmethod
+    def _handle_unavailability(exc: Exception, *, agent_id: str, model: Optional[str]) -> None:
+        """Turn provider errors that retrying cannot fix into a pause plus
+        ``LLMUnavailableError``; anything else is left for the caller's retry."""
+        kind = availability.classify_error(exc)
+        source = f"gateway:{agent_id}"
+        if kind in (availability.QUOTA, availability.AUTH):
+            availability.pause(kind, str(exc), source=source)
+            raise availability.LLMUnavailableError(str(exc), kind=kind) from exc
+        if kind == availability.MODEL and model:
+            scope = availability.model_scope(model)
+            availability.pause(kind, str(exc), source=source, scope=scope)
+            raise availability.LLMUnavailableError(str(exc), kind=kind, scope=scope) from exc
+        if kind == availability.OUTAGE and availability.record_outage_failure(str(exc)[:300], source=source):
+            raise availability.LLMUnavailableError(str(exc), kind=kind) from exc
 
     async def _execute_agent(
         self, agent: Agent, input_data: str

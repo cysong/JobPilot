@@ -245,18 +245,26 @@ export interface TasksExecutionTimeResponse {
   series: TasksExecutionTimeSeries[]
 }
 
-export interface LLMQuotaStatus {
-  paused: boolean
+export interface LLMPause {
+  scope: string // "global" or "model=<id>"
+  kind: string // quota | auth | model | outage | manual
   reason: string | null
   source: string | null
   since: number | null // unix seconds
+  expires_in: number | null // seconds, outage pauses only
+}
+
+export interface LLMAvailability {
+  pauses: LLMPause[]
   threshold_usd: number
+  key_ok: boolean | null
   key_limit: number | null
   key_remaining: number | null
   key_usage: number | null
 }
 
-export interface LLMQuotaResumeResponse {
+export interface LLMResumeResult {
+  cleared: string[]
   resubmitted: number
   in_broker: number
   skipped_failed: number

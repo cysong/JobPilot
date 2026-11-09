@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_configs.schemas import JobFamilyReading, TitleClassificationBatch
 from app.core.config import settings
-from app.core.llm.quota import QuotaExhaustedError
+from app.core.llm.availability import LLMUnavailableError
 from app.core.llm.types import ModelOverride
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.families.models import (
@@ -143,8 +143,8 @@ async def classify_titles(
                 context=context, model_override=override,
             )
             results = parse_title_batch(output, [i.title_key for i in batch], registry)
-        except QuotaExhaustedError:
-            logger.warning("title_classification_paused_quota", remaining=len(items) - start)
+        except LLMUnavailableError:
+            logger.warning("title_classification_paused", remaining=len(items) - start)
             break
         except Exception as exc:  # noqa: BLE001 - one bad batch must not stop the run
             logger.warning("title_batch_failed", size=len(batch), error=str(exc))
@@ -255,8 +255,8 @@ async def resolve_pending_jobs(
                 context=context, model_override=override,
             )
             reading = parse_jd_read(output, registry)
-        except QuotaExhaustedError:
-            job_family.attempts -= 1  # out of credit is not this job's failure
+        except LLMUnavailableError:
+            job_family.attempts -= 1  # paused LLM work is not this job's failure
             break
         except Exception as exc:  # noqa: BLE001
             job_family.error = str(exc)[:2000]

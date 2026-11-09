@@ -13,7 +13,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.core.metrics import title_classify_total
-from app.core.llm import quota
+from app.core.llm import availability
 from app.core.llm.gateway import AgentGateway
 from app.modules.matching.families.classifier import classify_missing_titles, resolve_pending_jobs
 from app.modules.matching.pipeline import discover_new_jobs, enqueue_matches, judge_queued_matches
@@ -29,8 +29,8 @@ def _disabled() -> dict | None:
 
 
 def _paused() -> dict | None:
-    """LLM work waits while the provider is out of credit (app.core.llm.quota)."""
-    return {"status": "paused"} if quota.is_paused() else None
+    """LLM work waits while it is paused (app.core.llm.availability)."""
+    return {"status": "paused"} if availability.is_paused() else None
 
 
 @celery_app.task(**_PERIODIC)

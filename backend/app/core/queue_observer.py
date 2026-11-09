@@ -9,18 +9,37 @@ by queue name.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from redis import asyncio as aioredis
 
 from app.core.config import settings
-from app.core.llm.quota import PAUSE_KEY
+from app.core.llm.availability import PAUSE_PREFIX
 from app.core.metrics import celery_queue_length, llm_paused
 
 logger = logging.getLogger(__name__)
 
 # Queues to monitor. Extend this list if custom Celery queues are introduced.
 CELERY_QUEUES: tuple[str, ...] = ("celery",)
+
+
+async def _publish_llm_pauses(redis) -> None:
+    """jobpilot_llm_paused{kind, scope}: 1 per active pause, 0 for kinds now clear."""
+    counts: dict[tuple[str, str], int] = {}
+    async for key in redis.scan_iter(match=PAUSE_PREFIX + "*"):
+        raw = await redis.get(key)
+        if not raw:
+            continue
+        try:
+            kind = json.loads(raw).get("kind", "unknown")
+        except ValueError:
+            kind = "unknown"
+        scope = "global" if key.endswith("global") else "model"
+        counts[(kind, scope)] = counts.get((kind, scope), 0) + 1
+    for kind in ("quota", "auth", "model", "outage", "manual"):
+        for scope in ("global", "model"):
+            llm_paused.labels(kind=kind, scope=scope).set(counts.get((kind, scope), 0))
 
 
 async def observe_queue_lengths(interval_seconds: int = 30) -> None:
@@ -36,7 +55,7 @@ async def observe_queue_lengths(interval_seconds: int = 30) -> None:
                     continue
                 celery_queue_length.labels(queue_name=queue).set(length)
             try:
-                llm_paused.set(1 if await redis.exists(PAUSE_KEY) else 0)
+                await _publish_llm_pauses(redis)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("queue_observer_llm_pause_failed err=%s", exc)
             await asyncio.sleep(interval_seconds)

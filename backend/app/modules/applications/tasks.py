@@ -12,7 +12,7 @@ from app.modules.workflow import AsyncBaseTask, DBTrackingTask
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import TaskType
 from app.modules.applications.repositories.application_repo import ApplicationRepository
-from app.core.llm.quota import QuotaExhaustedError
+from app.core.llm.availability import LLMUnavailableError
 from app.modules.jobs.repository import JobAnalysisRepository
 from app.modules.resumes.repository import ResumeRepository
 
@@ -271,11 +271,11 @@ async def resume_tailoring_task(
             self.db, application_id, "resume_tailoring", "Resume tailored successfully", "completed"
         )
         return result
-    except QuotaExhaustedError:
+    except LLMUnavailableError:
         # Not a failure: the task parks itself and resumes when credit is back.
         await update_tailoring_progress(
             self.db, application_id, "resume_tailoring",
-            "Paused: AI quota exhausted, will resume automatically", "paused",
+            "Paused: AI service unavailable, will resume automatically", "paused",
         )
         raise
     except Exception as exc:
@@ -331,11 +331,11 @@ async def cover_letter_generation_task(
             self.db, application_id, "cover_letter_generation", "Cover letter generated", "completed"
         )
         return result
-    except QuotaExhaustedError:
+    except LLMUnavailableError:
         # Not a failure: the task parks itself and resumes when credit is back.
         await update_tailoring_progress(
             self.db, application_id, "cover_letter_generation",
-            "Paused: AI quota exhausted, will resume automatically", "paused",
+            "Paused: AI service unavailable, will resume automatically", "paused",
         )
         raise
     except Exception as exc:

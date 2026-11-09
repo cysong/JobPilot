@@ -56,7 +56,7 @@ celery_app.autodiscover_tasks([
     "app.modules.resumes",  # Resume analysis tasks
     "app.modules.matching",  # Matching tasks
     "app.modules.users",  # User skill aggregation tasks
-    "app.modules.workflow",  # LLM quota watch
+    "app.modules.workflow",  # LLM availability watch
 ])
 
 # Configure Celery Beat periodic tasks.
@@ -88,8 +88,8 @@ _DEFAULT_BEAT_SCHEDULE = {
         'schedule': crontab(minute='1-59/5'),  # one minute after discover
         'options': {'expires': _EVERY_5_MIN_EXPIRES},
     },
-    'llm-quota-watch': {
-        'task': 'app.modules.workflow.tasks.llm_quota_watch',
+    'llm-availability-watch': {
+        'task': 'app.modules.workflow.tasks.llm_availability_watch',
         'schedule': crontab(minute='*/5'),
         'options': {'expires': _EVERY_5_MIN_EXPIRES},
     },

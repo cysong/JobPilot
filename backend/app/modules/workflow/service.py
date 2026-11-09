@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
 from app.core.config import settings
-from app.core.llm import quota
+from app.core.llm import availability
 from app.core.exceptions import BadRequestError, JobPilotException, NotFoundError
 
 from app.modules.admin.schemas import (
@@ -52,14 +52,16 @@ class TaskService:
     """Create, inspect, and manage tracked tasks."""
 
     @staticmethod
-    async def _park_if_quota_paused(db: AsyncSession, tasks: list[TaskExecution]) -> bool:
-        """While LLM calls are paused for lack of credit, keep new work as PENDING rows
-        without dispatching it; resuming resubmits it (workflow.reconcile)."""
-        if not quota.is_paused():
+    async def _park_if_llm_paused(db: AsyncSession, tasks: list[TaskExecution]) -> bool:
+        """While LLM work is paused globally, keep new work as PENDING rows without
+        dispatching it; resuming resubmits it (workflow.reconcile)."""
+        paused = availability.global_pause()
+        if not paused:
             return False
-        tasks[0].error_message = "Waiting: LLM quota exhausted, starts automatically when credit is back"
+        tasks[0].error_message = availability.parked_message(
+            availability.GLOBAL, paused.get("kind", "unknown"), waiting=True)
         await db.commit()
-        logger.warning("task_submission_parked_quota",
+        logger.warning("task_submission_parked_llm_paused",
                        extra={"workflow_id": tasks[0].workflow_id, "task_ids": [t.id for t in tasks]})
         return True
 
@@ -101,7 +103,7 @@ class TaskService:
         )
         await db.flush()
         await db.commit()
-        if await TaskService._park_if_quota_paused(db, [task]):
+        if await TaskService._park_if_llm_paused(db, [task]):
             return task
 
         module_path, func_name = info.celery_task.rsplit(".", 1)
@@ -210,7 +212,7 @@ class TaskService:
             prev_task_id = task_id
 
         await db.commit()
-        if await TaskService._park_if_quota_paused(db, created):
+        if await TaskService._park_if_llm_paused(db, created):
             return created
 
         chain_result = chain(*signatures).apply_async()
@@ -614,7 +616,7 @@ class TaskService:
 
         await db.flush()
         await db.commit()
-        if await TaskService._park_if_quota_paused(db, to_retry):
+        if await TaskService._park_if_llm_paused(db, to_retry):
             return
 
         # Submit chain and backfill celery ids

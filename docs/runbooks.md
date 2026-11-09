@@ -185,20 +185,34 @@ sum by (kind, outcome) (increase(jobpilot_resend_email_total[1h]))
 
 ---
 
-## LLMQuotaPaused
+## LLMPaused
 
-**含义：** OpenRouter 额度用完（403 "Key limit exceeded" / 402 余额不足），或 key 剩余额度低于 `LLM_QUOTA_PAUSE_THRESHOLD_USD`（默认 $2），所有大模型工作已暂停。**critical**
+**含义：** 大模型工作因重试无法解决的原因被暂停（`kind` 标签）。**critical**
 
-**影响：** 申请生成、岗位分析、简历分析、匹配判定全部挂起；新提交的申请会创建但不执行。不消耗重试次数，不会把任务标为失败。
+| kind | 原因 | 范围 | 如何恢复 |
+|---|---|---|---|
+| `quota` | 402 / 403 "Key limit exceeded"，或 key 剩余额度低于 `LLM_QUOTA_PAUSE_THRESHOLD_USD`（默认 $2） | 全局 | 在 OpenRouter 提额或充值；`llm_availability_watch` 每 5 分钟检查，恢复后自动解除 |
+| `auth` | 401，API key 被拒 | 全局 | 更新 `deploy/env/backend.env` 的 `OPENROUTER_API_KEY` 并重建 api / worker / beat；检测到 key 可用后自动解除 |
+| `model` | 404 模型下线 / 不存在 / 无可用 endpoint | 仅该模型（`model=<id>`） | 在 agent 配置里换模型并部署；该模型不再出现在配置中时自动解除 |
+| `manual` | 后台手动暂停 | 全局 | 后台 Dashboard "LLM availability" 卡片点 Resume |
 
-**排查：**
-1. 管理后台 Dashboard 的 "LLM quota" 卡片：暂停原因、时间、key 剩余额度。
-2. 或调用 `GET /api/v1/admin/llm/quota`。
+**影响：** 受影响的任务退回 PENDING（备注 "Paused: LLM unavailable [范围]"），不消耗重试、不标失败；全局暂停时新提交的任务只记录不派发，定时的分析 / 归类 / 判定跳过。解除后只重新提交该范围挂起的任务。
 
-**处理：**
-- 在 OpenRouter 提高 key 额度或充值。`llm_quota_watch` 每 5 分钟检查一次，额度恢复后自动解除暂停并重新提交挂起的任务。
-- 想立即恢复：后台卡片点 "Resume"（或 `POST /api/v1/admin/llm/quota/resume`）。
-- 额度未恢复就手动恢复，下一次调用会再次触发暂停。
+**排查：** 后台 Dashboard 的 "LLM availability" 卡片，或 `GET /api/v1/admin/llm/availability`。
+
+**手动处理：** 卡片上对单个暂停点 Resume（或 `POST /api/v1/admin/llm/availability/resume`，body `{"scope": "global"}`）。原因未消除就恢复，下一次调用会再次暂停。
+
+---
+
+## LLMOutageBreakerOpen
+
+**含义：** 2 分钟内连续 5 次服务类失败（5xx、过载、超时、连接失败），熔断打开，全局暂停一段冷却时间（5 分钟起，每次重开翻倍，最长 30 分钟）。**warning**
+
+**影响：** 冷却期内大模型工作挂起；到期后挂起的任务被重新提交，第一个请求即为探测：成功则恢复，失败则立即以更长冷却重新打开。
+
+**排查：** `dc logs --since 30m jobpilot-worker | grep -E "llm_paused|agent_call_failed"` 看具体错误；查看 OpenRouter 状态页。
+
+**处理：** 一般无需操作。若是 OpenRouter 侧长期故障，可在后台手动暂停，恢复后再 Resume。
 
 ---
 

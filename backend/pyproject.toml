@@ -54,5 +54,5 @@ include = ["app*"]
 # agent_configs lives next to app/ but is not an installed package.
 pythonpath = ["."]
 markers = [
-    "real_quota: use the real LLM quota pause flag instead of the suite-wide stub",
+    "real_availability: use the real LLM pause state (with a fake Redis) instead of the suite-wide stub",
 ]
