@@ -33,6 +33,7 @@ from app.shared.enums import Role, TaskType, ProficiencyLevel
 from app.core.config import settings
 from app.modules.workflow import TaskExecution
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
+from app.shared.search import build_keyword_filter
 
 
 
@@ -298,8 +299,9 @@ class ResumeService:
         )
 
         search_keyword = (keyword or "").strip()
-        if search_keyword:
-            stmt = stmt.where(trimmed_title.ilike(f"%{search_keyword}%"))
+        keyword_filter = build_keyword_filter(search_keyword, [trimmed_title])
+        if keyword_filter is not None:
+            stmt = stmt.where(keyword_filter)
 
         stmt = (
             stmt.order_by(func.count(JobAnalysis.id).desc(), trimmed_title.asc())

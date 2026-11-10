@@ -10,6 +10,7 @@ from app.modules.jobs.models import SeekJob
 from app.modules.resumes.models import Resume
 from app.shared.enums import ApplicationResolution, ApplicationStatus
 from app.shared.pagination import PaginationParams
+from app.shared.search import build_keyword_filter
 
 
 class ApplicationRepository:
@@ -92,15 +93,12 @@ class ApplicationRepository:
             .where(Application.user_id == user_id)
         )
 
-        if keyword:
-            search_pattern = f"%{keyword}%"
-            base_query = base_query.where(
-                or_(
-                    SeekJob.title.ilike(search_pattern),
-                    SeekJob.company_name.ilike(search_pattern),
-                    SeekJob.advertiser_name.ilike(search_pattern),
-                )
-            )
+        keyword_filter = build_keyword_filter(
+            keyword,
+            [SeekJob.title, SeekJob.company_name, SeekJob.advertiser_name],
+        )
+        if keyword_filter is not None:
+            base_query = base_query.where(keyword_filter)
 
         if status:
             base_query = base_query.where(Application.status == status)

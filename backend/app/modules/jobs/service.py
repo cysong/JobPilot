@@ -35,6 +35,7 @@ from app.core.config import settings
 from app.core.exceptions import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.core.metrics import job_ingest_total
 from app.shared.pagination import PaginationParams
+from app.shared.search import build_keyword_filter
 
 
 logger = logging.getLogger(__name__)
@@ -82,17 +83,18 @@ class JobService:
         # The ilike on content stays in the WHERE clause for behavior parity
         # — load_only above only narrows the SELECT column list, it doesn't
         # affect what columns the filter can reference.
-        if filters.keyword:
-            search_pattern = f"%{filters.keyword}%"
-            query = query.where(
-                or_(
-                    SeekJob.title.ilike(search_pattern),
-                    SeekJob.abstract.ilike(search_pattern),
-                    SeekJob.content.ilike(search_pattern),
-                    SeekJob.advertiser_name.ilike(search_pattern),
-                    SeekJob.company_name.ilike(search_pattern)
-                )
-            )
+        keyword_filter = build_keyword_filter(
+            filters.keyword,
+            [
+                SeekJob.title,
+                SeekJob.abstract,
+                SeekJob.content,
+                SeekJob.advertiser_name,
+                SeekJob.company_name,
+            ],
+        )
+        if keyword_filter is not None:
+            query = query.where(keyword_filter)
 
         # Apply location filter
         if filters.location_cities:
