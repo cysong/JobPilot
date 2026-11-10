@@ -125,6 +125,8 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 4
     DB_MAX_OVERFLOW: int = 2
     DB_POOL_TIMEOUT: int = 30  # seconds to wait for a free connection
+    DB_POOL_PRE_PING: bool = False  # one extra round trip per checkout; see app.core.database
+    DB_POOL_RECYCLE_SECONDS: int = 300  # replace pooled connections older than this
     LLM_QUOTA_PAUSE_THRESHOLD_USD: float = 2.0  # pause LLM work when the OpenRouter key has less left than this
     # Provider outage circuit breaker (app.core.llm.availability)
     LLM_OUTAGE_FAILURE_THRESHOLD: int = 5      # consecutive outage-type failures that open the breaker

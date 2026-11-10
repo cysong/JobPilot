@@ -20,9 +20,15 @@ database_url_parsed = make_url(database_url)
 is_supabase_transaction_pooler = _is_supabase_transaction_pooler(database_url)
 
 connect_args: dict[str, object] = {}
+# pool_pre_ping costs an extra database round trip on every checkout. Production
+# talks to Supabase across regions (~280ms per round trip), where pre-ping alone
+# made a one-query request take ~835ms instead of ~300ms. Stale connections are
+# retired by pool_recycle instead; a connection that still dies mid-use is
+# invalidated by SQLAlchemy and the next checkout gets a fresh one.
 engine_kwargs: dict[str, object] = {
     "echo": settings.ENVIRONMENT == "development",
-    "pool_pre_ping": True,
+    "pool_pre_ping": settings.DB_POOL_PRE_PING,
+    "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
 }
 
 if is_supabase_transaction_pooler:
