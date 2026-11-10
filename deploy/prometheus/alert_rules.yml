@@ -25,18 +25,24 @@ groups:
       # (it returns bucket boundaries on sparse data). _sum / _count gives a
       # meaningful average even with 1-2 requests per window. NaN when idle so
       # the alert silently sleeps.
+      #
+      # Excluded: PDF exports and admin task actions are slow by design and
+      # rare, so a couple of them would drag the average over the line.
+      # Threshold is 1.5s while the API (Kuala Lumpur) and Supabase (Sydney)
+      # are ~280ms apart per round trip; drop it to 1s once they share a region.
       - alert: APISlowRequests
         expr: |
-          sum(rate(http_request_duration_seconds_sum{handler!~"/metrics|/health"}[10m]))
-          / sum(rate(http_request_duration_seconds_count{handler!~"/metrics|/health"}[10m]))
-          > 1
-          and sum(increase(http_request_duration_seconds_count{handler!~"/metrics|/health"}[10m])) >= 5
-        for: 10m
+          sum(rate(http_request_duration_seconds_sum{handler!~"/metrics|/health|.*/export|/api/v1/admin/.*"}[10m]))
+          / sum(rate(http_request_duration_seconds_count{handler!~"/metrics|/health|.*/export|/api/v1/admin/.*"}[10m]))
+          > 1.5
+          and sum(increase(http_request_duration_seconds_count{handler!~"/metrics|/health|.*/export|/api/v1/admin/.*"}[10m])) >= 5
+        for: 15m
         labels:
           severity: warning
         annotations:
-          summary: "Average API request time exceeded 1s"
+          summary: "API responses are slow (10m average > 1.5s)"
           description: "10m rolling average is {{ $value | humanizeDuration }}."
+          action: "Check Grafana for the slowest handlers. Every database round trip costs ~280ms from the VPS to Supabase, so look for endpoints running many sequential queries."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#apislowrequests"
 
       - alert: CeleryTaskFailureRate
@@ -44,24 +50,28 @@ groups:
           sum(rate(jobpilot_celery_task_total{event="failure"}[10m])) by (task_name)
           / sum(rate(jobpilot_celery_task_total{event=~"success|failure"}[10m])) by (task_name)
           > 0.1
+          and sum(increase(jobpilot_celery_task_total{event="failure"}[10m])) by (task_name) >= 3
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Celery task {{ $labels.task_name }} failure rate > 10%"
           description: "Failure rate is {{ $value | humanizePercentage }} over the last 10m."
+          action: "Open Admin > Tasks, filter failed, read error_message. If it is an LLM error, check the LLM alerts first."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#celerytaskfailurerate"
 
       - alert: LLMCallFailureRate
         expr: |
           sum(rate(jobpilot_llm_call_total{outcome!="ok"}[10m])) by (agent_id)
           / sum(rate(jobpilot_llm_call_total[10m])) by (agent_id) > 0.2
+          and sum(increase(jobpilot_llm_call_total{outcome!="ok"}[10m])) by (agent_id) >= 5
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "LLM agent {{ $labels.agent_id }} failure rate > 20%"
           description: "Non-ok outcomes are {{ $value | humanizePercentage }} of all calls."
+          action: "Check the OpenRouter key credit and status page; the worker log has the provider error. Quota, auth and model errors also raise LLMPaused."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmcallfailurerate"
 
   # ===== Anomaly patterns =====
@@ -109,7 +119,8 @@ groups:
           severity: critical
         annotations:
           summary: "LLM work paused ({{ $labels.kind }}, {{ $labels.scope }})"
-          description: "AI work is parked until the cause is fixed: quota = top up, auth = fix the API key, model = change the model in the agent config, manual = resume in the admin dashboard."
+          description: "AI work is parked until the cause is fixed."
+          action: "quota: top up OpenRouter credit. auth: fix the API key. model: change the model in the agent config. manual: resume in the admin dashboard."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmpaused"
 
       - alert: LLMOutageBreakerOpen
@@ -120,6 +131,7 @@ groups:
         annotations:
           summary: "LLM provider looks down: circuit breaker open"
           description: "Calls are paused for a cooldown (5 min, doubling up to 30 min) and probed again automatically."
+          action: "Usually nothing: it recovers by itself. If it stays open for hours, check the OpenRouter status page."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#llmoutagebreakeropen"
 
   # ===== Matching v3 =====
@@ -129,13 +141,17 @@ groups:
     rules:
       - alert: MatchQueueStale
         # Backfill rows are excluded: they drain over days under the daily limit.
-        expr: jobpilot_match_queue_oldest_age_seconds > 86400
-        for: 15m
+        # 36h, not 24h: once a user's daily judge limit is spent (failed attempts
+        # count too), new jobs legitimately wait until the limit resets at UTC
+        # midnight, which alone can approach 24h.
+        expr: jobpilot_match_queue_oldest_age_seconds > 129600
+        for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "A new job has waited more than 24h to be matched"
+          summary: "A new job has waited more than 36h to be matched"
           description: "Oldest queued new-job match is {{ $value | humanizeDuration }} old."
+          action: "Check whether the judge task is running (Admin > Tasks) and whether the daily limit was spent on failed attempts."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#matchqueuestale"
 
       - alert: MatchFailedFinalRatio
@@ -148,6 +164,7 @@ groups:
         annotations:
           summary: "More than 5% of match judgments failed for good in the last 24h"
           description: "failed_final share is {{ $value | humanizePercentage }}."
+          action: "Read job_matches.error for the failed rows; an LLM outage or quota problem is the usual cause."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#matchfailedfinalratio"
 
       - alert: MatchNoATier
@@ -167,13 +184,16 @@ groups:
   - name: jobpilot_infra
     rules:
       - alert: APIDown
+        # 3m rides out a normal deploy restart; deploy-prod.sh also silences
+        # this alert for the duration of a deploy.
         expr: up{job="jobpilot-api"} == 0
-        for: 1m
+        for: 3m
         labels:
           severity: critical
         annotations:
           summary: "JobPilot API target is down"
-          description: "Prometheus has been unable to scrape jobpilot-api for >1m."
+          description: "Prometheus has been unable to scrape jobpilot-api for >3m."
+          action: "ssh vps, then: docker compose -f docker-compose.prod.yml ps and docker logs --tail 100 jobpilot-api."
           runbook_url: "https://github.com/cysong/JobPilot/blob/master/docs/runbooks.md#apidown"
 
       - alert: PrometheusTargetDown

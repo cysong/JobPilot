@@ -118,6 +118,7 @@ jobs:
               /opt/jobpilot/deploy/nginx \
               /opt/jobpilot/deploy/prometheus \
               /opt/jobpilot/deploy/alertmanager \
+              /opt/jobpilot/deploy/alertmanager/templates \
               /opt/jobpilot/deploy/grafana/provisioning/datasources \
               /opt/jobpilot/deploy/grafana/provisioning/dashboards \
               /opt/jobpilot/deploy/grafana/dashboards \
@@ -130,6 +131,7 @@ jobs:
           scp -P "${VPS_PORT:-22}" deploy/prometheus/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/prometheus.yml"
           scp -P "${VPS_PORT:-22}" deploy/prometheus/alert_rules.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/prometheus/alert_rules.yml"
           scp -P "${VPS_PORT:-22}" deploy/alertmanager/alertmanager.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/alertmanager/alertmanager.yml"
+          scp -P "${VPS_PORT:-22}" deploy/alertmanager/templates/jobpilot.tmpl "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/alertmanager/templates/jobpilot.tmpl"
           scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/datasources/prometheus.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/datasources/prometheus.yml"
           scp -P "${VPS_PORT:-22}" deploy/grafana/provisioning/dashboards/dashboard.yml "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/provisioning/dashboards/dashboard.yml"
           scp -P "${VPS_PORT:-22}" deploy/grafana/dashboards/jobpilot.json "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/jobpilot/deploy/grafana/dashboards/jobpilot.json"

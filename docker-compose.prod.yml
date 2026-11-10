@@ -1,3 +1,11 @@
+# Docker keeps container stdout in json-file logs; cap them so a chatty
+# container cannot fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   jobpilot-api:
     image: ${JOBPILOT_IMAGE}
@@ -6,6 +14,11 @@ services:
     env_file:
       - ./deploy/env/backend.env
     command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
+    # Rotating app log files (app.core.logging_config) live in a named volume so
+    # they survive the container being recreated on every deploy.
+    volumes:
+      - app-logs:/app/backend/logs
+    logging: *default-logging
     ports:
       - "127.0.0.1:18000:8000"
     healthcheck:
@@ -27,6 +40,11 @@ services:
     env_file:
       - ./deploy/env/backend.env
     command: ["uv", "run", "python", "run_celery_worker.py"]
+    # Rotating app log files (app.core.logging_config) live in a named volume so
+    # they survive the container being recreated on every deploy.
+    volumes:
+      - app-logs:/app/backend/logs
+    logging: *default-logging
     # Warm shutdown lets running LLM tasks finish; whatever is still cut off is
     # resubmitted by the worker's startup reconcile.
     stop_grace_period: 90s
@@ -45,6 +63,11 @@ services:
     env_file:
       - ./deploy/env/backend.env
     command: ["uv", "run", "python", "run_celery_beat.py"]
+    # Rotating app log files (app.core.logging_config) live in a named volume so
+    # they survive the container being recreated on every deploy.
+    volumes:
+      - app-logs:/app/backend/logs
+    logging: *default-logging
     depends_on:
       jobpilot-redis:
         condition: service_healthy
@@ -92,7 +115,7 @@ services:
       - jobpilot-internal
 
   jobpilot-alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.28.1  # >= 0.28: the email template needs tz / date / since
     container_name: jobpilot-alertmanager
     restart: unless-stopped
     env_file:
@@ -118,6 +141,7 @@ services:
           --storage.path=/alertmanager
     volumes:
       - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./deploy/alertmanager/templates:/etc/alertmanager/templates:ro
       - alertmanager-data:/alertmanager
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
@@ -171,6 +195,7 @@ services:
       - jobpilot-internal
 
 volumes:
+  app-logs:
   redis-data:
   prometheus-data:
   grafana-data:

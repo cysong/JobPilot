@@ -1,4 +1,5 @@
-# Alertmanager config for JobPilot.
+# Alertmanager config for JobPilot (Alertmanager >= 0.28: the email template
+# uses tz / date / since).
 #
 # Email delivery uses Gmail SMTP (smtp.gmail.com:587), sharing the same Gmail
 # account already configured for Grafana (GF_SMTP_*). The password is sourced
@@ -10,25 +11,32 @@
 # emails) is intentionally NOT used here — alerting and product email run on
 # independent rails so degradation of one cannot mask the other.
 #
-# Severity-based routing (single channel, throttled differently):
-#   critical → send immediately, repeat every 1h
-#   warning  → batch for 30s, repeat every 4h
+# Severity-based routing (single mailbox, throttled differently):
+#   critical → send immediately, repeat every 1h, email on resolve too
+#   warning  → batch for 2m, re-notify a changed group at most every 30m,
+#              repeat every 12h, no resolve email (it doubled the mail volume)
 #   info     → suppressed (visible in Grafana only)
 
 global:
   resolve_timeout: 5m
 
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
 route:
-  receiver: gmail
+  receiver: gmail-warning
   group_by: [alertname, severity]
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 4h
+  group_wait: 2m
+  # A group whose members change (e.g. one more LLM agent starts failing) is
+  # re-sent after group_interval; 5m turned one outage into 14 emails.
+  group_interval: 30m
+  repeat_interval: 12h
   routes:
     - matchers:
         - severity = critical
-      receiver: gmail
+      receiver: gmail-critical
       group_wait: 0s
+      group_interval: 5m
       repeat_interval: 1h
     - matchers:
         - severity = info
@@ -37,10 +45,11 @@ route:
 receivers:
   - name: "null"
 
-  - name: gmail
+  - name: gmail-critical
     email_configs:
-      - to: yansongc@gmail.com
-        from: yansongc@gmail.com
+      - &gmail
+        to: yansongc@gmail.com
+        from: "JobPilot Alerts <yansongc@gmail.com>"
         smarthost: smtp.gmail.com:587
         auth_username: yansongc@gmail.com
         auth_identity: yansongc@gmail.com
@@ -48,31 +57,13 @@ receivers:
         require_tls: true
         send_resolved: true
         headers:
-          Subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }} ({{ .GroupLabels.severity }})'
-        html: |-
-          <h3>[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}</h3>
-          <p><b>Severity:</b> {{ .GroupLabels.severity }}</p>
-          {{ if gt (len .Alerts.Firing) 0 }}
-          <h4>Firing ({{ .Alerts.Firing | len }})</h4>
-          <ul>
-          {{ range .Alerts.Firing }}
-            <li>
-              <b>{{ .Annotations.summary }}</b><br/>
-              {{ .Annotations.description }}<br/>
-              {{ if .Annotations.runbook_url }}<a href="{{ .Annotations.runbook_url }}">Runbook</a> ·{{ end }}
-              Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
-            </li>
-          {{ end }}
-          </ul>
-          {{ end }}
-          {{ if gt (len .Alerts.Resolved) 0 }}
-          <h4>Resolved ({{ .Alerts.Resolved | len }})</h4>
-          <ul>
-          {{ range .Alerts.Resolved }}
-            <li>{{ .Annotations.summary }} — resolved at {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}</li>
-          {{ end }}
-          </ul>
-          {{ end }}
+          Subject: '{{ template "jobpilot.subject" . }}'
+        html: '{{ template "jobpilot.html" . }}'
+
+  - name: gmail-warning
+    email_configs:
+      - <<: *gmail
+        send_resolved: false
 
 inhibit_rules:
   # When a critical fires, suppress the same-named warning to avoid duplicates
@@ -87,3 +78,12 @@ inhibit_rules:
       - alertname = APIDown
     target_matchers:
       - severity =~ "warning|critical"
+
+  # One LLM root cause, one email: while LLM work is paused (quota / auth /
+  # model / manual) or the outage breaker is open, the failure-rate alerts it
+  # causes downstream are noise. On 2026-11-09 an exhausted OpenRouter key
+  # produced 23 emails across these four alerts.
+  - source_matchers:
+      - alertname =~ "LLMPaused|LLMOutageBreakerOpen"
+    target_matchers:
+      - alertname =~ "LLMCallFailureRate|CeleryTaskFailureRate|MatchFailedFinalRatio|MatchQueueStale|MatchNoATier|CeleryRetryStorm"

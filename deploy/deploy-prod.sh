@@ -103,6 +103,20 @@ download_frontend_artifact
 echo "Running migrations..."
 docker compose -f "${COMPOSE_FILE}" run --rm --no-deps jobpilot-api uv run alembic upgrade head
 
+# Restarting the API and worker makes their scrape targets disappear for a
+# moment; silence the "target down" alerts for the length of a deploy so a
+# routine release does not page. Best effort: on a first deploy Alertmanager
+# is not running yet. The silence lives in alertmanager-data, so it survives
+# Alertmanager itself being recreated below.
+echo "Silencing deploy-time target-down alerts for 10m..."
+docker exec jobpilot-alertmanager amtool silence add \
+  --alertmanager.url=http://localhost:9093 \
+  --duration=10m \
+  --author=deploy-prod.sh \
+  --comment="Deploy ${JOBPILOT_IMAGE}" \
+  'alertname=~"APIDown|PrometheusTargetDown"' >/dev/null 2>&1 \
+  || echo "WARN: could not add the deploy silence (Alertmanager not running?)"
+
 echo "Starting services..."
 docker compose -f "${COMPOSE_FILE}" up -d \
   jobpilot-redis \

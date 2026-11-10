@@ -73,7 +73,9 @@ dc exec jobpilot-redis redis-cli llen celery
 
 ## APISlowRequests
 
-**含义：** 10 分钟滚动平均请求耗时超过 1s，持续 10 分钟。**warning**
+**含义：** 10 分钟滚动平均请求耗时超过 1.5s，持续 15 分钟（不计 PDF 导出和 `/api/v1/admin/*`，10 分钟内至少 5 个请求）。**warning**
+
+> 阈值暂定 1.5s：API（吉隆坡）到 Supabase（悉尼）每次数据库往返约 280ms。两者同区域后改回 1s。
 
 **影响：** 页面加载变慢，消耗 API 延迟 Error Budget。
 
@@ -95,7 +97,7 @@ dc exec jobpilot-redis redis-cli llen celery
 
 ## CeleryTaskFailureRate
 
-**含义：** 某个 `task_name` 的失败率超过 10%（10 分钟窗口），持续 10 分钟。**warning**
+**含义：** 某个 `task_name` 的失败率超过 10%（10 分钟窗口，且至少 3 次失败），持续 10 分钟。**warning**。`LLMPaused` / `LLMOutageBreakerOpen` 期间被抑制。
 
 **影响：** 职位分析、求职信生成等后台流程失败，消耗任务成功率 Error Budget。
 
@@ -114,7 +116,7 @@ dc exec jobpilot-redis redis-cli llen celery
 
 ## LLMCallFailureRate
 
-**含义：** 某个 `agent_id` 的 LLM 调用非 `ok` 比例超过 20%，持续 10 分钟。**warning**
+**含义：** 某个 `agent_id` 的 LLM 调用非 `ok` 比例超过 20%（10 分钟内至少 5 次失败），持续 10 分钟。**warning**。`LLMPaused` / `LLMOutageBreakerOpen` 期间被抑制。
 
 **影响：** 职位分析、简历分析、求职信生成质量下降或失败。
 
@@ -218,7 +220,9 @@ sum by (kind, outcome) (increase(jobpilot_resend_email_total[1h]))
 
 ## MatchQueueStale
 
-**含义：** 有新岗位的匹配排队超过 24 小时，持续 15 分钟（回填不计）。**warning**
+**含义：** 有新岗位的匹配排队超过 36 小时，持续 30 分钟（回填不计）。**warning**
+
+> 不用 24 小时：用户当天的判定额度用完后（失败的尝试也计入），新岗位要等到 UTC 零点额度重置，单这一项就可能接近 24 小时。
 
 **影响：** 新岗位迟迟没有档位，可能在判定前就过期。
 
@@ -273,7 +277,7 @@ sum by (kind, outcome) (increase(jobpilot_resend_email_total[1h]))
 
 ## APIDown
 
-**含义：** Prometheus 连续 1 分钟抓取不到 `jobpilot-api`。**critical**。触发后会抑制所有其他业务告警。
+**含义：** Prometheus 连续 3 分钟抓取不到 `jobpilot-api`。**critical**。触发后会抑制所有其他业务告警。`deploy-prod.sh` 部署时会对本告警和 `PrometheusTargetDown` 加 10 分钟静默。
 
 **影响：** 整站不可用。
 

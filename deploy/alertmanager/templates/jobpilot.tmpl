@@ -1,0 +1,60 @@
+{{/*
+  JobPilot alert email. Rendered by Alertmanager >= 0.28 (needs tz / date / since).
+  Times are shown in New Zealand time; UTC is kept in the footer for log lookups.
+*/}}
+
+{{ define "jobpilot.tz" }}Pacific/Auckland{{ end }}
+{{ define "jobpilot.grafana" }}https://api.freeclaw.cloud/grafana/d/jobpilot-overview{{ end }}
+
+{{ define "jobpilot.subject" -}}
+[JobPilot prod] {{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "critical" }}🔴 CRITICAL{{ else }}🟠 WARNING{{ end }}{{ else }}✅ RESOLVED{{ end }}: {{ (index .Alerts 0).Annotations.summary }}{{ if gt (len .Alerts) 1 }} ({{ len .Alerts }} alerts){{ end }}
+{{- end }}
+
+{{ define "jobpilot.html" }}
+{{- $tz := "Pacific/Auckland" -}}
+{{- $firing := eq .Status "firing" -}}
+{{- $critical := eq .CommonLabels.severity "critical" -}}
+{{- $color := "#16a34a" -}}
+{{- if $firing }}{{ if $critical }}{{ $color = "#dc2626" }}{{ else }}{{ $color = "#ea580c" }}{{ end }}{{ end -}}
+<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;color:#0f172a">
+  <div style="background:{{ $color }};color:#fff;padding:14px 18px;border-radius:8px 8px 0 0">
+    <div style="font-size:12px;letter-spacing:.06em;opacity:.9">JOBPILOT · PRODUCTION</div>
+    <div style="font-size:18px;font-weight:600;margin-top:4px">
+      {{ if $firing }}{{ if $critical }}Critical{{ else }}Warning{{ end }}: {{ .GroupLabels.alertname }}{{ else }}Resolved: {{ .GroupLabels.alertname }}{{ end }}
+    </div>
+  </div>
+  <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 8px 8px;padding:6px 18px 14px">
+  {{ range .Alerts.Firing }}
+    <div style="padding:12px 0;border-bottom:1px solid #f1f5f9">
+      <div style="font-size:15px;font-weight:600">{{ .Annotations.summary }}</div>
+      <table style="margin-top:8px;font-size:13px;border-collapse:collapse">
+        <tr><td style="color:#64748b;padding:2px 12px 2px 0">Now</td><td>{{ .Annotations.description }}</td></tr>
+        {{ if .Labels.agent_id }}<tr><td style="color:#64748b;padding:2px 12px 2px 0">LLM agent</td><td>{{ .Labels.agent_id }}</td></tr>{{ end }}
+        {{ if .Labels.task_name }}<tr><td style="color:#64748b;padding:2px 12px 2px 0">Task</td><td>{{ .Labels.task_name }}</td></tr>{{ end }}
+        {{ if .Labels.kind }}<tr><td style="color:#64748b;padding:2px 12px 2px 0">Cause</td><td>{{ .Labels.kind }} ({{ .Labels.scope }})</td></tr>{{ end }}
+        <tr><td style="color:#64748b;padding:2px 12px 2px 0">Started</td><td>{{ .StartsAt | tz $tz | date "Mon 2 Jan 15:04 MST" }} · {{ .StartsAt | since | humanizeDuration }} ago</td></tr>
+        {{ if .Annotations.action }}<tr><td style="color:#64748b;padding:2px 12px 2px 0;vertical-align:top">What to do</td><td><b>{{ .Annotations.action }}</b></td></tr>{{ end }}
+      </table>
+      <div style="margin-top:8px;font-size:13px">
+        <a href="{{ template "jobpilot.grafana" }}">Grafana</a>
+        {{ if .Annotations.runbook_url }} · <a href="{{ .Annotations.runbook_url }}">Runbook</a>{{ end }}
+      </div>
+    </div>
+  {{ end }}
+  {{ if .Alerts.Resolved }}
+    <div style="padding:12px 0">
+      <div style="font-size:13px;color:#64748b;margin-bottom:6px">Resolved</div>
+      {{ range .Alerts.Resolved }}
+      <div style="font-size:13px;padding:3px 0">
+        ✅ {{ .Annotations.summary }}<br/>
+        <span style="color:#64748b">{{ .StartsAt | tz $tz | date "Mon 2 Jan 15:04" }} → {{ .EndsAt | tz $tz | date "15:04 MST" }}{{ if .Labels.agent_id }} · {{ .Labels.agent_id }}{{ end }}{{ if .Labels.task_name }} · {{ .Labels.task_name }}{{ end }}</span>
+      </div>
+      {{ end }}
+    </div>
+  {{ end }}
+    <div style="font-size:11px;color:#94a3b8;margin-top:10px">
+      {{ .Status | toUpper }} · severity {{ .CommonLabels.severity }} · {{ len .Alerts }} alert(s) · sent by Alertmanager, times in NZ ({{ (index .Alerts 0).StartsAt.UTC.Format "2006-01-02 15:04 UTC" }} first start)
+    </div>
+  </div>
+</div>
+{{ end }}
