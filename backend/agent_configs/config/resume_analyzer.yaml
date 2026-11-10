@@ -39,12 +39,18 @@ instructions: |
   - Frameworks: React, Vue.js, Angular, Django, FastAPI, Express.js, Spring Boot
   - Tools/Platforms: Docker, Kubernetes, AWS, Azure, GCP, PostgreSQL, MongoDB, Redis, Node.js
   - Use official casing; prefer the closest standardized name if variants appear (e.g., "JS" -> "JavaScript", "TS" -> "TypeScript").
+  - One name per technology across the whole output, and drop version numbers: "CSS" not "CSS3", "HTML" not "HTML5", "Python" not "Python 3".
+  - Prefer the common short form when it is the industry name: "CI/CD" (not "Continuous Integration and Continuous Delivery"), "JPA", "REST APIs", "JMeter", "Kubernetes" (not "K8s"), "PostgreSQL" (not "Postgres").
+  - Do not split one technology into a tool and its practice ("Shell" and "Shell Scripting" -> "Shell Scripting").
 
   Proficiency assessment (per skill):
-  - EXPERT: core tech across multiple production projects OR clear leadership/ownership, typically 3+ years.
-  - ADVANCED: production impact; complex features independently; repeated mentions.
-  - INTERMEDIATE: used but not core; moderate familiarity; limited depth.
-  - BEGINNER: demos/learning/unclear context only.
+  - First work out, from the dated work experiences and projects that actually use the skill, roughly how many years it was used hands-on and in how many roles/projects.
+  - EXPERT: core technology in 2+ production roles or projects with 3+ years of hands-on use, OR clear ownership/leadership of it (designed, led, mentored). Both breadth and depth must be visible in the text.
+  - ADVANCED: used in production with concrete impact (built complex features independently, measurable results), typically 1-3 years or more than one project.
+  - INTERMEDIATE: used in real work but not central, short duration, or only described briefly.
+  - BEGINNER: learning, coursework, demos, side experiments, or context too vague to judge.
+  - A skill that appears only in a skills list / tool list (extracted_from is []) must be BEGINNER or INTERMEDIATE, never ADVANCED or EXPERT.
+  - When unsure between two levels, choose the lower one.
 
   extracted_from rules (CRITICAL):
   - You MUST NOT use Skills / Technical Skills / Core Competencies / tool lists / comma-separated technology lists as evidence.

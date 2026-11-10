@@ -34,6 +34,7 @@ from app.modules.matching.prefilter import ResumeRef, is_job_active, select_cand
 from app.modules.matching.text import html_to_text
 from app.modules.resumes.models import Document, Resume, ResumeSkill
 from app.modules.users.models import UserSkill
+from app.shared.skills import skill_key
 
 logger = structlog.get_logger()
 
@@ -130,14 +131,14 @@ async def _load_skill_library(db: AsyncSession, user_id: int) -> tuple[SkillLibr
         for source in extracted or []:
             if isinstance(source, dict):
                 for quote in source.get("quotes") or []:
-                    evidence.setdefault(name.lower(), []).append(str(quote))
+                    evidence.setdefault(skill_key(name), []).append(str(quote))
     entries = []
     for skill in user_skills:
         level = skill.manual_proficiency if skill.is_manual and skill.manual_proficiency else skill.proficiency_level
         entries.append(SkillLibraryEntry(
             skill_name=skill.skill_name,
             proficiency=getattr(level, "value", str(level)),
-            evidence=tuple(evidence.get(skill.skill_name.lower(), ())),
+            evidence=tuple(evidence.get(skill_key(skill.skill_name), ())),
         ))
     return tuple(entries)
 

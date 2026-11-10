@@ -18,6 +18,7 @@ from app.modules.users.models import UserSkill
 from app.modules.users.schemas import ProfilePreferencesUpdate, UserProfileUpdate
 from app.modules.resumes.models import Resume, ResumeSkill
 from app.shared.enums import ProficiencyLevel
+from app.shared.skills import canonical_skill_name, highest_proficiency, is_known_canonical, proficiency_rank, skill_key
 
 
 # ============================================
@@ -30,22 +31,28 @@ SKILL_AGGREGATION_LOCK_NS = 731001  # pg advisory lock namespace for per-user sk
 async def aggregate_user_skills(
     db: AsyncSession,
     user_id: int,
-    affected_skill_names: Optional[List[str]] = None
+    affected_skill_names: Optional[List[str]] = None,
+    *,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """
     Aggregate user skills from resume_skills to user_skills.
 
     This function:
-    1. Queries all resume_skills for the user, grouped by skill_name
-    2. For each skill, takes the MAX proficiency level
-    3. Updates or creates entries in user_skills
+    1. Reads the skills of the user's non-draft, non-deleted resumes and groups
+       them by ``skill_key`` (case, punctuation and known aliases ignored)
+    2. Takes the highest proficiency by rank (not SQL MAX, which compares the
+       stored strings alphabetically)
+    3. Updates or creates one user_skills row per skill, merging rows that
+       already exist under several spellings into one
     4. Respects manual skills (is_manual=True) by not overwriting their proficiency
-    5. Cleans up orphaned skills (skills that no longer exist in any resume)
+    5. Cleans up orphaned auto skills (full sync only)
 
     Args:
         db: Database session
         user_id: User ID
         affected_skill_names: Optional list of specific skills to update (for incremental updates)
+        commit: Commit at the end (the resync script passes False for dry runs)
 
     Returns:
         dict: Summary with total_skills, manual_skills, auto_skills counts
@@ -56,73 +63,87 @@ async def aggregate_user_skills(
     await db.execute(text("SELECT pg_advisory_xact_lock(:ns, :user_id)"),
                      {"ns": SKILL_AGGREGATION_LOCK_NS, "user_id": user_id})
 
-    # Step 1: Query resume_skills aggregated by skill_name
-    query = (
-        select(
-            ResumeSkill.skill_name,
-            func.max(ResumeSkill.proficiency_level).label('max_proficiency'),
-            func.count().label('source_count'),
-            func.max(ResumeSkill.created_at).label('last_seen_at')
+    affected_keys = {skill_key(name) for name in affected_skill_names} if affected_skill_names else None
+
+    # Step 1: resume skills grouped by skill identity
+    resume_rows = (await db.execute(
+        select(ResumeSkill.skill_name, ResumeSkill.proficiency_level, ResumeSkill.created_at)
+        .join(Resume, Resume.id == ResumeSkill.resume_id)
+        .where(
+            ResumeSkill.user_id == user_id,
+            Resume.is_draft.is_(False),
+            Resume.is_deleted.is_(False),
         )
-        .where(ResumeSkill.user_id == user_id)
-        .group_by(ResumeSkill.skill_name)
-    )
+    )).all()
 
-    if affected_skill_names:
-        query = query.where(ResumeSkill.skill_name.in_(affected_skill_names))
+    groups: dict[str, dict[str, Any]] = {}
+    for name, level, created_at in resume_rows:
+        key = skill_key(name)
+        if not key or (affected_keys is not None and key not in affected_keys):
+            continue
+        group = groups.setdefault(key, {"names": {}, "levels": [], "count": 0, "last_seen": None})
+        seen_count, seen_at = group["names"].get(name, (0, None))
+        group["names"][name] = (seen_count + 1, _latest(seen_at, created_at))
+        group["levels"].append(level)
+        group["count"] += 1
+        group["last_seen"] = _latest(group["last_seen"], created_at)
 
-    result = await db.execute(query)
-    resume_skills_agg = result.all()
+    existing_by_key: dict[str, list[UserSkill]] = {}
+    for skill in (await db.execute(select(UserSkill).where(UserSkill.user_id == user_id))).scalars().all():
+        key = skill_key(skill.skill_name)
+        if affected_keys is None or key in affected_keys:
+            existing_by_key.setdefault(key, []).append(skill)
 
-    # Step 2: Update or create user_skills
-    for skill_name, max_prof, count, last_seen in resume_skills_agg:
-        stmt = select(UserSkill).where(
-            UserSkill.user_id == user_id,
-            UserSkill.skill_name == skill_name
-        )
-        existing = (await db.execute(stmt)).scalar_one_or_none()
+    # Step 2: pick one surviving row per skill; the rest are merged away
+    keepers: dict[str, UserSkill] = {}
+    to_delete: list[UserSkill] = []
+    for key, rows in existing_by_key.items():
+        keeper = _pick_keeper(rows)
+        if key not in groups and not keeper.is_manual and affected_keys is None:
+            to_delete.extend(rows)  # orphaned auto skill (full sync only)
+            continue
+        keepers[key] = keeper
+        to_delete.extend(row for row in rows if row is not keeper)
 
-        if existing:
-            # Update existing skill
-            if existing.is_manual:
-                # Manual skill: only update metadata, keep proficiency
-                existing.source_count = count
-                existing.last_seen_at = last_seen
-            else:
-                # Auto skill: update proficiency and metadata
-                existing.proficiency_level = max_prof
-                existing.source_count = count
-                existing.last_seen_at = last_seen
+    # Delete before renaming so the renames cannot collide on uk_user_skill.
+    for skill in to_delete:
+        await db.delete(skill)
+    if to_delete:
+        await db.flush()
 
-            existing.updated_at = datetime.now(timezone.utc)
+    # Step 3: update or create
+    now = datetime.now(timezone.utc)
+    for key, group in groups.items():
+        keeper = keepers.get(key)
+        display_name = _display_name(group["names"], keeper)
+        level = highest_proficiency(group["levels"]) or ProficiencyLevel.INTERMEDIATE
+        if keeper is not None:
+            keeper.skill_name = display_name
+            if not keeper.is_manual:
+                keeper.proficiency_level = level
+            keeper.source_count = group["count"]
+            keeper.last_seen_at = group["last_seen"]
+            keeper.updated_at = now
         else:
-            # Create new skill
-            new_skill = UserSkill(
+            db.add(UserSkill(
                 id=str(uuid4()),
                 user_id=user_id,
-                skill_name=skill_name,
-                proficiency_level=max_prof,
+                skill_name=display_name,
+                proficiency_level=level,
                 is_manual=False,
-                source_count=count,
-                last_seen_at=last_seen
-            )
-            db.add(new_skill)
+                source_count=group["count"],
+                last_seen_at=group["last_seen"],
+            ))
 
-    # Step 3: Clean up orphaned skills (only if full sync, not incremental)
-    if not affected_skill_names:
-        all_resume_skill_names = {row[0] for row in resume_skills_agg}
+    # Manual skills merged above may have lost their resume sources entirely.
+    for key, keeper in keepers.items():
+        if key not in groups and keeper.is_manual:
+            keeper.skill_name = canonical_skill_name(keeper.skill_name)
 
-        stmt = select(UserSkill).where(
-            UserSkill.user_id == user_id,
-            UserSkill.is_manual == False,
-            UserSkill.skill_name.notin_(all_resume_skill_names) if all_resume_skill_names else True
-        )
-        orphaned_skills = (await db.execute(stmt)).scalars().all()
-
-        for skill in orphaned_skills:
-            await db.delete(skill)
-
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
 
     # Step 4: Get summary counts
     summary_stmt = select(
@@ -139,6 +160,37 @@ async def aggregate_user_skills(
         "manual_skills": manual_count,
         "auto_skills": total_count - manual_count,
     }
+
+
+def _latest(a: Optional[datetime], b: Optional[datetime]) -> Optional[datetime]:
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return max(a, b)
+
+
+def _pick_keeper(rows: List[UserSkill]) -> UserSkill:
+    """The row that survives a merge: a manual one (highest manual level) first."""
+    def sort_key(skill: UserSkill) -> tuple:
+        manual_level = skill.manual_proficiency or skill.proficiency_level
+        return (
+            1 if skill.is_manual else 0,
+            proficiency_rank(manual_level) if skill.is_manual else 0,
+            skill.source_count or 0,
+        )
+    return max(rows, key=sort_key)
+
+
+def _display_name(names: Dict[str, tuple], keeper: Optional[UserSkill]) -> str:
+    """Curated canonical spelling > the user's manual spelling > most used / most recent spelling."""
+    candidate = next(iter(names))
+    if is_known_canonical(candidate):
+        return canonical_skill_name(candidate)
+    if keeper is not None and keeper.is_manual:
+        return keeper.skill_name
+    epoch = datetime.min.replace(tzinfo=timezone.utc)
+    return max(names.items(), key=lambda item: (item[1][0], item[1][1] or epoch))[0]
 
 
 # ============================================
@@ -202,17 +254,17 @@ async def create_user_skill(
     Raises:
         ValueError: If skill already exists for this user
     """
-    normalized_skill = skill_name.strip()
+    normalized_skill = canonical_skill_name(skill_name)
+    key = skill_key(normalized_skill)
 
-    # Check if skill already exists
-    existing_stmt = select(UserSkill).where(
-        UserSkill.user_id == user_id,
-        func.lower(UserSkill.skill_name) == normalized_skill.lower()
-    )
-    existing = (await db.execute(existing_stmt)).scalar_one_or_none()
+    # Same skill under another spelling ("pytest" vs "Pytest", "CSS3" vs "CSS") counts as existing.
+    existing_names = (await db.execute(
+        select(UserSkill.skill_name).where(UserSkill.user_id == user_id)
+    )).scalars().all()
+    existing = next((name for name in existing_names if skill_key(name) == key), None)
 
     if existing:
-        raise ValueError(f"Skill '{skill_name}' already exists for this user")
+        raise ValueError(f"Skill '{skill_name}' already exists for this user as '{existing}'")
 
     # Create new manual skill
     new_skill = UserSkill(

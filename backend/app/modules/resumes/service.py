@@ -34,6 +34,13 @@ from app.core.config import settings
 from app.modules.workflow import TaskExecution
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
 from app.shared.search import build_keyword_filter
+from app.shared.skills import (
+    canonical_skill_name,
+    highest_proficiency,
+    proficiency_rank,
+    skill_key,
+    to_proficiency,
+)
 
 
 
@@ -571,6 +578,45 @@ class ResumeService:
             raise JobPilotException(str(exc))
 
     @staticmethod
+    def normalize_resume_skills(skills: list[dict]) -> dict[str, dict]:
+        """Clean one resume's LLM skill list, keyed by ``skill_key``.
+
+        - Names are canonicalised, so aliases and casing variants collapse.
+        - Duplicates within the list keep the highest level and all evidence.
+        - Unknown levels fall back to INTERMEDIATE.
+        - A skill with no evidence outside a skills list (``extracted_from``
+          empty) is capped at INTERMEDIATE: listing a tool is not proof of
+          advanced use.
+        """
+        normalized: dict[str, dict] = {}
+        for skill_data in skills:
+            raw_name = (skill_data.get("name") or "").strip()
+            if not raw_name:
+                continue
+            name = canonical_skill_name(raw_name)
+            key = skill_key(name)
+            if not key:
+                continue
+
+            proficiency = to_proficiency(skill_data.get("proficiency")) or ProficiencyLevel.INTERMEDIATE
+            extracted_from = list(skill_data.get("extracted_from") or [])
+
+            current = normalized.get(key)
+            if current is None:
+                normalized[key] = {"name": name, "proficiency": proficiency, "extracted_from": extracted_from}
+                continue
+            current["proficiency"] = highest_proficiency([current["proficiency"], proficiency])
+            current["extracted_from"].extend(extracted_from)
+
+        for entry in normalized.values():
+            if not entry["extracted_from"] and proficiency_rank(entry["proficiency"]) > proficiency_rank(
+                ProficiencyLevel.INTERMEDIATE
+            ):
+                entry["proficiency"] = ProficiencyLevel.INTERMEDIATE
+            entry["extracted_from"] = entry["extracted_from"] or None
+        return normalized
+
+    @staticmethod
     async def update_resume_skills(
         db: AsyncSession,
         resume_id: str,
@@ -578,81 +624,62 @@ class ResumeService:
         skills: list[dict]
     ) -> tuple[int, int]:
         """
-        Save or update skills for a resume.
+        Replace a resume's skills with the given LLM output.
 
-        This function:
-        1. For each skill in the list, INSERT or UPDATE resume_skills
-        2. Delete skills that no longer exist in the new list
-        3. Does NOT commit - caller should commit
+        Skills are matched to existing rows by ``skill_key`` (so a re-analysis
+        that changes "pytest" to "Pytest" updates the row instead of adding a
+        second one), existing duplicates of one skill are collapsed, and rows
+        for skills no longer listed are deleted. Does NOT commit.
 
         Args:
             db: Database session
             resume_id: Resume ID
             user_id: User ID
-            skills: List of skills [{"name": "Python", "proficiency": "expert"}, ...]
+            skills: List of skills [{"name": "Python", "proficiency": "expert", "extracted_from": [...]}, ...]
 
         Returns:
-            Number of skills saved
+            (number of skills kept, number of rows deleted)
         """
-        # Step 1 & 2: Insert or update each skill
-        skill_names_in_list = set()
-        for skill_data in skills:
-            skill_name = skill_data.get("name", "").strip()
-            if not skill_name:
-                continue
+        normalized = ResumeService.normalize_resume_skills(skills)
 
-            proficiency_str = skill_data.get(
-                "proficiency", ProficiencyLevel.INTERMEDIATE.value).lower()
+        existing_rows = (await db.execute(
+            select(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
+        )).scalars().all()
 
-            skill_names_in_list.add(skill_name)
-
-            # Map proficiency string to enum
-            try:
-                proficiency = ProficiencyLevel(proficiency_str)
-            except ValueError:
-                proficiency = ProficiencyLevel.INTERMEDIATE
-
-            extracted_from = skill_data.get("extracted_from")
-
-            # Check if skill already exists
-            stmt = select(ResumeSkill).where(
-                ResumeSkill.resume_id == resume_id,
-                ResumeSkill.skill_name == skill_name
-            )
-            existing_skill = (await db.execute(stmt)).scalar_one_or_none()
-
-            if existing_skill:
-                # Update existing skill
-                existing_skill.proficiency_level = proficiency
-                existing_skill.extracted_from = extracted_from
-                existing_skill.updated_at = datetime.now(timezone.utc)
+        keeper_by_key: dict[str, ResumeSkill] = {}
+        to_delete: list[ResumeSkill] = []
+        for row in existing_rows:
+            key = skill_key(row.skill_name)
+            if key in normalized and key not in keeper_by_key:
+                keeper_by_key[key] = row
             else:
-                # Insert new skill
-                new_skill = ResumeSkill(
+                to_delete.append(row)
+
+        # Delete first so renames below cannot collide on uk_resume_skill.
+        for row in to_delete:
+            await db.delete(row)
+        if to_delete:
+            await db.flush()
+
+        now = datetime.now(timezone.utc)
+        for key, entry in normalized.items():
+            row = keeper_by_key.get(key)
+            if row is not None:
+                row.skill_name = entry["name"]
+                row.proficiency_level = entry["proficiency"]
+                row.extracted_from = entry["extracted_from"]
+                row.updated_at = now
+            else:
+                db.add(ResumeSkill(
                     id=str(uuid4()),
                     user_id=user_id,
                     resume_id=resume_id,
-                    skill_name=skill_name,
-                    proficiency_level=proficiency,
-                    extracted_from=extracted_from,
-                )
-                db.add(new_skill)
+                    skill_name=entry["name"],
+                    proficiency_level=entry["proficiency"],
+                    extracted_from=entry["extracted_from"],
+                ))
 
-        # Step 3: Delete skills that no longer exist in the new list
-        if skill_names_in_list:
-            from sqlalchemy import delete
-            stmt = delete(ResumeSkill).where(
-                ResumeSkill.resume_id == resume_id,
-                ResumeSkill.skill_name.notin_(skill_names_in_list)
-            )
-            deleted_skills = (await db.execute(stmt)).rowcount
-        else:
-            # All skills removed, delete all
-            from sqlalchemy import delete
-            stmt = delete(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
-            deleted_skills = (await db.execute(stmt)).rowcount
-
-        return len(skill_names_in_list), deleted_skills
+        return len(normalized), len(to_delete)
 
     @staticmethod
     def _normalize_target_job_titles(
