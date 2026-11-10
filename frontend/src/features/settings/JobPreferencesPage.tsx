@@ -54,6 +54,19 @@ const CLEARANCE_OPTIONS: { value: SecurityClearance; label: string }[] = [
 
 const COMMON_LANGUAGES = ['English', 'Chinese', 'Hindi', 'Japanese', 'Korean', 'Spanish', 'French', 'German'] as const
 
+// Mirror the backend limits in ProfilePreferencesUpdate / SalaryExpectation.
+const MAX_LANGUAGES = 10
+const MAX_COUNTRY_LENGTH = 64
+
+// Accepts "120000", "120,000" or "120 000"; returns null unless it is a
+// positive whole number (the API stores salaries as integers).
+const parseSalary = (raw: string): number | null => {
+  const cleaned = raw.replace(/[,\s]/g, '')
+  if (!/^\d+$/.test(cleaned)) return null
+  const value = Number(cleaned)
+  return Number.isSafeInteger(value) && value > 0 ? value : null
+}
+
 interface PreferencesFormValues {
   default_tailoring_level: 'light' | 'moderate' | 'deep'
   job_locations: string[]
@@ -124,6 +137,11 @@ export default function JobPreferencesPage() {
   ]
 
   const toggleLanguage = (language: string, checked: boolean) => {
+    if (checked && selectedLanguages.length >= MAX_LANGUAGES) {
+      setLoadError(`You can select up to ${MAX_LANGUAGES} languages.`)
+      return
+    }
+    setLoadError(null)
     const next = checked
       ? [...selectedLanguages, language]
       : selectedLanguages.filter((item) => item !== language)
@@ -146,9 +164,9 @@ export default function JobPreferencesPage() {
       let salaryExpectation: UserPreferences['salary_expectation'] = null
 
       if (values.salary_mode === 'exact') {
-        const value = Number(values.salary_exact)
-        if (!Number.isFinite(value) || value <= 0) {
-          throw new Error('Please enter a valid expected yearly salary.')
+        const value = parseSalary(values.salary_exact)
+        if (value === null) {
+          throw new Error('Please enter the expected yearly salary as a whole number, e.g. 120000.')
         }
         salaryExpectation = {
           mode: 'exact',
@@ -161,10 +179,13 @@ export default function JobPreferencesPage() {
       }
 
       if (values.salary_mode === 'range') {
-        const min = Number(values.salary_min)
-        const max = Number(values.salary_max)
-        if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0 || max < min) {
-          throw new Error('Please enter a valid yearly salary range.')
+        const min = parseSalary(values.salary_min)
+        const max = parseSalary(values.salary_max)
+        if (min === null || max === null) {
+          throw new Error('Please enter the salary range as whole numbers, e.g. 110000 and 150000.')
+        }
+        if (max < min) {
+          throw new Error('The maximum salary must be greater than or equal to the minimum.')
         }
         salaryExpectation = {
           mode: 'range',
@@ -407,7 +428,7 @@ export default function JobPreferencesPage() {
                   <FormItem className="max-w-sm">
                     <FormLabel>Country you live in</FormLabel>
                     <FormControl>
-                      <Input placeholder={DEFAULT_COUNTRY} {...field} />
+                      <Input placeholder={DEFAULT_COUNTRY} maxLength={MAX_COUNTRY_LENGTH} {...field} />
                     </FormControl>
                     <p className="text-xs text-slate-500">
                       Jobs that require working on site or living in another country are rejected.

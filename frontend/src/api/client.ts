@@ -93,9 +93,35 @@ const unwrapResponse = <TResult>(response: AxiosResponse<ApiResponse<TResult> | 
   return payload as TResult
 }
 
+type ValidationIssue = { loc?: unknown[]; msg?: unknown }
+
+// FastAPI request-validation errors (422) bypass the ApiResponse envelope and
+// arrive as { detail: string | ValidationIssue[] }. Turn them into a readable
+// message instead of axios' generic "Request failed with status code 422".
+export const formatValidationDetail = (detail: unknown): string | null => {
+  if (typeof detail === 'string') return detail || null
+  if (!Array.isArray(detail) || detail.length === 0) return null
+
+  const messages = (detail as ValidationIssue[]).map((issue) => {
+    const field = (issue.loc ?? []).filter((part) => part !== 'body').join('.')
+    const msg = String(issue.msg ?? 'Invalid value')
+    return field ? `${field}: ${msg}` : msg
+  })
+  return messages.join('; ')
+}
+
 const toApiError = (error: AxiosError<ApiResponse<unknown>>): never => {
   const status = error.response?.status
   const payload = error.response?.data
+
+  if (payload && typeof payload === 'object' && 'detail' in payload && !('code' in payload)) {
+    const message = formatValidationDetail((payload as { detail: unknown }).detail)
+    if (message) {
+      const apiError = new ApiError(status ?? 0, message, status, payload)
+      handleApiError(apiError)
+      throw apiError
+    }
+  }
 
   if (payload && typeof payload === 'object' && 'code' in payload && 'message' in payload) {
     const apiError = new ApiError(

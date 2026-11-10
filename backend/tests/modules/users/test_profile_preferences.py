@@ -47,12 +47,18 @@ async def test_update_profile_preferences_merges_and_keeps_unsent_keys():
     db.get = AsyncMock(return_value=user)
     db.commit = AsyncMock()
     db.refresh = AsyncMock()
+    result_proxy = MagicMock()
+    result_proxy.scalars.return_value.all.return_value = [{"work_right": "Open work visa"}]
+    db.execute = AsyncMock(return_value=result_proxy)
 
     # An older client that only knows the original three fields.
     result = await update_profile_preferences(
         db, 1, ProfilePreferencesUpdate(job_locations=["Wellington"], default_tailoring_level="deep"))
     assert result == {"job_locations": ["Wellington"], "default_tailoring_level": "deep",
-                      "work_rights": "work_visa", "languages": ["English"]}
+                      "work_rights": "work_visa", "languages": ["English"],
+                      "work_right_hint": "Open work visa"}
+    # The hint is derived on read, never persisted.
+    assert "work_right_hint" not in user.preferences
 
     # Explicit null clears a value.
     result = await update_profile_preferences(db, 1, ProfilePreferencesUpdate(work_rights=None))

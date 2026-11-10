@@ -447,4 +447,8 @@ async def update_profile_preferences(
 
     await db.commit()
     await db.refresh(user)
-    return dict(user.preferences or {})
+    # Same shape as GET, including the derived work_right_hint, so a client
+    # that renders the response does not see the hint vanish after saving.
+    preferences = dict(user.preferences or {})
+    preferences["work_right_hint"] = await _latest_resume_work_right(db, user_id)
+    return preferences
