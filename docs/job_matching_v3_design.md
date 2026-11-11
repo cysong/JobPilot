@@ -930,3 +930,19 @@ backend/scripts/verify_matching_v3_migration.py
 | 队列积压导致岗位过期 | 新岗位优先出队；出队时检查在架；队列年龄告警 |
 | 费用随用户数增长 | 同族优先；每用户每日上限；前缀缓存 |
 | 岗位族配置变更导致数据失效 | 版本号；删除 / 拆分族时必须附迁移脚本 |
+
+## 15. 校准后的调整（prompt v3，2026-11-11）
+
+依据：Claude 复评与系统判定的对比（job-search `discovery/2026-11-11_match_calibration_report.md`）。系统 A 中 Claude 判 C 的占 38%，主要原因是众包岗、要求带人、相邻岗位族和应用支持类岗位。已有的匹配**不重判**，v3 只对新判定生效（`prompt_version = v3`）。
+
+| 调整 | 实现 |
+|---|---|
+| 非雇佣 / 众包岗位 | ① `config/non_employment.yaml` 公司黑名单，入队时直接拒绝（`NOT_EMPLOYMENT`，不调 LLM）；② judge 新增 `employment` 检查，`non_employment` 时以 `NOT_EMPLOYMENT` 拒绝，必须引用 JD 原文 |
+| 要求带人 | judge 新增 `people_management`（JD 要求 + 简历是否有带人经历，均需原文）；要求而没有时，代码把档位降到最高 C |
+| 相邻岗位族 | `family_relation = adjacent` 时代码把 A 降为 B（复评中 adjacent 的 A 只有 14% 成立） |
+| 应用支持 / 实施顾问 | prompt：属于不同方向（D） |
+| 语言 | 输入里把 Chinese 展开为 `Chinese (Mandarin, Cantonese)`，Mandarin / Cantonese 标注 `(Chinese)` |
+| 正文里的海外办公地 | prompt：地点字段是 NZ、正文写海外办公且不能远程时，按 `onsite_outside_candidate_country` |
+| 可替代技术 | prompt 示例改为 Java ↔ C#/.NET 可判 A；暂不做按用户配置 |
+
+代码降档时，`job_matches.validation` 记录 `llm_tier` 和 `tier_adjustments`，`judgment.tier` 保留 LLM 原始结论，便于对比。

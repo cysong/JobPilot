@@ -178,6 +178,9 @@ async def get_match_detail(db: AsyncSession, user: User, job_id: int) -> MatchDe
         other_constraints=judgment.get("other_constraints") or [],
         seniority_mismatch=judgment.get("seniority_mismatch"),
         is_different_track=judgment.get("is_different_track"),
+        people_management=judgment.get("people_management"),
+        llm_tier=(match.validation or {}).get("llm_tier"),
+        tier_adjustments=(match.validation or {}).get("tier_adjustments") or [],
         model=match.model,
         prompt_version=match.prompt_version,
     )

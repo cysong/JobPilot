@@ -1,0 +1,22 @@
+# Advertisers whose listings are crowd / paid-per-task work, not employment
+# (docs/job_matching_v3_design.md; calibration report 2026-11-11).
+# Jobs from these advertisers are rejected with NOT_EMPLOYMENT before the LLM judge.
+# Matching is on the normalized name (case, punctuation and company suffixes ignored);
+# an entry also matches longer names that start with it ("telus digital ai data" matches
+# "TELUS Digital AI Data Solutions").
+#
+# The judge also detects such listings from the description, so this list only needs
+# the frequent posters. Prod listings 2026-09 → 11 in brackets.
+companies:
+  - Alignerr            # 182
+  - Hired               # 41
+  - Crewlia             # 40
+  - Crossing Hurdles    # 30
+  - Twine               # 20
+  - DataAnnotation      # 13
+  - Joblet-AI           # 10
+  - Outlier
+  - Mindrift
+  - Braintrust
+  - TELUS Digital AI Data
+  - TELUS International AI

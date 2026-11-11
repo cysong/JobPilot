@@ -111,4 +111,11 @@ def test_conditions_include_country_and_languages():
                                        languages=("English", "Chinese")),
         resumes=[JAVA], extra_skills=[], job=JOB,
     )
-    assert "languages: English, Chinese" in text
+    assert "languages: English, Chinese (Mandarin, Cantonese)" in text
+
+
+def test_describe_languages_adds_varieties():
+    from app.modules.matching.judge.input_builder import describe_languages
+
+    assert describe_languages(["Mandarin", "english"]) == "Mandarin (Chinese), english"
+    assert describe_languages(["chinese"]) == "chinese (Mandarin, Cantonese)"

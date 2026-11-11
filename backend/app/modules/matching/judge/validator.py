@@ -20,6 +20,34 @@ from app.modules.matching.text import quote_in
 YEARS_TOLERANCE = 0.5
 
 
+_TIER_ORDER = "ABCD"
+
+
+def capped_tier(
+    tier: str, *, people_management_gap: bool, family_relation: str | None
+) -> tuple[str, list[str]]:
+    """Code-level ceilings on the LLM tier (calibration 2026-11-11).
+
+    - The job needs a people manager and the candidate never managed people: at most C.
+    - The job is only in an adjacent role family of the candidate's resumes: at most B
+      (14% of adjacent A's held up on review, against 35% for same-family A's).
+    Returns the final tier and the rules that lowered it.
+    """
+    applied: list[str] = []
+
+    def cap(current: str, ceiling: str, rule: str) -> str:
+        if _TIER_ORDER.index(current) < _TIER_ORDER.index(ceiling):
+            applied.append(rule)
+            return ceiling
+        return current
+
+    if people_management_gap:
+        tier = cap(tier, "C", "people_management_required")
+    if family_relation == "adjacent":
+        tier = cap(tier, "B", "adjacent_family")
+    return tier, applied
+
+
 class JudgmentStructureError(ValueError):
     """The output cannot be used as-is; the LLM call should be retried."""
 
@@ -48,6 +76,7 @@ def validate_judgment(
     skill_texts: Sequence[str],
     conditions: CandidateConditions,
     history_years: Mapping[str, float],
+    family_relation: str | None = None,
 ) -> JudgeOutcome:
     try:
         judgment = raw if isinstance(raw, MatchJudgment) else MatchJudgment.model_validate(raw)
@@ -77,7 +106,15 @@ def validate_judgment(
     if languages["required_languages"] and not quote_in(languages["quote"], job_text):
         fixes.append("constraint_quote_not_found:languages")
         data["languages"] = {"required_languages": [], "quote": None, "satisfied": None}
+    employment = data["employment"]
+    if employment["kind"] != "employment" and not quote_in(employment["quote"], job_text):
+        fixes.append("constraint_quote_not_found:employment")
+        data["employment"] = {"kind": "employment", "quote": None}
     data["other_constraints"] = [c for c in data["other_constraints"] if quote_in(c["quote"], job_text)]
+    people = data["people_management"]
+    if people["required"] and not quote_in(people["job_quote"], job_text):
+        fixes.append("people_management_quote_not_found")
+        people["required"], people["job_quote"] = False, None
 
     # A rejection needs a real JD sentence and a known candidate status.
     if data["decision"] == "rejected":
@@ -87,6 +124,7 @@ def validate_judgment(
             "SECURITY_CLEARANCE": conditions.security_clearance,
             "WORK_LOCATION": conditions.country,
             "LANGUAGE": ", ".join(conditions.languages) or None,
+            "NOT_EMPLOYMENT": "n/a",  # about the job, not the candidate
         }
         if not quote_in(rejection["quote"], job_text):
             fixes.append("rejection_quote_not_found")
@@ -99,6 +137,7 @@ def validate_judgment(
     unverified = 0
     total_quotes = 0
     evidence_items = [item["evidence"] for item in data["tech_items"]] + data["experience_evidence"]
+    evidence_items.append(people)  # its job_quote was verified above; this checks resume_quote
     for evidence in evidence_items:
         if evidence.get("job_quote"):
             total_quotes += 1
@@ -124,11 +163,17 @@ def validate_judgment(
     if judgment.seniority_mismatch and judgment.tier != "C":
         flags.append("tier_flag_conflict:seniority_mismatch")
 
+    tier, adjustments = capped_tier(
+        judgment.tier,
+        people_management_gap=people["required"] and not people["candidate_has"],
+        family_relation=family_relation,
+    )
+
     rejection = data["rejection"]
     return JudgeOutcome(
         status="rejected" if data["decision"] == "rejected" else "rated",
         resume_id=judgment.best_resume_id,
-        tier=judgment.tier,
+        tier=tier,
         tier_reason=judgment.tier_reason,
         tech_level=judgment.tech_level,
         experience_level=judgment.experience_level,
@@ -141,5 +186,6 @@ def validate_judgment(
             "flags": flags,
             "quotes_total": total_quotes,
             "quotes_unverified": unverified,
+            **({"llm_tier": judgment.tier, "tier_adjustments": adjustments} if adjustments else {}),
         },
     )

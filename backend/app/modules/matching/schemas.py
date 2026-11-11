@@ -78,6 +78,10 @@ class MatchDetail(MatchSummary):
     other_constraints: list[dict[str, Any]] = Field(default_factory=list)
     seniority_mismatch: Optional[bool] = None
     is_different_track: Optional[bool] = None
+    people_management: Optional[dict[str, Any]] = None
+    # Code-level ceilings applied to the LLM tier (prompt v3+), e.g. ["adjacent_family"].
+    llm_tier: Optional[Tier] = None
+    tier_adjustments: list[str] = Field(default_factory=list)
     model: Optional[str] = None
     prompt_version: Optional[str] = None
 

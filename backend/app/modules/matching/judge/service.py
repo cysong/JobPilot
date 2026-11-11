@@ -227,6 +227,7 @@ async def judge_pair(
     model_override: ModelOverride | None = None,
     context: dict | None = None,
     today: date | None = None,
+    family_relation: str | None = None,
 ) -> tuple[JudgeOutcome, dict]:
     """Call match_judge and validate. Returns (outcome, gateway context).
 
@@ -263,6 +264,7 @@ async def judge_pair(
                 skill_texts=[skill_line(s) for s in extra_skills],
                 conditions=user.conditions,
                 history_years=history,
+                family_relation=family_relation,
             )
         except JudgmentStructureError as exc:
             last_error = exc

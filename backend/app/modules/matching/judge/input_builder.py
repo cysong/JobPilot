@@ -48,6 +48,23 @@ class JobInput:
 
 MAX_SKILL_EVIDENCE = 2
 
+# A language name and the spoken varieties a JD may ask for instead. Users write
+# "Chinese" in preferences while JDs ask for "Mandarin" (calibration 2026-11-11).
+_LANGUAGE_VARIETIES: dict[str, tuple[str, ...]] = {
+    "chinese": ("Mandarin", "Cantonese"),
+    "mandarin": ("Chinese",),
+    "cantonese": ("Chinese",),
+}
+
+
+def describe_languages(languages: Sequence[str]) -> str:
+    """'Chinese, English' -> 'Chinese (Mandarin, Cantonese), English'."""
+    parts = []
+    for language in languages:
+        varieties = _LANGUAGE_VARIETIES.get(language.strip().lower())
+        parts.append(f"{language} ({', '.join(varieties)})" if varieties else language)
+    return ", ".join(parts)
+
 
 def skill_library_supplement(
     skills: Iterable[SkillLibraryEntry], resumes: Sequence[CandidateResume]
@@ -76,7 +93,7 @@ def build_judge_input(
     lines.append(f"work_rights: {conditions.work_rights or 'unknown'}")
     lines.append(f"security_clearance: {conditions.security_clearance or 'unknown'}")
     lines.append(f"located_in: {conditions.country}")
-    lines.append(f"languages: {', '.join(conditions.languages) if conditions.languages else 'unknown'}")
+    lines.append(f"languages: {describe_languages(conditions.languages) if conditions.languages else 'unknown'}")
 
     lines.append("")
     lines.append("[CANDIDATE RESUMES]")

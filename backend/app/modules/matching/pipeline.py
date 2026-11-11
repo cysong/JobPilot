@@ -27,6 +27,7 @@ from app.core.metrics import match_judge_duration_seconds, match_judge_total, ma
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.families.classifier import register_jobs
 from app.modules.matching.families.models import JobFamilyStatus, JobRoleFamily
+from app.modules.matching.employment import NON_EMPLOYMENT_REASON, is_non_employment_company
 from app.modules.matching.families.registry import RoleFamilyRegistry, get_registry
 from app.modules.matching.judge.input_builder import JobInput
 from app.modules.matching.judge.service import (
@@ -107,7 +108,7 @@ async def enqueue_matches(
     """Plan every classified live job that has no match row for a matching user."""
     now = _now(now)
     registry = registry or get_registry()
-    counts = {"queued": 0, "location_rejected": 0, "filtered": 0}
+    counts = {"queued": 0, "location_rejected": 0, "non_employment": 0, "filtered": 0}
     for user_id in user_ids if user_ids is not None else await matching_user_ids(db):
         user = await load_user_context(db, user_id)
         bound = [r for r in user.resume_refs if r.role_family]
@@ -118,7 +119,7 @@ async def enqueue_matches(
         jobs = (await db.execute(
             select(JobRoleFamily.job_id, JobRoleFamily.role_family, JobRoleFamily.families_version,
                    JobRoleFamily.updated_at, SeekJob.title, SeekJob.location_city, SeekJob.location_label,
-                   SeekJob.work_types_label, SeekJob.listed_at)
+                   SeekJob.work_types_label, SeekJob.listed_at, SeekJob.advertiser_name, SeekJob.company_name)
             .join(SeekJob, SeekJob.id == JobRoleFamily.job_id)
             .where(JobRoleFamily.status == JobFamilyStatus.CLASSIFIED, active_job_clause(now),
                    ~exists().where(JobMatch.user_id == user_id, JobMatch.job_id == JobRoleFamily.job_id))
@@ -149,7 +150,12 @@ async def enqueue_matches(
                 "reject_code": None,
                 "reject_reason": None,
             }
-            if plan.prefilter == "location_rejected":
+            if is_non_employment_company(job.advertiser_name, job.company_name):
+                # No LLM call: a crowd-work platform on the blocklist.
+                row.update(status=JobMatchStatus.REJECTED, family_relation=_relation(user, job.role_family),
+                           reject_code=RejectCode.NOT_EMPLOYMENT, reject_reason=NON_EMPLOYMENT_REASON)
+                counts["non_employment"] += 1
+            elif plan.prefilter == "location_rejected":
                 # No LLM call: the city is outside the user's preferences.
                 row.update(status=JobMatchStatus.REJECTED, family_relation=_relation(user, job.role_family),
                            reject_code=RejectCode.LOCATION,
@@ -282,6 +288,7 @@ async def _judge_one(
             users[match.user_id] = await load_user_context(db, match.user_id)
         user = users[match.user_id]
         candidate_ids = list(match.candidate_resume_ids)
+        family_relation = match.family_relation
         match.attempts += 1
         attempts = match.attempts
         await db.commit()
@@ -292,6 +299,7 @@ async def _judge_one(
         outcome, ctx = await judge_pair(
             gateway, user=user, job=job, candidate_ids=candidate_ids, model_override=override,
             context={"operation": "match_judge", "user_id": user.user_id},
+            family_relation=family_relation,
         )
     except availability.LLMUnavailableError:
         # LLM work is paused: not this pair's fault. Undo the attempt, release the lease

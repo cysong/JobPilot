@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # Matching v3 (docs/job_matching_v3_design.md)
     MATCH_LLM_PROVIDER: str = "openrouter"
     MATCH_JUDGE_MODEL: str = "openai/gpt-6.1-terra"
-    MATCH_JUDGE_PROMPT_VERSION: str = "v2"
+    MATCH_JUDGE_PROMPT_VERSION: str = "v3"
     MATCH_DEFAULT_COUNTRY: str = "New Zealand"  # assumed candidate location when preferences have none
     TITLE_CLASSIFIER_MODEL: str = "z-ai/glm-5.3-flash"
     MATCH_MAX_CANDIDATE_RESUMES: int = 3

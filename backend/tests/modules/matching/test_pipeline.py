@@ -65,8 +65,10 @@ def _judgment(resume_id: str, tier: str) -> dict:
         "security_clearance": {"requirement": "none", "quote": None, "satisfied": None},
         "work_location": {"requirement": "none", "country": None, "quote": None, "satisfied": None},
         "languages": {"required_languages": [], "quote": None, "satisfied": None},
+        "employment": {"kind": "employment", "quote": None},
         "other_constraints": [],
         "best_resume_id": resume_id, "is_different_track": False, "seniority_mismatch": False,
+        "people_management": {"required": False, "job_quote": None, "candidate_has": False, "resume_quote": None},
         "tech_level": "strong", "tech_items": [{"requirement": "Must know the stack", "is_core": True,
                                                 "relation": "same",
                                                 "evidence": {"job_quote": "Must know the stack",
@@ -114,7 +116,7 @@ async def test_discover_and_enqueue(session_factory):
         await _classify(db, _gateway(calls))
         assert await discover_new_jobs(db) == 0  # idempotent
         counts = await enqueue_matches(db)
-    assert counts == {"queued": 3, "location_rejected": 1, "filtered": 1}
+    assert counts == {"queued": 3, "location_rejected": 1, "non_employment": 0, "filtered": 1}
 
     rows = await _matches(session_factory)
     assert set(rows) == {1, 2, 3, 5}
@@ -128,7 +130,21 @@ async def test_discover_and_enqueue(session_factory):
     assert rows[3].ai_call_id is None and rows[3].tier is None
 
     async with session_factory() as db:
-        assert await enqueue_matches(db) == {"queued": 0, "location_rejected": 0, "filtered": 1}
+        assert await enqueue_matches(db) == {"queued": 0, "location_rejected": 0, "non_employment": 0, "filtered": 1}
+
+
+@pytest.mark.asyncio
+async def test_blocklisted_company_is_rejected_without_llm(session_factory):
+    calls: list = []
+    async with session_factory() as db:
+        await _seed(db, qa_family="qa_test")
+        await db.execute(update(SeekJob).where(SeekJob.id == 2).values(advertiser_name="Alignerr"))
+        await db.commit()
+        await _classify(db, _gateway(calls))
+        counts = await enqueue_matches(db)
+    assert counts["non_employment"] == 1 and counts["queued"] == 2
+    row = (await _matches(session_factory))[2]
+    assert (row.status, row.reject_code, row.ai_call_id) == ("rejected", "NOT_EMPLOYMENT", None)
 
 
 @pytest.mark.asyncio

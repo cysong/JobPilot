@@ -6,7 +6,7 @@ import copy
 import pytest
 
 from app.modules.matching.judge.input_builder import CandidateConditions
-from app.modules.matching.judge.validator import JudgmentStructureError, validate_judgment
+from app.modules.matching.judge.validator import JudgmentStructureError, capped_tier, validate_judgment
 
 JD = (
     "Senior .NET Developer\n"
@@ -29,10 +29,12 @@ BASE = {
     "security_clearance": {"requirement": "none", "quote": None, "satisfied": None},
     "work_location": {"requirement": "none", "country": None, "quote": None, "satisfied": None},
     "languages": {"required_languages": [], "quote": None, "satisfied": None},
+    "employment": {"kind": "employment", "quote": None},
     "other_constraints": [],
     "best_resume_id": "res_1",
     "is_different_track": False,
     "seniority_mismatch": False,
+    "people_management": {"required": False, "job_quote": None, "candidate_has": False, "resume_quote": None},
     "tech_level": "strong",
     "tech_items": [
         {"requirement": "5+ years of C# and .NET", "is_core": True, "relation": "same",
@@ -51,7 +53,7 @@ BASE = {
 
 
 def _validate(raw, *, wr="citizen", sc=None, years=6.5, candidates=("res_1", "res_2"),
-              languages=("English", "Chinese")):
+              languages=("English", "Chinese"), relation=None):
     return validate_judgment(
         raw,
         candidate_ids=list(candidates),
@@ -60,6 +62,7 @@ def _validate(raw, *, wr="citizen", sc=None, years=6.5, candidates=("res_1", "re
         skill_texts=SKILLS,
         conditions=CandidateConditions(work_rights=wr, security_clearance=sc, languages=tuple(languages)),
         history_years={"res_1": years, "res_2": 1.0},
+        family_relation=relation,
     )
 
 
@@ -208,3 +211,56 @@ def test_other_constraints_keep_only_quoted():
     ])
     out = _validate(raw)
     assert [c["requirement"] for c in out.judgment["other_constraints"]] == ["Driver licence"]
+
+
+# ------------------------------------------------------------------ v3: employment, people, caps
+
+def test_non_employment_rejection_needs_no_candidate_status():
+    raw = _judgment(decision="rejected",
+                    rejection={"code": "NOT_EMPLOYMENT", "reason": "Gig platform.",
+                               "quote": "This role is based in our Sydney office."},
+                    employment={"kind": "non_employment", "quote": "This role is based in our Sydney office."})
+    out = _validate(raw)
+    assert (out.status, out.reject_code) == ("rejected", "NOT_EMPLOYMENT")
+
+
+def test_non_employment_without_jd_quote_is_dropped():
+    out = _validate(_judgment(employment={"kind": "non_employment", "quote": "Paid per task"}))
+    assert out.judgment["employment"] == {"kind": "employment", "quote": None}
+    assert "constraint_quote_not_found:employment" in out.validation["consistency_fixes"]
+
+
+def test_people_management_gap_caps_at_c():
+    people = {"required": True, "job_quote": "Applicants must be NZ citizens or permanent residents.",
+              "candidate_has": False, "resume_quote": None}
+    out = _validate(_judgment(people_management=people))
+    assert out.tier == "C" and out.validation["llm_tier"] == "A"
+    assert out.validation["tier_adjustments"] == ["people_management_required"]
+    assert out.judgment["tier"] == "A"  # the stored judgment keeps the LLM's answer
+
+
+def test_people_management_requirement_needs_a_jd_quote():
+    people = {"required": True, "job_quote": "Manage a team of 6", "candidate_has": False, "resume_quote": None}
+    out = _validate(_judgment(people_management=people))
+    assert out.tier == "A" and "people_management_quote_not_found" in out.validation["consistency_fixes"]
+
+
+def test_candidate_with_people_management_is_not_capped():
+    people = {"required": True, "job_quote": "Applicants must be NZ citizens or permanent residents.",
+              "candidate_has": True, "resume_quote": "Deployed to Azure App Service"}
+    out = _validate(_judgment(people_management=people))
+    assert out.tier == "A" and "tier_adjustments" not in out.validation
+
+
+def test_adjacent_family_caps_a_at_b():
+    out = _validate(_judgment(), relation="adjacent")
+    assert out.tier == "B" and out.validation["tier_adjustments"] == ["adjacent_family"]
+    assert _validate(_judgment(), relation="same").tier == "A"
+    assert _validate(_judgment(tier="C"), relation="adjacent").tier == "C"
+
+
+def test_capped_tier_rules_combine():
+    assert capped_tier("A", people_management_gap=True, family_relation="adjacent") == (
+        "C", ["people_management_required"])
+    assert capped_tier("B", people_management_gap=False, family_relation="adjacent") == ("B", [])
+    assert capped_tier("D", people_management_gap=True, family_relation="adjacent") == ("D", [])

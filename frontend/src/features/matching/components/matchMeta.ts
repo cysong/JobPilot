@@ -13,6 +13,7 @@ const REJECT_LABELS: Record<string, string> = {
   SECURITY_CLEARANCE: 'Security clearance',
   WORK_LOCATION: 'Work in another country',
   LANGUAGE: 'Language',
+  NOT_EMPLOYMENT: 'Not an employment role',
 }
 
 export const rejectLabel = (code: string | null) => (code ? REJECT_LABELS[code] ?? code : 'Rejected')

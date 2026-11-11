@@ -337,6 +337,15 @@ export interface MatchDetail extends MatchSummary {
   other_constraints: { requirement: string; quote: string }[]
   seniority_mismatch: boolean | null
   is_different_track: boolean | null
+  people_management: {
+    required: boolean
+    job_quote: string | null
+    candidate_has: boolean
+    resume_quote: string | null
+  } | null
+  /** The LLM's tier before code-level ceilings (set only when one applied). */
+  llm_tier: MatchTier | null
+  tier_adjustments: string[]
   model: string | null
   prompt_version: string | null
 }

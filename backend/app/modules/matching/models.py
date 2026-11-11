@@ -82,6 +82,8 @@ class RejectCode:
     SECURITY_CLEARANCE = "SECURITY_CLEARANCE"
     WORK_LOCATION = "WORK_LOCATION"  # judged by the LLM; LOCATION is the code-level city filter
     LANGUAGE = "LANGUAGE"
+    # Crowd work / paid-per-task gigs: by the company blocklist (no LLM) or by the judge.
+    NOT_EMPLOYMENT = "NOT_EMPLOYMENT"
 
 
 class JobMatch(Base, TimestampMixin):

@@ -21,6 +21,11 @@ const LEVEL_LABEL: Record<string, string> = {
   none: 'None',
 }
 
+const TIER_ADJUSTMENT_LABEL: Record<string, string> = {
+  people_management_required: 'needs people management experience',
+  adjacent_family: 'adjacent role family',
+}
+
 const formatYears = (value: number | null) => (value === null ? '—' : `${Math.round(value * 10) / 10} yrs`)
 
 function ConditionRow({ label, check }: { label: string; check: MatchConditionCheck | null }) {
@@ -73,6 +78,14 @@ function MatchDetailBody({ detail, actions }: { detail: MatchDetail; actions?: R
             Relevant {formatYears(detail.relevant_years)} / required {formatYears(detail.required_years)}
           </span>
           {detail.seniority_mismatch ? <span className="text-amber-700">Seniority mismatch</span> : null}
+          {detail.people_management?.required && !detail.people_management.candidate_has ? (
+            <span className="text-amber-700">People management required</span>
+          ) : null}
+          {detail.tier_adjustments?.length && detail.llm_tier ? (
+            <span title={detail.tier_adjustments.map((r) => TIER_ADJUSTMENT_LABEL[r] ?? r).join('; ')}>
+              Lowered from {detail.llm_tier}: {detail.tier_adjustments.map((r) => TIER_ADJUSTMENT_LABEL[r] ?? r).join(', ')}
+            </span>
+          ) : null}
         </div>
       </div>
 

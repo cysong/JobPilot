@@ -1,4 +1,4 @@
-version: 2
+version: 3
 name: "match_judge"
 provider: openrouter
 model: "openai/gpt-6.1-terra"
@@ -47,9 +47,19 @@ instructions: |
          include the candidate's country
        - none: nothing like that (NZ roles, remote roles open to NZ residents, or not stated)
        Put the required country in country.
+       Read the whole description, not only the location field: a role listed in NZ whose body
+       says the work is in an office abroad (e.g. "based in our Sydney office", "5 days a week in
+       Melbourne") with no remote or NZ option is onsite_outside_candidate_country.
      languages.required_languages: spoken or written languages the JD explicitly requires
        (e.g. "fluent Japanese required"). Ignore programming languages, and ignore languages that
-       are only "an advantage" or "nice to have".
+       are only "an advantage" or "nice to have". The candidate's languages may list dialects in
+       brackets, e.g. "Chinese (Mandarin, Cantonese)": a JD asking for any of them is satisfied.
+     employment.kind:
+       - non_employment: not a job with an employer but paid work on a platform: crowd or gig
+         work, paid per task or per hour on a marketplace, AI model training / evaluation /
+         data annotation tasks, "contributor" or "expert" networks, open-ended freelance gigs
+       - employment: anything else, including fixed-term, contract and agency-placed roles
+       Quote the JD sentence that shows non_employment.
 
      A requirement is NOT satisfied when:
        - work rights: citizen and candidate is not citizen; pr_or_citizen and candidate is
@@ -58,9 +68,11 @@ instructions: |
          not_eligible
        - work location: any requirement other than none, given the candidate's country
        - languages: a required language is not among the candidate's languages
+       - employment: kind is non_employment (code NOT_EMPLOYMENT; no candidate status needed)
      satisfied = null when the candidate status for that check is "unknown".
      If any requirement is not satisfied: decision = "rejected" and fill rejection with its code
-     (WORK_RIGHTS, SECURITY_CLEARANCE, WORK_LOCATION or LANGUAGE), a one-sentence reason and the
+     (WORK_RIGHTS, SECURITY_CLEARANCE, WORK_LOCATION, LANGUAGE or NOT_EMPLOYMENT), a one-sentence
+     reason and the
      exact JD sentence. Otherwise decision = "rated" and rejection = null. Never reject on an
      unknown status. Continue with all remaining fields either way.
 
@@ -75,6 +87,9 @@ instructions: |
   3. DIFFERENT TRACK
      is_different_track = true when the job's actual work is a different career track from
      the candidate (e.g. a PLC automation role for a software tester). Then tier must be D.
+     Supporting, configuring or implementing a business application for its users (application
+     support analyst, implementation consultant, ERP / CRM functional consultant) is a different
+     track from building software or testing it, even when the title says "engineer".
 
   4. TECHNOLOGY (tech_items, tech_level)
      List the job's core and must-have requirements (at most 12), each verbatim, with:
@@ -120,6 +135,11 @@ instructions: |
      about 4+ more years than relevant_years, a Principal / Head-of / Director role for a
      non-lead candidate, or a graduate / junior role for a candidate with 8+ years. Then tier
      must be C.
+     people_management.required = true only when the JD makes managing people part of the job:
+     direct reports, line management, hiring, performance reviews, workforce planning, people
+     leadership. Leading the technical work of a team without managing its people (a typical
+     Tech Lead) does not count. candidate_has = true only when a dated work entry in the chosen
+     resume shows managing people. When required and not candidate_has, tier is at most C.
 
   7. TIER (decide last)
      A  Strongly recommended — apply. tech_level strong AND experience_level strong.
@@ -128,7 +148,8 @@ instructions: |
         ability, lacks the relevant experience), or experience_level strong but tech_level
         partial (has done this work, missing a core technology).
      C  Not recommended. tech_level weak, or both tech_level partial and experience_level not
-        strong, or seniority_mismatch.
+        strong, or seniority_mismatch, or people management is required and the candidate has
+        none.
      D  Not relevant: is_different_track.
      When torn between A and B, choose A if a recruiter would shortlist this candidate.
      tier_reason: 1-2 sentences for the candidate naming the decisive requirements and evidence,
@@ -141,15 +162,24 @@ instructions: |
     non-core gap. tech strong, experience strong.
   - A: Intermediate QA Engineer, Playwright (TypeScript), API automation, CI/CD. Resume: SDET
     roles building Playwright E2E and API frameworks. tech strong, experience strong.
-  - B: Senior .NET Developer needing C#, ASP.NET Core, SQL Server, 5+ years. Resume: 8 years of
-    Java/Spring backend work, a little C# in a side project. tech partial (C# is the primary
-    language), experience strong.
+  - A: Senior .NET Developer needing C#, ASP.NET Core, SQL Server, 5+ years. Resume: 8 years of
+    Java/Spring backend work. C# / .NET is a close substitute for Java / Spring and SQL Server
+    for PostgreSQL. tech strong, experience strong.
+  - B: Senior Go Developer, Go is the only language, 5+ years of commercial Go. Resume: 8 years
+    of Java backend work, no Go. tech partial (Go is the primary language and only a distant
+    substitute), experience strong.
   - B: QA job needing Playwright and API testing; candidate has Selenium automation only in a
     2-year internship. tech strong, experience partial.
   - C: Data Engineer needing Spark, Airflow, Snowflake, 5+ years; resume is front-end React with
     no data pipeline work. tech weak, experience none.
+  - C: Engineering Team Lead with 6 direct reports, hiring and performance reviews. Resume: senior
+    developer, never managed people. people_management required, candidate_has false.
   - D: Automation Engineer programming PLCs and SCADA in a dairy plant; candidate is a software
     test automation engineer.
+  - D: Application Support Analyst supporting the finance system for business users; candidate
+    is a backend developer.
+  - Rejected NOT_EMPLOYMENT: "Software Tester (Remote), $40/hr, flexible tasks on our platform,
+    work when you want"; candidate any.
 
   STRICT RULES
   - Every quote must be copied word for word from the JOB, a resume or the skill library.

@@ -239,7 +239,8 @@ async def run_evaluation(
             async with sem:
                 try:
                     outcome, ctx = await judge_pair(gateway, user=user, job=job, candidate_ids=candidates,
-                                                    model_override=override)
+                                                    model_override=override,
+                                                    family_relation=row["prefilter"])
                     row.update(
                         judged=True, status=outcome.status, tier=outcome.tier, tier_reason=outcome.tier_reason,
                         reject_code=outcome.reject_code, resume_id=outcome.resume_id,
