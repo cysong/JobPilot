@@ -262,6 +262,7 @@ async def get_job_detail(
 
     # Build response with analysis (includes cn_content) and convenience content_cn for UI toggle
     job_detail = JobDetail.model_validate(job)
+    await service.JobService.apply_user_state(db, current_user.id, [job_detail])
     if job.analysis:
         job_detail.analysis = JobAnalysisResponse.model_validate(job.analysis)
         job_detail.content_cn = job.analysis.cn_content
@@ -278,7 +279,9 @@ async def get_similar_jobs(
     """Get similar jobs from the same company and classification."""
     similar_jobs = await service.JobService.get_similar_jobs(db, job_id, limit)
 
-    return [JobBase.model_validate(job) for job in similar_jobs]
+    items = [JobBase.model_validate(job) for job in similar_jobs]
+    await service.JobService.apply_user_state(db, current_user.id, items)
+    return items
 
 
 @router.get("/{job_id}/analysis", response_model=JobAnalysisResponse)

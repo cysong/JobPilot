@@ -45,6 +45,20 @@ class JobService:
     """Service class for Job-related operations"""
 
     @staticmethod
+    async def apply_user_state(db: AsyncSession, user_id: int, items: list[JobBase]) -> None:
+        """Fill the per-user fields of job responses: is_viewed, last_viewed_at and
+        has_application (a non-deleted application). They are not columns, so a
+        response built from a SeekJob alone always carries the defaults."""
+        job_ids = [item.id for item in items]
+        view_map = await UserJobViewRepository.get_view_map(db, user_id, job_ids)
+        applied = await ApplicationRepository.get_job_id_set_by_user(db, user_id, job_ids)
+        for item in items:
+            viewed = view_map.get(item.id)
+            item.is_viewed = viewed is not None
+            item.last_viewed_at = viewed.last_viewed_at if viewed else None
+            item.has_application = item.id in applied
+
+    @staticmethod
     async def get_jobs(
         db: AsyncSession,
         filters: JobFiltersRequest,
@@ -541,28 +555,18 @@ class JobService:
             limit=pagination.get_limit(),
         )
         items: list[SavedJobItem] = []
-        job_ids = [job.id for _, job in rows]
-        view_map = await UserJobViewRepository.get_view_map(db, user.id, job_ids)
-        application_job_ids = await ApplicationRepository.get_job_id_set_by_user(
-            db,
-            user.id,
-            job_ids,
-        )
         for saved, job in rows:
             job_item = JobBase.model_validate(job)
             # Keep saved cards visually aligned with list cards when source logo is missing.
             if not job_item.company_logo and job.branding_logo_url:
                 job_item.company_logo = job.branding_logo_url
-            viewed = view_map.get(job.id)
-            job_item.is_viewed = viewed is not None
-            job_item.last_viewed_at = viewed.last_viewed_at if viewed else None
-            job_item.has_application = job.id in application_job_ids
             items.append(
                 SavedJobItem(
                     job=job_item,
                     saved_at=saved.created_at,
                 )
             )
+        await JobService.apply_user_state(db, user.id, [item.job for item in items])
         return SavedJobListResponse.create(
             items=items,
             total=total,
