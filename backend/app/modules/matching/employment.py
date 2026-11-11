@@ -7,13 +7,15 @@ from pathlib import Path
 
 import yaml
 
+from app.modules.matching.families.normalize import strip_accents
+
 _CONFIG = Path(__file__).parent / "config" / "non_employment.yaml"
 _SUFFIXES = re.compile(r"\b(limited|ltd|inc|llc|pty|co|corp|corporation|group|nz|new zealand)\b")
 
 
 def company_key(name: str | None) -> str:
-    """Lowercase, drop company suffixes and punctuation: 'Joblet-AI Ltd.' -> 'joblet ai'."""
-    text = _SUFFIXES.sub(" ", (name or "").lower())
+    """Lowercase, drop accents, company suffixes and punctuation: 'Joblet-AI Ltd.' -> 'joblet ai'."""
+    text = _SUFFIXES.sub(" ", strip_accents(name or "").lower())
     return " ".join(re.findall(r"[a-z0-9]+", text))
 
 

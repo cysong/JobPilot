@@ -68,6 +68,8 @@ class JobRoleFamily(Base, TimestampMixin):
             postgresql_where=text("status = 'classified'"),
         ),
         Index("ix_job_role_families_title_key", "title_key"),
+        Index("ix_job_role_families_duplicate_of", "duplicate_of",
+              postgresql_where=text("duplicate_of IS NOT NULL")),
         Index(
             "ix_job_role_families_pending",
             "status",
@@ -88,3 +90,7 @@ class JobRoleFamily(Base, TimestampMixin):
     ai_call_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # First listing of the same job in another city / on another platform (matching.duplicates).
+    duplicate_of: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("seek_jobs.id", ondelete="SET NULL"), nullable=True
+    )

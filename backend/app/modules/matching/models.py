@@ -118,6 +118,7 @@ class JobMatch(Base, TimestampMixin):
             postgresql_where=text("status = 'failed_retryable'"),
         ),
         Index("ix_job_matches_job", "job_id"),
+        Index("ix_job_matches_duplicate_of", "duplicate_of", postgresql_where=text("duplicate_of IS NOT NULL")),
     )
 
     id: Mapped[str] = mapped_column(String(255), primary_key=True)
@@ -158,3 +159,8 @@ class JobMatch(Base, TimestampMixin):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     judged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Result for a repost of the same job: the match it was copied from (no LLM call) or,
+    # for results judged before deduplication, the group's best result it is merged into.
+    duplicate_of: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("job_matches.id", ondelete="SET NULL"), nullable=True
+    )

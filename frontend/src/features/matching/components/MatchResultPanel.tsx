@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, CircleDashed, Info, XCircle } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +89,22 @@ function MatchDetailBody({ detail, actions }: { detail: MatchDetail; actions?: R
           ) : null}
         </div>
       </div>
+
+      {detail.other_listings?.length ? (
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-900">Same job, other listings</h3>
+          <ul className="space-y-1 text-sm">
+            {detail.other_listings.map((listing) => (
+              <li key={listing.job_id}>
+                <Link to={`/jobs/${listing.job_id}`} className="text-indigo-600 hover:underline">
+                  {listing.location_label ?? 'Unknown location'}
+                </Link>
+                {listing.source ? <span className="text-slate-500"> · {listing.source}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {detail.tech_items.length > 0 ? (
         <div className="space-y-2">

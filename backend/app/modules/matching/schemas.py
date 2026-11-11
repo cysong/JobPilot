@@ -42,6 +42,8 @@ class MatchSummary(BaseModel):
     recommended_resume: Optional[ResumeBriefInfo]
     application_status: Optional[str] = None
     label: Optional[MatchLabelInfo] = None
+    # Other live listings of the same job (other cities / platforms) folded into this one.
+    other_listing_count: int = 0
 
 
 class MatchListItem(BaseModel):
@@ -63,6 +65,13 @@ class MatchListResponse(BaseModel):
     counts: MatchCounts
 
 
+class OtherListing(BaseModel):
+    job_id: int
+    source: Optional[str]
+    location_label: Optional[str]
+    listed_at: Optional[datetime]
+
+
 class MatchDetail(MatchSummary):
     """Full judgment for the job detail page."""
 
@@ -82,6 +91,7 @@ class MatchDetail(MatchSummary):
     # Code-level ceilings applied to the LLM tier (prompt v3+), e.g. ["adjacent_family"].
     llm_tier: Optional[Tier] = None
     tier_adjustments: list[str] = Field(default_factory=list)
+    other_listings: list[OtherListing] = Field(default_factory=list)
     model: Optional[str] = None
     prompt_version: Optional[str] = None
 

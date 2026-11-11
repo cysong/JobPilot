@@ -1,4 +1,4 @@
-import { Ban, MapPinOff } from 'lucide-react'
+import { Ban, Copy, MapPinOff } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import type { MatchSummary, MatchTier } from '@/types/job'
@@ -30,6 +30,12 @@ export function MatchBadges({ match }: { match: MatchSummary }) {
         <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700">
           <MapPinOff className="h-3 w-3" />
           Location unconfirmed
+        </Badge>
+      ) : null}
+      {match.other_listing_count ? (
+        <Badge variant="outline" className="gap-1 text-slate-600" title="Same job posted in other cities or on other sites">
+          <Copy className="h-3 w-3" />
+          +{match.other_listing_count} other listing{match.other_listing_count > 1 ? 's' : ''}
         </Badge>
       ) : null}
     </div>

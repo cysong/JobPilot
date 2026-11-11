@@ -946,3 +946,23 @@ backend/scripts/verify_matching_v3_migration.py
 | 可替代技术 | prompt 示例改为 Java ↔ C#/.NET 可判 A；暂不做按用户配置 |
 
 代码降档时，`job_matches.validation` 记录 `llm_tier` 和 `tier_adjustments`，`judgment.tier` 保留 LLM 原始结论，便于对比。
+
+## 16. 重复发布（2026-11-11）
+
+同一岗位在多个城市或多个平台（Seek / LinkedIn / SmartRecruiters / Workable）重复发布：过去一个月有判定的 1,358 条里约 25% 是重复的，JD 完全相同的重复对中有 17% 档位不一致。
+
+**判定规则**（`app/modules/matching/duplicates.py`，阈值来自生产数据）：
+
+- 标题规范化后相同（`title_key`），且标题里的级别词相同（Senior / Junior / Lead …）；
+- 发布时间相差不超过 30 天；
+- JD 正文按 5 词切片，`max(Jaccard, 包含度) ≥ 0.90`；公司名规范化后对不上时（平台间常见：Kainga Ora / Kāinga Ora - Homes and Communities、datacom1 / Datacom）要求 `≥ 0.95`。同标题的重复对两极分化明显：1,317 对 ≥ 0.9，392 对 < 0.9 的基本是不同岗位；
+- 标题不同的不合并（众包平台会把同一份 JD 挂在完全不同的职位名下）。
+
+**数据**：
+
+- `job_role_families.duplicate_of`：岗位登记（discover）时计算，指向该组最早的一条，不形成链。`seek_jobs` 归爬虫所有，不写。
+- `job_matches.duplicate_of`：判定时如果同组已有该用户的判定结果（按城市拒绝的除外），直接复制，不调 LLM，`validation.copied_from` 记来源；复制不占每日 LLM 限额。
+
+**展示**：匹配列表和计数按组去重，每组显示最好的一条（未被合并的优先、rated 优先、档位高优先、发布时间新优先），附 `other_listing_count`；详情页列出其它城市 / 平台的链接。
+
+**存量数据**：`scripts/backfill_job_duplicates.py`（默认 dry run，`--apply` 提交）给已登记的岗位分组；已有判定不重判，每组保留最好的一条，其余标记 `duplicate_of` 指向它。

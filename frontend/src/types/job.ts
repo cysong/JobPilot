@@ -283,6 +283,8 @@ export interface MatchSummary {
   recommended_resume: ResumeBriefInfo | null
   application_status: string | null
   label: MatchLabelInfo | null // admins only
+  /** Other live listings of the same job (other cities / platforms) folded into this entry. */
+  other_listing_count?: number
 }
 
 export interface MatchListItem {
@@ -346,6 +348,12 @@ export interface MatchDetail extends MatchSummary {
   /** The LLM's tier before code-level ceilings (set only when one applied). */
   llm_tier: MatchTier | null
   tier_adjustments: string[]
+  other_listings: {
+    job_id: number
+    source: string | null
+    location_label: string | null
+    listed_at: string | null
+  }[]
   model: string | null
   prompt_version: string | null
 }

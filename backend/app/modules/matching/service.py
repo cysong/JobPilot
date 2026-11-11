@@ -13,6 +13,7 @@ from app.modules.auth.models import User
 from app.modules.jobs.models import SeekJob
 from app.modules.jobs.repository import JobRepository, UserJobViewRepository
 from app.modules.jobs.schemas import JobBriefInfo, ResumeBriefInfo
+from app.modules.matching.duplicates import group_job_ids
 from app.modules.matching.families.classifier import refresh_job_families, set_title_family
 from app.modules.matching.families.models import JobRoleFamily, JobTitleFamily
 from app.modules.matching.families.normalize import normalize_title
@@ -32,6 +33,7 @@ from app.modules.matching.schemas import (
     MatchListItem,
     MatchListResponse,
     MatchSummary,
+    OtherListing,
     ResumeRoleFamilyResponse,
     RoleFamilyInfo,
     TitleFamilyItem,
@@ -69,11 +71,34 @@ async def _application_status_map(db: AsyncSession, user_id: int, job_ids: list[
     return {job_id: getattr(status, "value", str(status)) for job_id, status in rows}
 
 
+def _representatives(user_id: int, now: datetime):
+    """One row per duplicate group (reposts of a job in other cities / on other platforms)
+    among the user's live judged results: the group's best result, plus the group size.
+
+    Best = not merged into another result, rated before rejected, best tier, newest listing.
+    A job without duplicates is its own group.
+    """
+    group_key = func.coalesce(JobRoleFamily.duplicate_of, JobMatch.job_id)
+    order = (JobMatch.duplicate_of.is_not(None), JobMatch.status != JobMatchStatus.RATED,
+             JobMatch.tier.asc().nullslast(), SeekJob.listed_at.desc().nullslast(), JobMatch.id)
+    return (
+        select(JobMatch.id.label("match_id"),
+               func.row_number().over(partition_by=group_key, order_by=order).label("rank"),
+               func.count().over(partition_by=group_key).label("group_size"))
+        .join(SeekJob, SeekJob.id == JobMatch.job_id)
+        .outerjoin(JobRoleFamily, JobRoleFamily.job_id == JobMatch.job_id)
+        .where(JobMatch.user_id == user_id, active_job_clause(now),
+               JobMatch.status.in_([JobMatchStatus.RATED, JobMatchStatus.REJECTED]))
+        .subquery()
+    )
+
+
 async def _counts(db: AsyncSession, user_id: int, now: datetime) -> MatchCounts:
+    reps = _representatives(user_id, now)
     rows = (await db.execute(
         select(JobMatch.status, JobMatch.tier, func.count())
-        .join(SeekJob, SeekJob.id == JobMatch.job_id)
-        .where(JobMatch.user_id == user_id, active_job_clause(now))
+        .join(reps, reps.c.match_id == JobMatch.id)
+        .where(reps.c.rank == 1)
         .group_by(JobMatch.status, JobMatch.tier)
     )).all()
     counts = MatchCounts()
@@ -82,8 +107,10 @@ async def _counts(db: AsyncSession, user_id: int, now: datetime) -> MatchCounts:
             setattr(counts, tier, getattr(counts, tier) + count)
         elif status == JobMatchStatus.REJECTED:
             counts.rejected += count
-        elif status in PENDING_STATUSES:
-            counts.pending += count
+    counts.pending = (await db.execute(
+        select(func.count()).select_from(JobMatch).join(SeekJob, SeekJob.id == JobMatch.job_id)
+        .where(JobMatch.user_id == user_id, active_job_clause(now), JobMatch.status.in_(PENDING_STATUSES))
+    )).scalar_one()
     return counts
 
 
@@ -111,19 +138,23 @@ async def list_matches(
     by a hard condition, with the reason and the JD quote.
     """
     now = now or datetime.now(timezone.utc)
+    reps = _representatives(user.id, now)
     stmt = (
-        select(JobMatch)
+        select(JobMatch, reps.c.group_size)
+        .join(reps, reps.c.match_id == JobMatch.id)
         .join(SeekJob, SeekJob.id == JobMatch.job_id)
-        .where(JobMatch.user_id == user.id, active_job_clause(now))
+        .where(reps.c.rank == 1)
     )
     if view == "rejected":
         stmt = stmt.where(JobMatch.status == JobMatchStatus.REJECTED)
     else:
         stmt = stmt.where(JobMatch.status == JobMatchStatus.RATED, JobMatch.tier.in_(_allowed_tiers(user, tiers)))
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    matches = list((await db.execute(
+    page = (await db.execute(
         stmt.order_by(SeekJob.listed_at.desc().nullslast(), JobMatch.id).limit(limit).offset(offset)
-    )).scalars())
+    )).all()
+    matches = [row[0] for row in page]
+    other_listings = {row[0].id: row[1] - 1 for row in page}
 
     job_ids = [m.job_id for m in matches]
     job_map = await JobRepository.get_brief_map(db, job_ids)
@@ -142,9 +173,25 @@ async def list_matches(
         info.is_viewed = viewed is not None
         info.last_viewed_at = viewed.last_viewed_at if viewed else None
         info.has_application = match.job_id in applications
-        items.append(MatchListItem(job=info, match=MatchSummary(**_summary(
-            match, resumes.get(match.resume_id), applications.get(match.job_id), labels.get(match.job_id)))))
+        summary = MatchSummary(**_summary(
+            match, resumes.get(match.resume_id), applications.get(match.job_id), labels.get(match.job_id)))
+        summary.other_listing_count = other_listings.get(match.id, 0)
+        items.append(MatchListItem(job=info, match=summary))
     return MatchListResponse(items=items, total=total, counts=await _counts(db, user.id, now))
+
+
+async def _other_listings(db: AsyncSession, job_id: int) -> list[OtherListing]:
+    """Live reposts of the same job (other cities / platforms), oldest first."""
+    group = await group_job_ids(db, job_id)
+    if len(group) < 2:
+        return []
+    rows = (await db.execute(
+        select(SeekJob.id, SeekJob.source, SeekJob.location_label, SeekJob.listed_at)
+        .where(SeekJob.id.in_([j for j in group if j != job_id]), active_job_clause(datetime.now(timezone.utc)))
+        .order_by(SeekJob.listed_at.asc().nullslast(), SeekJob.id)
+    )).all()
+    return [OtherListing(job_id=r.id, source=r.source, location_label=r.location_label, listed_at=r.listed_at)
+            for r in rows]
 
 
 async def _resume_map(db: AsyncSession, resume_ids: list[str]) -> dict[str, Resume]:
@@ -181,6 +228,7 @@ async def get_match_detail(db: AsyncSession, user: User, job_id: int) -> MatchDe
         people_management=judgment.get("people_management"),
         llm_tier=(match.validation or {}).get("llm_tier"),
         tier_adjustments=(match.validation or {}).get("tier_adjustments") or [],
+        other_listings=await _other_listings(db, job_id),
         model=match.model,
         prompt_version=match.prompt_version,
     )

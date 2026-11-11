@@ -27,6 +27,7 @@ from app.core.metrics import match_judge_duration_seconds, match_judge_total, ma
 from app.modules.jobs.models import SeekJob
 from app.modules.matching.families.classifier import register_jobs
 from app.modules.matching.families.models import JobFamilyStatus, JobRoleFamily
+from app.modules.matching.duplicates import judged_sibling, mark_duplicates
 from app.modules.matching.employment import NON_EMPLOYMENT_REASON, is_non_employment_company
 from app.modules.matching.families.registry import RoleFamilyRegistry, get_registry
 from app.modules.matching.judge.input_builder import JobInput
@@ -86,6 +87,10 @@ async def discover_new_jobs(db: AsyncSession, *, now: datetime | None = None, li
         .limit(limit or settings.MATCH_DISCOVER_LIMIT)
     )).all()
     added = await register_jobs(db, [(r.id, r.title) for r in rows])
+    # Reposts in another city / on another platform reuse the first listing's results.
+    duplicates = await mark_duplicates(db, [r.id for r in rows])
+    if duplicates:
+        logger.info("match_discover_duplicates", duplicates=duplicates, registered=added)
     await db.commit()
     return added
 
@@ -205,7 +210,9 @@ async def _claim(db: AsyncSession, now: datetime, size: int, stats: JudgeRunStat
     """
     used = dict((await db.execute(
         # Every finished attempt counts, failed ones included (they may still be billed).
-        select(JobMatch.user_id, func.count()).where(JobMatch.judged_at >= _day_start(now))
+        # Results copied from another listing of the same job cost nothing and do not count.
+        select(JobMatch.user_id, func.count()).where(JobMatch.judged_at >= _day_start(now),
+                                                     JobMatch.duplicate_of.is_(None))
         .group_by(JobMatch.user_id)
     )).all())
     due = (await db.execute(
@@ -284,6 +291,11 @@ async def _judge_one(
             match.status, match.next_attempt_at = JobMatchStatus.SKIPPED_EXPIRED, None
             await db.commit()
             return JobMatchStatus.SKIPPED_EXPIRED
+        sibling = await judged_sibling(db, user_id=match.user_id, job_id=match.job_id, exclude_match_id=match.id)
+        if sibling is not None:
+            _copy_result(match, sibling, job_content_hash=sha256_hex(job.job.description), now=clock())
+            await db.commit()
+            return "copied"
         if match.user_id not in users:
             users[match.user_id] = await load_user_context(db, match.user_id)
         user = users[match.user_id]
@@ -358,6 +370,24 @@ async def _judge_one(
         match.error = None
         await db.commit()
     return outcome.status
+
+
+_COPIED_FIELDS = ("status", "resume_id", "resume_content_hash", "tier", "tier_reason", "tech_level",
+                  "experience_level", "reject_code", "reject_reason", "reject_quote", "judgment", "model",
+                  "prompt_version")
+
+
+def _copy_result(match: JobMatch, source: JobMatch, *, job_content_hash: str, now: datetime) -> None:
+    """Reuse the judgment of another listing of the same job (no LLM call)."""
+    for name in _COPIED_FIELDS:
+        setattr(match, name, getattr(source, name))
+    match.validation = {**(source.validation or {}), "copied_from": source.id}
+    match.duplicate_of = source.duplicate_of or source.id
+    match.job_content_hash = job_content_hash
+    match.ai_call_id = None
+    match.judged_at = now
+    match.next_attempt_at = None
+    match.error = None
 
 
 def _count_validation(validation: dict[str, Any]) -> None:
