@@ -6,11 +6,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.modules.admin.dependencies import require_admin
+from app.modules.admin.dependencies import require_admin, require_admin_scope
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.modules.auth.scopes import MATCHING_LABELS
 from app.modules.matching import service
 from app.modules.matching.schemas import (
+    MatchLabelBatchCreate,
+    MatchLabelBatchResponse,
     MatchLabelCreate,
     MatchLabelInfo,
     ResumeRoleFamilyResponse,
@@ -23,6 +26,8 @@ from app.modules.matching.schemas import (
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 admin_router = APIRouter(prefix="/admin/matching", tags=["admin-matching"], dependencies=[Depends(require_admin)])
+# Label endpoints also accept an admin's API key with the matching:labels scope.
+labels_router = APIRouter(prefix="/admin/matching", tags=["admin-matching"])
 
 
 @router.get("/role-families", response_model=list[RoleFamilyInfo])
@@ -42,14 +47,24 @@ async def set_resume_role_family(
     return await service.set_resume_role_family(db, current_user, resume_id, payload.role_family)
 
 
-@admin_router.post("/labels", response_model=MatchLabelInfo, status_code=201)
+@labels_router.post("/labels", response_model=MatchLabelInfo, status_code=201)
 async def create_label(
     payload: MatchLabelCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    admin: Annotated[User, Depends(require_admin)],
+    admin: Annotated[User, Depends(require_admin_scope(MATCHING_LABELS))],
 ):
     """Label the admin's own result for a job (append-only)."""
     return await service.create_label(db, admin, payload)
+
+
+@labels_router.post("/labels/batch", response_model=MatchLabelBatchResponse)
+async def create_labels_batch(
+    payload: MatchLabelBatchCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin_scope(MATCHING_LABELS))],
+):
+    """Label up to 200 of the admin's own pairs; per-item errors are returned, not raised."""
+    return await service.create_labels_batch(db, admin, payload)
 
 
 @admin_router.get("/title-families", response_model=TitleFamilyListResponse)

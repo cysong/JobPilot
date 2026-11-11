@@ -21,4 +21,11 @@ export interface ApiKeyCreated extends ApiKey {
 export interface ApiKeyCreateRequest {
   name: string
   expires_at?: string | null
+  /** Admin-only scopes, e.g. 'matching:labels'. */
+  scopes?: string[]
 }
+
+/** Scopes an admin can grant (mirrors backend app/modules/auth/scopes.py). */
+export const ADMIN_API_KEY_SCOPES: { value: string; label: string }[] = [
+  { value: 'matching:labels', label: 'Submit match calibration labels' },
+]

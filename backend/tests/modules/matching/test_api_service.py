@@ -19,7 +19,7 @@ if LOCAL_DB:
     from app.modules.matching.families.models import JobRoleFamily, JobTitleFamily
     from app.modules.matching.labels.models import MatchLabel
     from app.modules.matching.models import JobMatch
-    from app.modules.matching.schemas import MatchLabelCreate
+    from app.modules.matching.schemas import MatchLabelBatchCreate, MatchLabelCreate
     from app.modules.resumes.models import Document, Resume
     from app.shared.enums import ApplicationStatus, Role
 
@@ -120,6 +120,23 @@ async def test_admin_sees_d_and_labels(session):
         await service.create_label(session, admin, MatchLabelCreate(job_id=2, label="A", reason_tags=["NOPE"]))
     with pytest.raises(NotFoundError):
         await service.create_label(session, admin, MatchLabelCreate(job_id=999, label="A"))
+
+
+@pytest.mark.asyncio
+async def test_label_batch_saves_valid_items_and_reports_the_rest(session):
+    admin, _ = await _seed(session, role=Role.ADMIN)
+    result = await service.create_labels_batch(session, admin, MatchLabelBatchCreate(labels=[
+        MatchLabelCreate(job_id=2, label="A", reason_tags=["TECH"]),
+        MatchLabelCreate(job_id=999, label="A"),
+        MatchLabelCreate(job_id=1, label="C", reason_tags=["NOPE"]),
+        MatchLabelCreate(job_id=2, label="B"),
+    ]))
+    assert [(e.index, e.job_id) for e in result.errors] == [(1, 999), (2, 1)]
+    assert [c.label for c in result.created] == ["A", "B"]
+    rows = (await session.execute(select(MatchLabel).order_by(MatchLabel.created_at))).scalars().all()
+    assert {r.source for r in rows} == {"api"}
+    current = [r for r in rows if r.superseded_by is None]
+    assert [(r.job_id, r.label) for r in current] == [(2, "B")]
 
 
 @pytest.mark.asyncio

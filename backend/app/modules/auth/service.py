@@ -252,8 +252,9 @@ async def create_api_key(
     user_id: int,
     name: str,
     expires_at: datetime | None = None,
+    scopes: list[str] | None = None,
 ) -> tuple[ApiKey, str]:
-    """Create a new API key. Returns (record, plaintext)."""
+    """Create a new API key. Returns (record, plaintext). Callers check who may grant ``scopes``."""
     plaintext = _generate_api_key_plaintext()
     record = ApiKey(
         id=str(uuid4()),
@@ -261,7 +262,7 @@ async def create_api_key(
         name=name,
         prefix=plaintext[:API_KEY_PREFIX_LENGTH],
         key_hash=_hash_api_key(plaintext),
-        scopes=[],
+        scopes=list(scopes or []),
         expires_at=expires_at,
     )
     db.add(record)

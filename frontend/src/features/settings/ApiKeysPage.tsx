@@ -7,7 +7,10 @@ import { AlertTriangle, Check, Copy, Loader2 } from 'lucide-react'
 
 import { apiKeysApi } from '@/api/apiKeys'
 import { ApiError } from '@/types/api'
+import { ADMIN_API_KEY_SCOPES } from '@/types/apiKeys'
 import type { ApiKey, ApiKeyCreated } from '@/types/apiKeys'
+import { useAuthStore } from '@/store/authStore'
+import { Role } from '@/types/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -45,6 +48,8 @@ function relative(value: string) {
 
 export default function ApiKeysPage() {
   const { toast } = useToast()
+  const isAdmin = useAuthStore((state) => state.user?.role === Role.ADMIN)
+  const [scopes, setScopes] = useState<string[]>([])
 
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,12 +94,14 @@ export default function ApiKeysPage() {
   const handleStartCreate = () => {
     setIsCreating(true)
     setCreateError(null)
+    setScopes([])
     createForm.reset({ name: '' })
   }
 
   const handleCancelCreate = () => {
     setIsCreating(false)
     setCreateError(null)
+    setScopes([])
     createForm.reset({ name: '' })
   }
 
@@ -102,11 +109,15 @@ export default function ApiKeysPage() {
     setSubmitting(true)
     setCreateError(null)
     try {
-      const created = await apiKeysApi.create({ name: values.name })
+      const created = await apiKeysApi.create({
+        name: values.name,
+        ...(isAdmin && scopes.length ? { scopes } : {}),
+      })
       setRevealed(created)
       setCopied(false)
       setIsCreating(false)
       createForm.reset({ name: '' })
+      setScopes([])
       await fetchKeys()
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to create API key.'
@@ -229,6 +240,15 @@ export default function ApiKeysPage() {
         <div className="mt-1 text-xs text-slate-500">
           Created {relative(key.created_at)} · Last used {relativeOrNever(key.last_used_at)}
         </div>
+        {key.scopes.length ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {key.scopes.map((scope) => (
+              <span key={scope} className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700">
+                {scope}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="flex shrink-0 gap-2">
         <Button
@@ -273,6 +293,29 @@ export default function ApiKeysPage() {
                     </FormItem>
                   )}
                 />
+                {isAdmin ? (
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-medium text-slate-900">Admin scopes</legend>
+                    <p className="text-xs text-slate-500">
+                      Lets this key call the listed admin endpoints. Leave unchecked for a normal key.
+                    </p>
+                    {ADMIN_API_KEY_SCOPES.map((scope) => (
+                      <label key={scope.value} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300"
+                          checked={scopes.includes(scope.value)}
+                          onChange={(e) =>
+                            setScopes((prev) =>
+                              e.target.checked ? [...prev, scope.value] : prev.filter((s) => s !== scope.value),
+                            )
+                          }
+                        />
+                        {scope.label} <code className="text-xs text-slate-500">{scope.value}</code>
+                      </label>
+                    ))}
+                  </fieldset>
+                ) : null}
                 {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
                 <div className="flex gap-2">
                   <Button

@@ -24,6 +24,9 @@ from app.modules.matching.pipeline import active_job_clause
 from app.modules.matching.schemas import (
     MatchCounts,
     MatchDetail,
+    MatchLabelBatchCreate,
+    MatchLabelBatchError,
+    MatchLabelBatchResponse,
     MatchLabelCreate,
     MatchLabelInfo,
     MatchListItem,
@@ -227,6 +230,33 @@ async def create_label(db: AsyncSession, admin: User, payload: MatchLabelCreate)
         raise BadRequestError(str(exc)) from exc
     await db.commit()
     return MatchLabelInfo.model_validate(row)
+
+
+async def create_labels_batch(db: AsyncSession, admin: User, payload: MatchLabelBatchCreate) -> MatchLabelBatchResponse:
+    """Label many of the admin's own pairs at once (calibration runs, automation).
+
+    Each item is checked and saved on its own savepoint, so one bad item does not
+    drop the rest. Labels are append-only: a repeat for the same job supersedes.
+    """
+    job_ids = {item.job_id for item in payload.labels}
+    existing = set((await db.execute(select(SeekJob.id).where(SeekJob.id.in_(job_ids)))).scalars())
+    created: list[MatchLabelInfo] = []
+    errors: list[MatchLabelBatchError] = []
+    for index, item in enumerate(payload.labels):
+        if item.job_id not in existing:
+            errors.append(MatchLabelBatchError(index=index, job_id=item.job_id, error="Job not found"))
+            continue
+        try:
+            async with db.begin_nested():
+                row = await add_label(db, user_id=admin.id, job_id=item.job_id, label=item.label,
+                                      labeled_by=admin.id, source="api", reason_tags=item.reason_tags,
+                                      note=item.note)
+        except ValueError as exc:
+            errors.append(MatchLabelBatchError(index=index, job_id=item.job_id, error=str(exc)))
+            continue
+        created.append(MatchLabelInfo.model_validate(row))
+    await db.commit()
+    return MatchLabelBatchResponse(created=created, errors=errors)
 
 
 async def _job_counts(db: AsyncSession, keys: list[str]) -> dict[str, int]:

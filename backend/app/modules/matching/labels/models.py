@@ -39,7 +39,7 @@ class MatchLabel(Base):
     label: Mapped[str] = mapped_column(String(16), nullable=False)
     reason_tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    source: Mapped[str] = mapped_column(String(16), nullable=False, comment="ui | import")
+    source: Mapped[str] = mapped_column(String(16), nullable=False, comment="ui | import | api")
     labeled_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     predicted_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     predicted_tier: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)

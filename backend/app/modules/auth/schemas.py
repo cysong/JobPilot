@@ -175,6 +175,18 @@ class ApiKeyCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=100)
     expires_at: datetime | None = None
+    # Admin-only scopes (app.modules.auth.scopes.ADMIN_SCOPES); empty for normal keys.
+    scopes: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("scopes")
+    @classmethod
+    def validate_scopes(cls, value: list[str]) -> list[str]:
+        from app.modules.auth.scopes import ADMIN_SCOPES
+
+        unknown = [s for s in value if s not in ADMIN_SCOPES]
+        if unknown:
+            raise ValueError(f"unknown scopes: {', '.join(unknown)}")
+        return sorted(set(value))
 
 
 class ApiKeyResponse(BaseModel):

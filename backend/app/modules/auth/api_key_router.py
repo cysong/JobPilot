@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import ForbiddenError
 from app.core.security import require_jwt_only
+from app.shared.enums import Role
 from app.modules.auth import service
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
@@ -28,11 +30,14 @@ async def create_api_key_route(
     current_user: Annotated[User, Depends(require_jwt_only)],
 ):
     """Create a new API key. The plaintext value is returned only once."""
+    if payload.scopes and current_user.role != Role.ADMIN:
+        raise ForbiddenError("Only admins can create keys with scopes")
     record, plaintext = await service.create_api_key(
         db,
         user_id=current_user.id,
         name=payload.name,
         expires_at=payload.expires_at,
+        scopes=payload.scopes,
     )
     return ApiKeyCreatedResponse(
         id=record.id,

@@ -106,6 +106,26 @@ class MatchLabelCreate(BaseModel):
     note: Optional[str] = Field(None, max_length=2000)
 
 
+MAX_LABEL_BATCH = 200
+
+
+class MatchLabelBatchCreate(BaseModel):
+    labels: list[MatchLabelCreate] = Field(..., min_length=1, max_length=MAX_LABEL_BATCH)
+
+
+class MatchLabelBatchError(BaseModel):
+    index: int
+    job_id: int
+    error: str
+
+
+class MatchLabelBatchResponse(BaseModel):
+    """Valid items are saved even when others fail; ``errors`` lists the rest by index."""
+
+    created: list[MatchLabelInfo]
+    errors: list[MatchLabelBatchError]
+
+
 class TitleFamilyItem(BaseModel):
     title_key: str
     example_title: str

@@ -190,3 +190,11 @@ backend/alembic/versions/<ts>_add_api_keys.py
 - 设置页加 "API Keys" tab
 - 创建按钮 → 表单（name 必填）→ 弹窗一次性显示 plaintext + 复制按钮 + 红字"关闭后无法再次查看"
 - 列表展示 `prefix`、`name`、`last_used_at`、撤销按钮
+
+## 管理员 scope（2026-11-11）
+
+scope 只用来**放开**本来只接受网页登录的管理员接口，不收紧普通接口：空数组仍等于该用户登录态的权限。
+
+- 可授予的 scope 定义在 `app/modules/auth/scopes.py` 的 `ADMIN_SCOPES`，只有管理员创建 key 时能勾选（前端 API Keys 页），非管理员带 scopes 创建返回 403。
+- `require_admin_scope(scope)`（`app/modules/admin/dependencies.py`）：网页登录的管理员直接通过；API key 要求持有人是管理员且 key 带该 scope。其它管理员接口仍用 `require_admin`（只接受网页登录）。
+- 目前唯一的 scope：`matching:labels`，开放 `POST /admin/matching/labels` 和 `POST /admin/matching/labels/batch`（一次最多 200 条，逐条返回错误，`source=api`）。
