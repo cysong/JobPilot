@@ -197,10 +197,10 @@ title_key 在 job_title_families 中？
 
 ### 4.4 简历绑定岗位族
 
-- 字段：`resumes.role_family`，每份正式简历一个。
-- **自动建议**：简历定稿时，把 `target_job_titles`（来自受控词表，即线上已出现的职位名）规范化后查缓存，取出现最多的岗位族；平票取第一个目标职位名的岗位族。
-- **用户可修改**：简历页提供岗位族选择。修改后不重跑已有匹配；触发一次回填（§10.3）。
-- 未绑定岗位族的简历不参与匹配。
+- 字段：`resumes.role_family`，每份正式简历一个，是简历唯一的匹配设置（简历页 “Matched as”）。
+- **由用户选择**：简历页提供岗位族选择，默认不选。修改后不重跑已有匹配；触发一次回填（§10.3）。
+- 未绑定岗位族的简历不参与匹配（“Not used for matching”）。
+- 原“目标职位名”（`target_job_titles`，简历页 “Roles”）已于 2026-11 下线：不再展示、编辑或由简历分析生成，匹配也不读取；字段和数据保留。上线 v3 时曾用它一次性推荐初始岗位族（CLI `resumes suggest`）。
 
 ---
 
@@ -485,7 +485,7 @@ v2 依据第 1 阶段 50 条标注调整（v1 把 13/18 个应为 A 的岗位判
 # All LLM-backed commands are dry runs unless --yes is given.
 uv run python -m app.modules.matching.cli families classify-titles --all --yes   # one-off title cache warm-up
 uv run python -m app.modules.matching.cli families init --days 30 --yes          # classify live jobs
-uv run python -m app.modules.matching.cli resumes suggest --user <id> [--apply]
+uv run python -m app.modules.matching.cli resumes suggest --user <id> [--apply]   # one-off, from the retired target_job_titles
 uv run python -m app.modules.matching.cli resumes set <resume_id> <family>
 uv run python -m app.modules.matching.cli dataset create --name main --user <id> --random 300 --filtered-sample 80 --yes
 uv run python -m app.modules.matching.cli run --dataset main@v1 [--model <model>] [--repeat 2] [--baseline <run>] --yes
