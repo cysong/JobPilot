@@ -5,7 +5,6 @@ export interface ResumeListItem {
     created_at: string
     updated_at: string
     document_id?: string
-    target_job_titles: string[]
     role_family?: string | null // matching v3 role family; null = not used for matching
     role_family_source?: 'auto' | 'user' | null
 }
@@ -26,7 +25,6 @@ export interface Resume {
     created_at: string
     updated_at: string
     document: Document
-    target_job_titles?: string[]
 }
 
 export interface CreateResumeRequest {
@@ -51,25 +49,11 @@ export interface ResumeListResponse {
     formal_count: number
 }
 
-export interface TargetJobTitleOption {
-    title: string
-    count: number
-}
-
-export interface TargetJobTitleOptionsResponse {
-    items: TargetJobTitleOption[]
-    selection_limit: number
-}
-
 export interface FormalResumeLimit {
     limit: number | null
     current_count: number
     can_create_more: boolean
     remaining: number | null
-}
-
-export interface UpdateTargetJobTitlesRequest {
-    target_job_titles: string[]
 }
 
 export interface ResumeExportRequest {

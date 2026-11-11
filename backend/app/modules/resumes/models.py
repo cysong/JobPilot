@@ -102,6 +102,7 @@ class Resume(Base, TimestampMixin):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Analysis fields
+    # Retired target roles ("Roles"): no longer read or written; column kept for the data.
     target_job_titles: Mapped[list[str]] = mapped_column(
         JSON,
         nullable=True,

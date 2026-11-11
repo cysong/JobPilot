@@ -12,14 +12,6 @@ export const useResumes = () => {
     })
 }
 
-export const useTargetJobTitleOptions = (keyword: string, enabled = true) => {
-    return useQuery({
-        queryKey: ['resume-target-job-title-options', keyword],
-        queryFn: () => resumeApi.getTargetJobTitleOptions(keyword || undefined),
-        enabled,
-    })
-}
-
 export const useFormalResumeLimit = () => {
     return useQuery({
         queryKey: ['resume-formal-limit'],
@@ -59,33 +51,6 @@ export const useUpdateResumeTitle = () => {
   })
 }
 
-export const useUpdateTargetJobTitles = () => {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: ({ id, targetJobTitles }: { id: string; targetJobTitles: string[] }) =>
-      resumeApi.updateTargetJobTitles(id, { target_job_titles: targetJobTitles }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['resumes'] })
-      queryClient.invalidateQueries({ queryKey: ['resumes', variables.id] })
-      queryClient.invalidateQueries({ queryKey: ['resume-edit', variables.id] })
-      toast({ title: 'Success', description: 'Target roles updated successfully' })
-    },
-    onError: (error) => {
-      const description = error instanceof ApiError
-        ? error.message
-        : 'Failed to update target roles'
-      toast({
-        title: 'Error',
-        description,
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
-// Hook for creating resume without auto-navigation (for config-driven DocumentEditPage)
 export const useCreateResume = () => {
     const queryClient = useQueryClient()
     return useMutation({

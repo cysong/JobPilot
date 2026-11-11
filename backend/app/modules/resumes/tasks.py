@@ -26,8 +26,6 @@ async def analyze_resume_task(
         content = resume.document.content if resume.document else ""
         user_id = resume.user_id
         is_draft = resume.is_draft
-        current_target_job_titles = list(resume.target_job_titles or [])
-        allowed_target_job_titles = await ResumeService.get_controlled_target_job_titles(db)
     if not content or len(content.strip()) < 50:
         raise ValueError(f"Resume {resume_id} has insufficient content to analyze")
 
@@ -36,7 +34,6 @@ async def analyze_resume_task(
         input_data=json.dumps(
             {
                 "resume_content": content,
-                "allowed_target_job_titles": allowed_target_job_titles,
             },
             ensure_ascii=False,
         ),
@@ -45,22 +42,11 @@ async def analyze_resume_task(
 
     analysis_data = result.model_dump() if isinstance(result, AnalyzedResume) else result
     async with self.session() as db:
-        filtered_target_job_titles = await ResumeService.filter_analysis_target_job_titles(
-            db,
-            analysis_data.get("target_job_titles") or [],
-        )
-        analysis_data["target_job_titles"] = filtered_target_job_titles
-        merged_target_job_titles = ResumeService.merge_target_job_titles(
-            current_target_job_titles,
-            filtered_target_job_titles,
-        )
-
         await ResumeRepository.update_analysis(
             db=db,
             resume_id=resume_id,
             analysis_data=analysis_data,
             analysis_version=AnalyzedResume.__version__,
-            merged_target_job_titles=merged_target_job_titles,
         )
 
         # Always sync resume skills so re-analysis can remove stale rows.

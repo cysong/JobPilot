@@ -130,13 +130,7 @@ class AnalyzedResume(BaseModel):
     """Structured resume analysis output."""
 
     # Schema version (class-level constant)
-    __version__ = "v1.1.0"
-
-    # Target job titles (for downstream matching)
-    target_job_titles: list[str] = Field(
-        default_factory=list,
-        description="Candidate target job titles selected from the controlled allowed list, ordered by relevance"
-    )
+    __version__ = "v1.2.0"
 
     # Basic information
     candidate_name: str = Field(..., description="Candidate full name")

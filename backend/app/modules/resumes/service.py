@@ -18,22 +18,17 @@ from app.core.exceptions import (
     NotFoundError,
 )
 from app.core.response_codes import ResponseCode
-from app.modules.jobs.models import JobAnalysis
-from app.modules.resumes.config import resume_module_settings
 from app.modules.resumes.models import Document, Resume, ResumeSkill
 from app.modules.resumes.repository import ResumeRepository, DocumentRepository
 from app.modules.resumes.schemas import (
     ResumeCreate,
-    ResumeTargetJobTitlesUpdate,
     ResumeUpdate,
-    TargetJobTitleOption,
 )
 from app.modules.workflow.service import TaskService, TaskSubmissionSpec
 from app.shared.enums import Role, TaskType, ProficiencyLevel
 from app.core.config import settings
 from app.modules.workflow import TaskExecution
 from app.shared.schemas import DocumentEditResponse, DocumentUpdateRequest
-from app.shared.search import build_keyword_filter
 from app.shared.skills import (
     canonical_skill_name,
     highest_proficiency,
@@ -256,126 +251,6 @@ class ResumeService:
         await db.refresh(resume)
 
         return resume
-
-    @staticmethod
-    async def update_target_job_titles(
-        db: AsyncSession,
-        resume_id: str,
-        user_id: int,
-        payload: ResumeTargetJobTitlesUpdate,
-    ) -> Resume:
-        """Update user-selected target job titles for a resume."""
-        resume = await ResumeService.get_resume_by_id(db, resume_id, user_id)
-        if not resume:
-            raise NotFoundError("Resume not found")
-
-        normalized_titles = ResumeService._normalize_target_job_titles(
-            payload.target_job_titles,
-            max_titles=resume_module_settings.TARGET_JOB_TITLES_LIMIT,
-        )
-        canonical_titles = await ResumeService._validate_target_job_titles(
-            db, normalized_titles
-        )
-
-        resume.target_job_titles = canonical_titles
-        resume.updated_at = datetime.now(timezone.utc)
-        db.add(resume)
-        await db.commit()
-        await db.refresh(resume)
-
-        return resume
-
-    @staticmethod
-    async def get_target_job_title_options(
-        db: AsyncSession,
-        *,
-        keyword: str | None = None,
-        limit: int = 10,
-    ) -> list[TargetJobTitleOption]:
-        """Get aggregated target job title options from analyzed jobs."""
-        trimmed_title = func.trim(JobAnalysis.normalized_job_title)
-        stmt = (
-            select(
-                trimmed_title.label("title"),
-                func.count(JobAnalysis.id).label("count"),
-            )
-            .where(JobAnalysis.normalized_job_title.is_not(None))
-            .where(trimmed_title != "")
-            .group_by(trimmed_title)
-            .having(func.count(JobAnalysis.id) >= resume_module_settings.TARGET_JOB_TITLE_MIN_JOB_COUNT)
-        )
-
-        search_keyword = (keyword or "").strip()
-        keyword_filter = build_keyword_filter(search_keyword, [trimmed_title])
-        if keyword_filter is not None:
-            stmt = stmt.where(keyword_filter)
-
-        stmt = (
-            stmt.order_by(func.count(JobAnalysis.id).desc(), trimmed_title.asc())
-        )
-
-        if not search_keyword:
-            stmt = stmt.limit(limit)
-
-        result = await db.execute(stmt)
-        return [
-            TargetJobTitleOption(title=row.title, count=row.count)
-            for row in result.all()
-        ]
-
-    @staticmethod
-    async def get_controlled_target_job_titles(db: AsyncSession) -> list[str]:
-        """Return the controlled target job title vocabulary."""
-        options = await ResumeService.get_target_job_title_options(
-            db,
-            keyword=None,
-            limit=10_000,
-        )
-        return [option.title for option in options]
-
-    @staticmethod
-    async def filter_analysis_target_job_titles(
-        db: AsyncSession,
-        titles: list[str],
-    ) -> list[str]:
-        """Silently filter analyzed target job titles to existing normalized job titles."""
-        normalized_titles = ResumeService._normalize_target_job_titles(
-            titles,
-            max_titles=resume_module_settings.TARGET_JOB_TITLES_LIMIT,
-        )
-        controlled_title_map = await ResumeService._get_existing_target_job_title_map_for_titles(
-            db,
-            normalized_titles,
-        )
-        return ResumeService._coerce_controlled_target_job_titles(
-            normalized_titles,
-            controlled_title_map,
-            strict=False,
-        )
-
-    @staticmethod
-    def merge_target_job_titles(
-        existing_titles: list[str] | None,
-        analyzed_titles: list[str] | None,
-    ) -> list[str]:
-        """Merge analyzed titles into user-maintained titles with case-insensitive deduplication."""
-        merged: list[str] = []
-        seen: set[str] = set()
-
-        for title_group in (existing_titles or [], analyzed_titles or []):
-            for source in title_group:
-                trimmed = source.strip()
-                if not trimmed:
-                    continue
-
-                key = trimmed.lower()
-                if key in seen:
-                    continue
-
-                seen.add(key)
-                merged.append(trimmed)
-
-        return merged
 
     @staticmethod
     async def finalize_resume(
@@ -680,101 +555,6 @@ class ResumeService:
                 ))
 
         return len(normalized), len(to_delete)
-
-    @staticmethod
-    def _normalize_target_job_titles(
-        titles: list[str],
-        *,
-        max_titles: int,
-    ) -> list[str]:
-        """Normalize, deduplicate, and limit target job titles."""
-        normalized: list[str] = []
-        seen: set[str] = set()
-
-        for title in titles:
-            trimmed = title.strip()
-            if not trimmed:
-                continue
-
-            key = trimmed.lower()
-            if key in seen:
-                continue
-
-            seen.add(key)
-            normalized.append(trimmed)
-
-        if len(normalized) > max_titles:
-            raise BadRequestError(
-                f"At most {max_titles} target job titles are allowed."
-            )
-
-        return normalized
-
-    @staticmethod
-    async def _validate_target_job_titles(
-        db: AsyncSession,
-        titles: list[str],
-    ) -> list[str]:
-        """Validate titles against aggregated analyzed job titles."""
-        controlled_title_map = await ResumeService._get_existing_target_job_title_map_for_titles(
-            db,
-            titles,
-        )
-        return ResumeService._coerce_controlled_target_job_titles(
-            titles,
-            controlled_title_map,
-            strict=True,
-        )
-
-    @staticmethod
-    async def _get_existing_target_job_title_map_for_titles(
-        db: AsyncSession,
-        titles: list[str],
-    ) -> dict[str, str]:
-        """Get canonical existing target job titles keyed by lowercase title."""
-        normalized_titles = [title.strip().lower() for title in titles if title.strip()]
-        if not normalized_titles:
-            return {}
-
-        trimmed_title = func.trim(JobAnalysis.normalized_job_title)
-        lowered_trimmed_title = func.lower(trimmed_title)
-        stmt = (
-            select(trimmed_title.label("title"))
-            .where(JobAnalysis.normalized_job_title.is_not(None))
-            .where(trimmed_title != "")
-            .where(lowered_trimmed_title.in_(normalized_titles))
-            .group_by(trimmed_title)
-        )
-        result = await db.execute(stmt)
-        return {row.title.lower(): row.title for row in result.all()}
-
-    @staticmethod
-    def _coerce_controlled_target_job_titles(
-        titles: list[str],
-        controlled_title_map: dict[str, str],
-        *,
-        strict: bool,
-    ) -> list[str]:
-        """Coerce titles to the controlled vocabulary, optionally raising on invalid values."""
-        if not titles:
-            return []
-
-        coerced: list[str] = []
-        missing_titles: list[str] = []
-
-        for title in titles:
-            canonical_title = controlled_title_map.get(title.lower())
-            if canonical_title:
-                coerced.append(canonical_title)
-            else:
-                missing_titles.append(title)
-
-        if strict and missing_titles:
-            raise BadRequestError(
-                "Invalid target job titles: " + ", ".join(missing_titles)
-            )
-
-        return coerced
 
     @staticmethod
     async def _submit_resume_analysis_tasks(db: AsyncSession, resume_id: str, user_id: int) -> list[TaskExecution]:

@@ -22,7 +22,6 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { resumeApi } from '@/api/resumes'
-import { TargetJobTitlesEditor } from './TargetJobTitlesEditor'
 import { RoleFamilySelect } from '@/features/matching/components/RoleFamilySelect'
 
 interface ResumeCardProps {
@@ -149,38 +148,7 @@ export function ResumeCard({ resume, onDelete }: ResumeCardProps) {
                 <p className="text-sm text-slate-500 mt-1">
                     Updated {formatDistanceToNow(new Date(resume.updated_at), { addSuffix: true })}
                 </p>
-
-                <div className="mt-4 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                        {resume.target_job_titles.length > 0 ? (
-                            resume.target_job_titles.map((title) => (
-                                <Badge
-                                    key={title}
-                                    variant="outline"
-                                    className="border-slate-200 bg-slate-50 font-normal text-slate-700"
-                                >
-                                    {title}
-                                </Badge>
-                            ))
-                        ) : (
-                            <Badge
-                                variant="outline"
-                                className="border-dashed border-slate-200 bg-slate-50 font-normal text-slate-400"
-                            >
-                                No target roles
-                            </Badge>
-                        )}
-                    </div>
-                </div>
             </Link>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-                <TargetJobTitlesEditor
-                    resumeId={resume.id}
-                    resumeTitle={resume.title}
-                    currentTitles={resume.target_job_titles}
-                />
-            </div>
 
             {!resume.is_draft && (
                 <RoleFamilySelect resumeId={resume.id} value={resume.role_family ?? null} />

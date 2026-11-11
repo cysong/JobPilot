@@ -31,7 +31,6 @@ if LOCAL_DB:
 RESUME_ANALYSIS = {
     "candidate_name": "Ann Example", "current_title": "SDET", "total_experience_years": 8,
     "location": "Christchurch", "work_right": "Work visa", "technical_skills": [],
-    "target_job_titles": [],
 }
 RESUME_TEXT = "## Experience\n- Senior SDET 2017 - present: built Java/TestNG API test frameworks, CI pipelines"
 
@@ -91,7 +90,7 @@ async def _seed(db):
     db.add(Document(id="doc_src", root_id="doc_src", content=RESUME_TEXT, content_hash="h", created_by=1))
     await db.flush()
     db.add(Resume(id="res1", user_id=1, document_id="doc_src", title="SDET", is_draft=False, is_deleted=False,
-                  analysis_result=RESUME_ANALYSIS))
+                  analysis_result=RESUME_ANALYSIS, target_job_titles=["Legacy Role"]))
     await db.flush()
     db.add(Application(id="app1", user_id=1, job_id=1, source_resume_id="res1", status=ApplicationStatus.PENDING))
     await db.commit()
@@ -120,6 +119,10 @@ async def test_resume_analysis(session_factory, gateway):  # noqa: F811
     result = await _run(analyze_resume_task, resume_id="res1", task_id="t2")
     _assert_released(gateway, ["resume_analyzer"])
     assert result["output_data"]["status"] == "completed" and result["output_data"]["is_draft"] is False
+    async with session_factory() as db:
+        resume = await db.get(Resume, "res1")
+    assert resume.target_job_titles == ["Legacy Role"]  # retired Roles: kept, never rewritten
+    assert "target_job_titles" not in resume.analysis_result
 
 
 @pytest.mark.asyncio

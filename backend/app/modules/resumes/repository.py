@@ -118,7 +118,6 @@ class ResumeRepository:
         resume_id: str,
         analysis_data: dict,
         analysis_version: str,
-        merged_target_job_titles: list[str] | None = None,
     ) -> Resume:
         """
         Update resume analysis result and timestamps.
@@ -130,8 +129,6 @@ class ResumeRepository:
             raise ValueError(f"Resume {resume_id} not found")
 
         now = datetime.now(timezone.utc)
-        if merged_target_job_titles is not None:
-            resume.target_job_titles = merged_target_job_titles
         resume.analysis_result = analysis_data
         resume.analysis_version = analysis_version
         resume.analyzed_at = now
