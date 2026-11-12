@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 import { Check, ArrowRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/authStore'
+import { useRegistrationAllowed } from '@/features/auth/useRegistrationAllowed'
 
 export default function LandingPage() {
     const { isAuthenticated } = useAuthStore()
+    const registrationAllowed = useRegistrationAllowed()
     return (
         <div className="bg-white text-slate-900 font-sans">
             {/* Navigation */}
@@ -31,9 +33,11 @@ export default function LandingPage() {
                         ) : (
                             <>
                                 <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</Link>
-                                <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30">
-                                    <Link to="/register">Get Started Free</Link>
-                                </Button>
+                                {registrationAllowed && (
+                                    <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30">
+                                        <Link to="/register">Get Started Free</Link>
+                                    </Button>
+                                )}
                             </>
                         )}
                     </div>
@@ -63,8 +67,8 @@ export default function LandingPage() {
                             ) : (
                                 <>
                                     <Button asChild size="lg" className="h-14 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full shadow-xl hover:shadow-2xl text-lg">
-                                        <Link to="/register">
-                                            Start Your Free Trial
+                                        <Link to={registrationAllowed === false ? '/login' : '/register'}>
+                                            {registrationAllowed === false ? 'Sign In' : 'Start Your Free Trial'}
                                             <ArrowRight className="ml-2 w-5 h-5" />
                                         </Link>
                                     </Button>

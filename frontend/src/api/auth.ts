@@ -9,6 +9,7 @@ import type {
   LoginRequest,
   MessageResponse,
   RegisterRequest,
+  RegistrationStatus,
   ResetPasswordRequest,
   TokenResponse,
   User,
@@ -16,6 +17,14 @@ import type {
 } from '@/types/auth'
 
 export const authApi = {
+  /**
+   * Whether sign-up is open (public)
+   */
+  getRegistrationStatus: async (): Promise<RegistrationStatus> => {
+    const result = await apiClient.get<RegistrationStatus, RegistrationStatus>('/auth/registration-status')
+    return result
+  },
+
   /**
    * Register a new user account
    */

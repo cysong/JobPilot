@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import create_access_token, get_current_user, require_jwt_only
@@ -11,6 +12,7 @@ from app.modules.auth.schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
     MessageResponse,
+    RegistrationStatus,
     ResetPasswordRequest,
     Token,
     UserLogin,
@@ -33,9 +35,17 @@ from app.modules.auth.service import (
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+@router.get("/registration-status", response_model=RegistrationStatus)
+async def registration_status():
+    """Public: whether sign-up is open (the frontend hides it when closed)."""
+    return RegistrationStatus(allowed=settings.ALLOW_REGISTRATION)
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user account."""
+    if not settings.ALLOW_REGISTRATION:
+        raise ForbiddenError("Registration is currently closed")
     user = await create_user(db, user_data)
     return user
 

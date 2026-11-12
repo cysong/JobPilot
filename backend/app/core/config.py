@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # User Defaults
     # Default role for new users (USER/VIP/ADMIN)
     DEFAULT_USER_ROLE: str = "USER"
+    # When False, POST /auth/register is refused and the frontend hides sign-up
+    ALLOW_REGISTRATION: bool = True
 
     # User Limits (by role)
     USER_FORMAL_RESUME_LIMIT: int = 3  # Free users: max 3 formal resumes

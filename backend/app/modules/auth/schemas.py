@@ -93,6 +93,12 @@ class Token(BaseModel):
     token_type: str = Field(default="bearer", description="Token type")
 
 
+class RegistrationStatus(BaseModel):
+    """Whether new accounts can be created."""
+
+    allowed: bool
+
+
 class MessageResponse(BaseModel):
     """Simple success message response."""
 

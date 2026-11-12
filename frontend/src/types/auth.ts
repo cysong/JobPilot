@@ -93,6 +93,10 @@ export interface ChangeEmailRequest {
   current_password: string
 }
 
+export interface RegistrationStatus {
+  allowed: boolean
+}
+
 export interface MessageResponse {
   message: string
 }

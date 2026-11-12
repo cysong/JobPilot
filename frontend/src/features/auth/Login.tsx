@@ -9,6 +9,7 @@ import * as z from 'zod'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
 import { useAuthStore } from '@/store/authStore'
+import { useRegistrationAllowed } from './useRegistrationAllowed'
 import { authApi } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +50,7 @@ export default function Login({ redirectPath = '/dashboard' }: LoginProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuthStore()
+  const registrationAllowed = useRegistrationAllowed()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -221,17 +223,19 @@ export default function Login({ redirectPath = '/dashboard' }: LoginProps) {
               </Form>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <div className="text-center text-sm text-slate-600">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline"
-              >
-                Sign up
-              </Link>
-            </div>
-          </CardFooter>
+          {registrationAllowed && (
+            <CardFooter className="flex flex-col gap-4">
+              <div className="text-center text-sm text-slate-600">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline"
+                >
+                  Sign up
+                </Link>
+              </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>

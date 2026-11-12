@@ -9,6 +9,7 @@ import * as z from 'zod'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
 import { useAuthStore } from '@/store/authStore'
+import { useRegistrationAllowed } from './useRegistrationAllowed'
 import { authApi } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,6 +56,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>
 export default function Register() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const registrationAllowed = useRegistrationAllowed()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -109,6 +111,32 @@ export default function Register() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (registrationAllowed === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md shadow-xl border-slate-200">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Registration is closed</CardTitle>
+            <CardDescription>
+              JobPilot is not accepting new accounts right now.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <p className="text-sm text-slate-600">
+              Already have an account?{' '}
+              <Link
+                to="/login"
+                className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
+    )
   }
 
   return (
