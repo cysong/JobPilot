@@ -158,6 +158,9 @@ async def run_evaluation(
             if source.config.get("model") != override.model:
                 raise ValueError(
                     f"run {reuse_run_id} used {source.config.get('model')}, not {override.model}")
+            if (source.config.get("model_settings") or None) != (override.model_settings or None):
+                raise ValueError(f"run {reuse_run_id} used model settings "
+                                 f"{source.config.get('model_settings')}, not {override.model_settings}")
             current_prompt = prompt_version or settings.MATCH_JUDGE_PROMPT_VERSION
             if source.config.get("prompt_version") != current_prompt:
                 raise ValueError(f"run {reuse_run_id} used prompt {source.config.get('prompt_version')}, "
@@ -188,6 +191,7 @@ async def run_evaluation(
                 "dataset": f"{dataset.name}@v{dataset.version}",
                 "provider": override.provider,
                 "model": override.model,
+                "model_settings": override.model_settings or None,
                 "prompt_version": prompt_version or settings.MATCH_JUDGE_PROMPT_VERSION,
                 "families_version": registry.version,
                 "repeats": repeats,

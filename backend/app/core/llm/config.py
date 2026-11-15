@@ -94,6 +94,14 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
         "input": 2.00 / 1_000_000,
         "output": 10.0 / 1_000_000,
     },
+    "anthropic/claude-haiku-5.5": {
+        "input": 0.10 / 1_000_000,
+        "output": 0.50 / 1_000_000,
+    },
+    "deepseek/deepseek-v4.1-flash-1017": {
+        "input": 0.038 / 1_000_000,
+        "output": 0.50 / 1_000_000,
+    },
     "z-ai/glm-5.3-flash": {
         "input": 0.034 / 1_000_000,
         "output": 0.083 / 1_000_000,

@@ -25,6 +25,7 @@ def test_cli_registers_all_models_so_mappers_configure():
     ["resumes", "set", "res_1", "qa_test"],
     ["dataset", "create", "--user", "1"],
     ["run", "--dataset", "main@v1", "--judged-limit", "200", "--repeat", "2", "--repeat-sample", "100"],
+    ["run", "--dataset", "main@v4", "--model", "anthropic/claude-haiku-5.5", "--reasoning-effort", "xhigh"],
     ["report", "mer_1"],
     ["compare", "mer_1", "mer_2"],
     ["labels", "export", "--run", "mer_1"],

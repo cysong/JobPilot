@@ -184,8 +184,11 @@ async def _run(args) -> None:
     from app.core.llm.gateway import AgentGateway
     from app.modules.matching.evaluation.runner import run_evaluation
 
-    override = ModelOverride(provider=args.provider, model=args.model)
-    if not _confirm(args, f"Run {args.dataset} with {override.provider}/{override.model}, "
+    # Merged over the YAML model_settings, so only the reasoning effort changes
+    settings_override = {"reasoning": {"effort": args.reasoning_effort}} if args.reasoning_effort else {}
+    override = ModelOverride(provider=args.provider, model=args.model, model_settings=settings_override)
+    if not _confirm(args, f"Run {args.dataset} with {override.provider}/{override.model} "
+                          f"(reasoning effort {args.reasoning_effort or 'from YAML'}), "
                           f"repeat={args.repeat} (sample {args.repeat_sample or 'all'}), "
                           f"judged_limit={args.judged_limit or 'all'}, limit={args.limit or 'all'}, "
                           f"reuse={args.reuse or '-'}, focus={args.focus or 'all'}."):
@@ -302,6 +305,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dataset", required=True)
     p.add_argument("--provider", default=settings.MATCH_LLM_PROVIDER)
     p.add_argument("--model", default=settings.MATCH_JUDGE_MODEL)
+    p.add_argument("--reasoning-effort", choices=["minimal", "low", "medium", "high", "xhigh"],
+                   help="override the YAML reasoning effort")
     p.add_argument("--repeat", type=int, default=1)
     p.add_argument("--concurrency", type=int, default=settings.MATCH_JUDGE_CONCURRENCY)
     p.add_argument("--baseline")
