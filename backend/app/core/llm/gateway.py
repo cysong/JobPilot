@@ -17,18 +17,28 @@ from app.core.llm import availability
 from app.core.llm.agent_loader import AgentLoader
 from app.core.llm.config import MODEL_PRICING, llm_gateway_settings
 from app.core.llm.output_schemas import CleaningOutputSchema, should_use_cleaning_schema
-from app.core.llm.providers import build_provider_runtime, normalize_provider_name
+from app.core.llm.providers import build_provider_runtime, normalize_provider_name, upstream_capture
 from app.core.llm.types import GatewayContext, ModelOverride
 from app.core.metrics import (
     llm_call_duration_seconds,
     llm_call_total,
     llm_db_held_total,
     llm_tokens_total,
+    llm_upstream_call_total,
 )
 from app.modules.workflow import AICallRepository
 from app.shared.enums import AICallStatus
 
 logger = structlog.get_logger()
+
+
+def _merge_extra_body(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Overlay ``override`` on ``base``; the OpenRouter ``provider`` routing object is
+    merged key by key so an agent that pins hosts keeps the global privacy settings."""
+    merged = {**base, **override}
+    if isinstance(base.get("provider"), dict) and isinstance(override.get("provider"), dict):
+        merged["provider"] = {**base["provider"], **override["provider"]}
+    return merged
 
 
 class AgentGateway:
@@ -88,14 +98,16 @@ class AgentGateway:
                 kind=paused.get("kind", "unknown"), scope=paused["scope"])
         self._log_start(agent_id, agent, context)
         self._check_no_open_transaction(agent_id)
+        upstream: dict[str, Any] = {}
+        capture_token = upstream_capture.set(upstream)
 
         try:
             result, usage = await self._execute_agent(agent, input_data)
             latency_ms = int((time.time() - start_time) * 1000)
 
             availability.record_success()
-            self._log_success(agent_id, agent, usage, latency_ms, context)
-            context["usage"] = self._usage_summary(agent, usage)
+            self._log_success(agent_id, agent, usage, latency_ms, context, upstream)
+            context["usage"] = {**self._usage_summary(agent, usage), **self._upstream_fields(upstream)}
             ai_call_id = await self._record_ai_call(
                 agent_id=agent_id,
                 agent=agent,
@@ -114,7 +126,7 @@ class AgentGateway:
             latency_ms = int((time.time() - start_time) * 1000)
 
             self._log_error(agent_id, agent, error_type,
-                            exc, latency_ms, context)
+                            exc, latency_ms, context, upstream)
             ai_call_id = await self._record_ai_call(
                 agent_id=agent_id,
                 agent=agent,
@@ -130,6 +142,25 @@ class AgentGateway:
             )
             self._handle_unavailability(exc, agent_id=agent_id, model=model)
             raise
+        finally:
+            upstream_capture.reset(capture_token)
+
+    @staticmethod
+    def _upstream_fields(upstream: dict[str, Any]) -> dict[str, Any]:
+        """Upstream host, generation id and billed cost reported by OpenRouter, if any."""
+        return {
+            f"upstream_{key}" if key != "upstream" else key: value
+            for key, value in upstream.items()
+            if value is not None
+        }
+
+    @staticmethod
+    def _count_upstream(agent_id: str, agent: Agent, upstream: dict[str, Any], outcome: str) -> None:
+        if upstream.get("upstream"):
+            llm_upstream_call_total.labels(
+                agent_id=agent_id, model=getattr(agent, "model", None) or "unknown",
+                upstream=upstream["upstream"], outcome=outcome,
+            ).inc()
 
     @staticmethod
     def _check_no_open_transaction(agent_id: str) -> None:
@@ -235,7 +266,13 @@ class AgentGateway:
 
         model_settings = agent.model_settings
         if override.model_settings:
-            model_settings = model_settings.resolve(ModelSettings(**override.model_settings))
+            resolved = model_settings.resolve(ModelSettings(**override.model_settings))
+            # resolve() replaces extra_body wholesale; merge it so a per-call routing
+            # override keeps body fields set in the YAML (plugins, ...).
+            if isinstance(model_settings.extra_body, dict) and isinstance(resolved.extra_body, dict):
+                resolved = dataclasses.replace(
+                    resolved, extra_body=_merge_extra_body(model_settings.extra_body, resolved.extra_body))
+            model_settings = resolved
 
         # Re-decide the output wrapper: JSON cleanup applies to non-OpenAI providers.
         output_type = agent.output_type
@@ -272,7 +309,7 @@ class AgentGateway:
     def _with_default_extra_body(agent: Agent, default_extra_body: dict[str, Any]) -> Agent:
         """Merge provider-level extra_body defaults; values set by the agent win."""
         current = agent.model_settings.extra_body
-        merged = {**default_extra_body, **(current if isinstance(current, dict) else {})}
+        merged = _merge_extra_body(default_extra_body, current if isinstance(current, dict) else {})
         model_settings = dataclasses.replace(agent.model_settings, extra_body=merged)
         return agent.clone(model_settings=model_settings)
 
@@ -296,8 +333,11 @@ class AgentGateway:
         usage: Optional[Usage],
         latency_ms: int,
         context: GatewayContext,
+        upstream: dict[str, Any] | None = None,
     ) -> None:
         """Log successful agent call with metrics."""
+        upstream = upstream or {}
+        self._count_upstream(agent_id, agent, upstream, "ok")
         estimated_cost = self._calculate_cost(
             getattr(agent, "model", ""),
             getattr(usage, "input_tokens", 0) or 0,
@@ -338,6 +378,7 @@ class AgentGateway:
             requests=getattr(usage, "requests", None),
             estimated_cost=estimated_cost,
             operation=context.get("operation"),
+            **self._upstream_fields(upstream),
         )
 
     def _log_error(
@@ -348,8 +389,11 @@ class AgentGateway:
         error: Exception,
         latency_ms: int,
         context: GatewayContext,
+        upstream: dict[str, Any] | None = None,
     ) -> None:
         """Log failed agent call."""
+        upstream = upstream or {}
+        self._count_upstream(agent_id, agent, upstream, error_type)
         provider = getattr(agent, "provider", None) or "unknown"
         model = getattr(agent, "model", None) or "unknown"
 
@@ -382,6 +426,7 @@ class AgentGateway:
             latency_ms=latency_ms,
             operation=context.get("operation"),
             exc_info=True,
+            **self._upstream_fields(upstream),
         )
 
     async def _record_ai_call(

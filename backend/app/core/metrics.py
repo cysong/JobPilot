@@ -54,6 +54,12 @@ llm_call_total = Counter(
     labelnames=("agent_id", "provider", "model", "outcome"),
 )
 
+llm_upstream_call_total = Counter(
+    "jobpilot_llm_upstream_call_total",
+    "LLM call outcomes by the OpenRouter upstream host that served them.",
+    labelnames=("agent_id", "model", "upstream", "outcome"),
+)
+
 llm_call_duration_seconds = Histogram(
     "jobpilot_llm_call_duration_seconds",
     "LLM agent call latency in seconds.",

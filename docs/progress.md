@@ -5,11 +5,21 @@
 **Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
 **Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-11-09
+**Last Updated:** 2026-11-16
 
 ---
 
 ## Work Log
+
+### 2026-11-16 - match_judge: cheaper model evaluation and OpenRouter host routing
+
+- Evaluated replacing GPT-6.1 Terra with DeepSeek V4.1 Flash (xhigh) on the gold set and a 150-pair sample, with Claude Opus arbitrating disagreements. Accuracy was on par with Terra; DeepSeek grades more generously. Cost per judgment is about 80% lower.
+- Added `--reasoning-effort` to the eval CLI and pricing for Haiku 5.5 / DeepSeek V4.1 Flash (57eabe3). Added in-place retry of unparseable judge JSON (638baea).
+- Traced the invalid JSON to one OpenRouter host (Wafer, 13/13 bad); five other hosts produced 0 bad JSON in 21 calls each (docs/issues.md). Benchmark spend about $0.6. Added:
+  - `MATCH_JUDGE_OPENROUTER_PROVIDERS` and `MATCH_JUDGE_REASONING_EFFORT`, applied only to the configured judge model; matching CLI flag `--openrouter-providers`;
+  - judge `max_tokens` 32000 and the OpenRouter response-healing plugin;
+  - gateway logging of the serving host, generation id and billed cost, plus metric `jobpilot_llm_upstream_call_total`.
+- Next: deploy, then switch production to DeepSeek through env (`MATCH_JUDGE_MODEL`, `MATCH_JUDGE_REASONING_EFFORT`, `MATCH_JUDGE_OPENROUTER_PROVIDERS`), observe for a week, then propose design-doc updates.
 
 ### 2026-11-09 - Production deploy and task scheduling fixes
 

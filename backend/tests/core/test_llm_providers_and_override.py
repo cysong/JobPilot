@@ -143,14 +143,65 @@ def test_model_override_keeps_plain_text_agents_plain():
 
 def test_default_extra_body_merges_and_agent_values_win():
     agent = _loaded_agent()
-    agent.model_settings = ModelSettings(extra_body={"provider": {"order": ["x"]}, "foo": 1})
+    agent.model_settings = ModelSettings(
+        extra_body={"provider": {"order": ["x"], "require_parameters": False}, "foo": 1})
 
     merged = AgentGateway._with_default_extra_body(
-        agent, {"provider": {"require_parameters": True}, "bar": 2}
+        agent, {"provider": {"require_parameters": True, "data_collection": "deny"}, "bar": 2}
     )
 
-    assert merged.model_settings.extra_body == {"provider": {"order": ["x"]}, "foo": 1, "bar": 2}
-    assert agent.model_settings.extra_body == {"provider": {"order": ["x"]}, "foo": 1}
+    # Routing keys are merged one by one: pinning hosts keeps the global privacy setting.
+    assert merged.model_settings.extra_body == {
+        "provider": {"order": ["x"], "require_parameters": False, "data_collection": "deny"},
+        "foo": 1, "bar": 2,
+    }
+    assert agent.model_settings.extra_body == {
+        "provider": {"order": ["x"], "require_parameters": False}, "foo": 1}
+
+
+def test_model_override_merges_extra_body_with_yaml_values():
+    agent = _loaded_agent(provider="openrouter")
+    agent.model_settings = ModelSettings(extra_body={"plugins": [{"id": "response-healing"}]})
+
+    clone = AgentGateway._apply_model_override(agent, ModelOverride(
+        model_settings={"extra_body": {"provider": {"only": ["a/fp8"]}}}))
+
+    assert clone.model_settings.extra_body == {
+        "plugins": [{"id": "response-healing"}], "provider": {"only": ["a/fp8"]}}
+
+
+@pytest.mark.asyncio
+async def test_openrouter_hook_captures_upstream_host_and_cost():
+    import httpx
+
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(200, request=request, json={
+        "id": "gen-1", "provider": "DeepInfra", "usage": {"cost": 0.0042}, "choices": []})
+    capture: dict = {}
+    token = providers_module.upstream_capture.set(capture)
+    try:
+        await providers_module._capture_openrouter_upstream(response)
+    finally:
+        providers_module.upstream_capture.reset(token)
+
+    assert capture == {"upstream": "DeepInfra", "generation_id": "gen-1", "cost": 0.0042}
+    assert response.json()["provider"] == "DeepInfra"  # body still readable by the SDK
+
+
+@pytest.mark.asyncio
+async def test_openrouter_hook_ignores_calls_outside_the_gateway():
+    import httpx
+
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(200, request=request, content=b"not json")
+    await providers_module._capture_openrouter_upstream(response)  # no capture set: no-op
+    capture: dict = {}
+    token = providers_module.upstream_capture.set(capture)
+    try:
+        await providers_module._capture_openrouter_upstream(response)
+    finally:
+        providers_module.upstream_capture.reset(token)
+    assert capture == {}
 
 
 def test_cost_uses_openrouter_pricing():
@@ -221,3 +272,27 @@ def test_usage_summary_computes_cost():
     summary = AgentGateway._usage_summary(agent, _Usage())
     assert summary["input_tokens"] == 2_000
     assert summary["estimated_cost"] == pytest.approx(2_000 * 1e-6 + 1_000 * 5e-6)
+
+
+@pytest.mark.asyncio
+async def test_call_reports_upstream_host_in_usage_context():
+    agent = _loaded_agent(provider="openrouter")
+    gateway = AgentGateway(loader=AsyncMock())
+    gateway.loader.load_agent = AsyncMock(return_value=agent)
+
+    async def fake_execute(run_agent, input_data):
+        # What the OpenRouter HTTP hook does while the SDK request runs.
+        providers_module.upstream_capture.get().update(
+            {"upstream": "Parasail", "generation_id": "gen-9", "cost": 0.01})
+        return _Out(value="ok"), None
+
+    gateway._execute_agent = fake_execute  # type: ignore[method-assign]
+    gateway._record_ai_call = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    context: dict = {}
+    await gateway.call("demo", "input", context=context)
+
+    assert context["usage"]["upstream"] == "Parasail"
+    assert context["usage"]["upstream_generation_id"] == "gen-9"
+    assert context["usage"]["upstream_cost"] == 0.01
+    assert providers_module.upstream_capture.get() is None

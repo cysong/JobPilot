@@ -215,8 +215,26 @@ def fallback_candidates(user: UserContext) -> tuple[str, ...]:
 # ------------------------------------------------------------------ judging
 
 
-def judge_override() -> ModelOverride:
-    return ModelOverride(provider=settings.MATCH_LLM_PROVIDER, model=settings.MATCH_JUDGE_MODEL)
+def judge_override(
+    *,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
+    openrouter_providers: Sequence[str] | None = None,
+) -> ModelOverride:
+    """Model and settings for match_judge. The configured effort and host list are tuned
+    for MATCH_JUDGE_MODEL, so they only apply when judging with that model; explicit
+    arguments always apply."""
+    model = model or settings.MATCH_JUDGE_MODEL
+    if model == settings.MATCH_JUDGE_MODEL:
+        reasoning_effort = reasoning_effort or settings.MATCH_JUDGE_REASONING_EFFORT
+        if openrouter_providers is None:
+            openrouter_providers = settings.MATCH_JUDGE_OPENROUTER_PROVIDERS
+    model_settings: dict[str, Any] = {}
+    if reasoning_effort:
+        model_settings["reasoning"] = {"effort": reasoning_effort}
+    if openrouter_providers and settings.MATCH_LLM_PROVIDER == "openrouter":
+        model_settings["extra_body"] = {"provider": {"only": list(openrouter_providers)}}
+    return ModelOverride(provider=settings.MATCH_LLM_PROVIDER, model=model, model_settings=model_settings)
 
 
 async def judge_pair(

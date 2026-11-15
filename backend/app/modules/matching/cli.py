@@ -184,11 +184,15 @@ async def _run(args) -> None:
     from app.core.llm.gateway import AgentGateway
     from app.modules.matching.evaluation.runner import run_evaluation
 
-    # Merged over the YAML model_settings, so only the reasoning effort changes
-    settings_override = {"reasoning": {"effort": args.reasoning_effort}} if args.reasoning_effort else {}
-    override = ModelOverride(provider=args.provider, model=args.model, model_settings=settings_override)
+    from app.modules.matching.judge.service import judge_override
+
+    # Same routing as production for the configured judge model; flags override it.
+    hosts = [h.strip() for h in args.openrouter_providers.split(",") if h.strip()] \
+        if args.openrouter_providers is not None else None
+    base = judge_override(model=args.model, reasoning_effort=args.reasoning_effort, openrouter_providers=hosts)
+    override = ModelOverride(provider=args.provider, model=base.model, model_settings=base.model_settings)
     if not _confirm(args, f"Run {args.dataset} with {override.provider}/{override.model} "
-                          f"(reasoning effort {args.reasoning_effort or 'from YAML'}), "
+                          f"(settings {override.model_settings or 'from YAML'}), "
                           f"repeat={args.repeat} (sample {args.repeat_sample or 'all'}), "
                           f"judged_limit={args.judged_limit or 'all'}, limit={args.limit or 'all'}, "
                           f"reuse={args.reuse or '-'}, focus={args.focus or 'all'}."):
@@ -307,6 +311,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default=settings.MATCH_JUDGE_MODEL)
     p.add_argument("--reasoning-effort", choices=["minimal", "low", "medium", "high", "xhigh"],
                    help="override the YAML reasoning effort")
+    p.add_argument("--openrouter-providers",
+                   help="comma-separated OpenRouter hosts to route to ('' = any); "
+                        "defaults to MATCH_JUDGE_OPENROUTER_PROVIDERS for the configured judge model")
     p.add_argument("--repeat", type=int, default=1)
     p.add_argument("--concurrency", type=int, default=settings.MATCH_JUDGE_CONCURRENCY)
     p.add_argument("--baseline")

@@ -3,12 +3,19 @@ name: "match_judge"
 provider: openrouter
 model: "openai/gpt-6.1-terra"
 model_settings:
-  max_tokens: 12000
+  # Reasoning counts against max_tokens on some hosts: 13% of DeepSeek xhigh answers used
+  # more than 12k output tokens (up to ~24k), so a 12k cap risks cutting the JSON off.
+  max_tokens: 32000
   reasoning:
     effort: high
   # GPT-6.1 Terra does not accept temperature; a fixed seed keeps runs comparable.
   extra_args:
     seed: 20261108
+  # OpenRouter repairs JSON syntax slips (missing brackets, trailing commas) for free;
+  # it cannot fix garbled output, which is why the judge's hosts are also pinned.
+  extra_body:
+    plugins:
+      - id: response-healing
 
 instructions: |
   You are a senior technical recruiter in New Zealand. You decide how well ONE job fits ONE

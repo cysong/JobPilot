@@ -1,5 +1,39 @@
 # 问题修复记录
 
+## ✅ 已修复（待部署）：DeepSeek V4.1 Flash 做 match_judge 时随机输出无效 JSON
+
+### 问题描述
+评估 DeepSeek V4.1 Flash（xhigh）替换 Terra 时，16–28% 的调用首次返回无效或被截断的 JSON（`Invalid JSON when parsing`、`EOF while parsing`），重试多数能成功。
+
+### 根本原因
+- OpenRouter 把同一模型路由到约 47 个托管商端点，默认按价格分配。
+- **Wafer**（`wafer/us`、`wafer/mxfp4`）的输出基本不可用：
+  - 测试的 13 次调用全部失败，其中 4 次是在开启 Response Healing 之后。
+  - 失败形式包括 JSON 损坏、字段名乱码、嵌套结构错乱。这类内容损坏 Healing 修不了。
+- 其他托管商一共测了 164 次完整调用，没有出现语法错误的 JSON。
+  - 唯一的异常是 3 次输出失控：模型在某个 quote 字段里不停重复，直到 token 用完（Cohere、DeepInfra、DeepInfra priority 各 1 次）。
+  - 这是模型本身的问题，靠重试兜底。
+- **截断（推测，未单独验证）：** 164 次有效回答里有 22 次的输出超过 12000 token，最高 24366。
+  - 如果托管商把推理 token 也算进 `max_tokens`，这些回答在 12000 的上限下会被截断。
+  - 不过也有托管商在 12000 的上限下仍然输出了 2.8 万 token，所以并不是每家都按这个上限执行。
+
+### 修复方案
+- **限定托管商：** 新增 `MATCH_JUDGE_OPENROUTER_PROVIDERS`，只路由到验证过的托管商（provider `only`）。
+  - gateway 现在逐键合并 `provider` 路由对象，所以 `require_parameters` 和 `data_collection=deny` 仍然生效。
+  - 这个 env 变量接受 JSON 列表或逗号分隔两种写法。
+- **调整 `match_judge.yaml`：** `max_tokens` 调到 32000；开启 Response Healing 作为额外保险（只修语法错误，这次的问题它修不了）。
+  - 已确认 Terra 在新配置下调用正常。
+- **记录托管商：** gateway 从 OpenRouter 响应中记录实际服务的托管商、generation id 和实际费用，写入日志、`context["usage"]` 和新指标 `jobpilot_llm_upstream_call_total`。
+  - 成功和失败两条路径都已验证。
+- **保留重试：** 已有的 `judge_pair` 原地重试（638baea）保留，作为最后一道兜底。
+
+### 验证结果
+- 下面 5 家各 21 次调用，全部是有效 JSON：sail-research/fp4、particle-ai/us/flex、morph/fp8、river、ionstream/flex。
+- DeepInfra/fp8 是 20/21：1 次输出失控，而且速度慢，单次最长 192 秒。
+- 21 次零失败只能说明失败率大概率低于约 14%。更准确的数字要等用金标准试跑和上线后的观察。
+
+---
+
 ## ✅ 已修复：应用源简历外键删除行为与非空约束冲突
 
 ### 问题描述

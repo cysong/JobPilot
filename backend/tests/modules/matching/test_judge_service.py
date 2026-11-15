@@ -206,3 +206,46 @@ def test_fallback_candidates_skip_resumes_without_family():
         *USER.resume_refs,
     ))
     assert fallback_candidates(user) == ("res_java", "res_qa")
+
+
+# ------------------------------------------------------------------ judge_override
+
+
+def test_judge_override_defaults_to_yaml_settings(monkeypatch):
+    from app.core.config import settings
+    from app.modules.matching.judge.service import judge_override
+
+    monkeypatch.setattr(settings, "MATCH_JUDGE_MODEL", "openai/gpt-6.1-terra")
+    monkeypatch.setattr(settings, "MATCH_JUDGE_REASONING_EFFORT", None)
+    monkeypatch.setattr(settings, "MATCH_JUDGE_OPENROUTER_PROVIDERS", [])
+    override = judge_override()
+    assert override.model == "openai/gpt-6.1-terra"
+    assert override.model_settings == {}
+
+
+def test_judge_override_applies_configured_effort_and_hosts(monkeypatch):
+    from app.core.config import settings
+    from app.modules.matching.judge.service import judge_override
+
+    monkeypatch.setattr(settings, "MATCH_LLM_PROVIDER", "openrouter")
+    monkeypatch.setattr(settings, "MATCH_JUDGE_MODEL", "deepseek/deepseek-v4.1-flash-1017")
+    monkeypatch.setattr(settings, "MATCH_JUDGE_REASONING_EFFORT", "xhigh")
+    monkeypatch.setattr(settings, "MATCH_JUDGE_OPENROUTER_PROVIDERS", ["deepinfra/fp8", "morph/fp8"])
+
+    assert judge_override().model_settings == {
+        "reasoning": {"effort": "xhigh"},
+        "extra_body": {"provider": {"only": ["deepinfra/fp8", "morph/fp8"]}},
+    }
+    # Tuning for the configured model does not leak onto another model (e.g. an eval baseline).
+    assert judge_override(model="openai/gpt-6.1-terra").model_settings == {}
+    # Explicit arguments win; an empty host list means any host.
+    assert judge_override(reasoning_effort="high", openrouter_providers=[]).model_settings == {
+        "reasoning": {"effort": "high"}}
+
+
+@pytest.mark.parametrize("raw", ['["morph/fp8", "river"]', "morph/fp8, river", " morph/fp8,river, "])
+def test_judge_host_list_parses_json_or_comma_env(raw, monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("MATCH_JUDGE_OPENROUTER_PROVIDERS", raw)
+    assert Settings().MATCH_JUDGE_OPENROUTER_PROVIDERS == ["morph/fp8", "river"]

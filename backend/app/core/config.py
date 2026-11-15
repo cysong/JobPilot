@@ -1,7 +1,10 @@
 """Application configuration using Pydantic Settings"""
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+import json
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from typing import Annotated, List
 
 # Get the backend directory (parent of app)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -74,6 +77,11 @@ class Settings(BaseSettings):
     # Matching v3 (docs/job_matching_v3_design.md)
     MATCH_LLM_PROVIDER: str = "openrouter"
     MATCH_JUDGE_MODEL: str = "openai/gpt-6.1-terra"
+    # Tuning for MATCH_JUDGE_MODEL (ignored when a run judges with another model):
+    MATCH_JUDGE_REASONING_EFFORT: str | None = None  # overrides the YAML effort, e.g. "xhigh"
+    # OpenRouter hosts the judge may be routed to, e.g. ["deepinfra/fp8", "morph/fp8"]; empty = any.
+    # Hosts of one model differ in quantization and some emit broken JSON.
+    MATCH_JUDGE_OPENROUTER_PROVIDERS: Annotated[List[str], NoDecode] = []
     MATCH_JUDGE_PROMPT_VERSION: str = "v3"
     MATCH_DEFAULT_COUNTRY: str = "New Zealand"  # assumed candidate location when preferences have none
     TITLE_CLASSIFIER_MODEL: str = "z-ai/glm-5.3-flash"
@@ -146,6 +154,18 @@ class Settings(BaseSettings):
     # Empty string disables the manual-enqueue endpoint (returns 503).
     ENQUEUE_API_URL: str = ""
     ENQUEUE_API_KEY: str = ""
+
+    @field_validator("MATCH_JUDGE_OPENROUTER_PROVIDERS", mode="before")
+    @classmethod
+    def _split_host_list(cls, value):
+        # Accept a JSON list or a comma-separated string, so a hand-edited env file
+        # cannot stop every service from starting.
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                return json.loads(text)
+            return [part.strip() for part in text.split(",") if part.strip()]
+        return value
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

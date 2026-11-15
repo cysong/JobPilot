@@ -25,6 +25,8 @@ OPENROUTER_ALLOWED_SETTINGS = {
     "z-ai/glm-5.3-flash": {"max_tokens", "reasoning", "temperature", "top_p", "extra_args", "tool_choice"},
 }
 OPENROUTER_ALLOWED_EXTRA_ARGS = {"seed"}
+# extra_body carries OpenRouter's own request options, not model parameters.
+OPENROUTER_ALLOWED_EXTRA_BODY = {"plugins", "provider"}
 
 
 def _config(agent_id: str) -> dict:
@@ -45,11 +47,13 @@ def test_openrouter_agents_only_send_supported_parameters(agent_id):
     config = _config(agent_id)
     model = config["model"]
     assert model in OPENROUTER_ALLOWED_SETTINGS, f"add {model} to the allowed-settings snapshot"
-    settings_keys = set((config.get("model_settings") or {}).keys())
+    settings_keys = set((config.get("model_settings") or {}).keys()) - {"extra_body"}
     unsupported = settings_keys - OPENROUTER_ALLOWED_SETTINGS[model]
     assert not unsupported, f"{agent_id}: {model} does not accept {sorted(unsupported)}"
     extra_args = set(((config.get("model_settings") or {}).get("extra_args") or {}).keys())
     assert extra_args <= OPENROUTER_ALLOWED_EXTRA_ARGS, f"{agent_id}: unexpected extra_args {extra_args}"
+    extra_body = set(((config.get("model_settings") or {}).get("extra_body") or {}).keys())
+    assert extra_body <= OPENROUTER_ALLOWED_EXTRA_BODY, f"{agent_id}: unexpected extra_body {extra_body}"
 
 
 def test_switched_agents_use_the_chosen_models():
