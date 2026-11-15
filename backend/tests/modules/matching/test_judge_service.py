@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
+from agents.exceptions import ModelBehaviorError
 
 from app.core.llm.types import ModelOverride
 from app.modules.matching.judge.input_builder import (
@@ -154,6 +155,29 @@ async def test_judge_pair_gives_up_after_retries():
     with pytest.raises(JudgeFailure) as info:
         await judge_pair(gateway, user=USER, job=_job(), candidate_ids=["res_java"])
     assert info.value.retryable is False
+    assert gateway.call.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_judge_pair_retries_invalid_json_then_succeeds():
+    gateway = AsyncMock()
+    gateway.call = AsyncMock(side_effect=[ModelBehaviorError("Invalid JSON when parsing {"),
+                                          copy.deepcopy(JUDGMENT)])
+
+    outcome, _ = await judge_pair(gateway, user=USER, job=_job(), candidate_ids=["res_java"])
+
+    assert gateway.call.await_count == 2
+    assert outcome.validation["structure_retries"] == 1
+
+
+@pytest.mark.asyncio
+async def test_judge_pair_repeated_invalid_json_stays_retryable():
+    gateway = AsyncMock()
+    gateway.call = AsyncMock(side_effect=ModelBehaviorError("Invalid JSON when parsing {"))
+
+    with pytest.raises(JudgeFailure) as info:
+        await judge_pair(gateway, user=USER, job=_job(), candidate_ids=["res_java"])
+    assert info.value.retryable is True
     assert gateway.call.await_count == 3
 
 

@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Protocol, Sequence
 
 import structlog
+from agents.exceptions import ModelBehaviorError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -251,6 +252,12 @@ async def judge_pair(
         call_context.setdefault("user_id", user.user_id)
         try:
             raw = await gateway.call(MATCH_JUDGE_AGENT, prompt, context=call_context, model_override=override)
+        except ModelBehaviorError as exc:
+            # Unparseable JSON from the model (some cheaper models emit it at random): a fresh
+            # call usually succeeds, so retry here instead of re-queuing the whole pair.
+            last_error = exc
+            logger.warning("match_judge_invalid_json", attempt=attempt, error=str(exc)[:300])
+            continue
         except Exception as exc:  # noqa: BLE001
             if availability.is_unavailable(exc):
                 raise  # LLM work is paused: not a judging failure
@@ -272,4 +279,6 @@ async def judge_pair(
             continue
         outcome.validation["structure_retries"] = attempt
         return outcome, call_context
-    raise JudgeFailure(f"invalid output after retries: {last_error}", retryable=False)
+    # Repeated invalid JSON is still transient: let the pipeline try again later.
+    raise JudgeFailure(f"invalid output after retries: {last_error}",
+                       retryable=isinstance(last_error, ModelBehaviorError))
