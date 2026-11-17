@@ -19,7 +19,10 @@
   - `MATCH_JUDGE_OPENROUTER_PROVIDERS` and `MATCH_JUDGE_REASONING_EFFORT`, applied only to the configured judge model; matching CLI flag `--openrouter-providers`;
   - judge `max_tokens` 32000 and the OpenRouter response-healing plugin;
   - gateway logging of the serving host, generation id and billed cost, plus metric `jobpilot_llm_upstream_call_total`.
-- Next: deploy, then switch production to DeepSeek through env (`MATCH_JUDGE_MODEL`, `MATCH_JUDGE_REASONING_EFFORT`, `MATCH_JUDGE_OPENROUTER_PROVIDERS`), observe for a week, then propose design-doc updates.
+- Deployed f09122f by hand over ssh (GitHub Actions jobs refused to start: "account is locked due to a billing issue", although billing and PayPal showed no problem): amd64 image built locally, loaded on the VPS, api / worker / beat recreated. Production still judges with Terra; a smoke call logged the serving host and billed cost.
+- Gold set through the deployed code with hosts pinned (mer_2936794c): 39/39 answered, 1 retry (14 without pinning), exact match 25/39 (Terra 24/39), billed $0.12.
+- Switched production match_judge to DeepSeek V4.1 Flash xhigh through env: `MATCH_JUDGE_MODEL=deepseek/deepseek-v4.1-flash-1017`, `MATCH_JUDGE_REASONING_EFFORT=xhigh`, `MATCH_JUDGE_OPENROUTER_PROVIDERS=morph/fp8,river,ionstream/flex,particle-ai/us/flex` (backup `backend.env.bak-202611162212`; rollback = remove the three lines and recreate api / worker / beat).
+- Next: observe for a week (`jobpilot_llm_upstream_call_total`, judge failures after retries; roll back if failures exceed 2% or A-tier quality drops), then propose design-doc updates.
 
 ### 2026-11-09 - Production deploy and task scheduling fixes
 
