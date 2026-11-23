@@ -7,6 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/backend
 
 # Runtime deps for WeasyPrint and health checks.
+# PDF export fonts: Liberation (Arial/Times metrics) for Latin text and
+# Noto CJK for Chinese; without them WeasyPrint falls back to DejaVu, which
+# is wide and has no CJK glyphs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libcairo2 \
@@ -15,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdk-pixbuf-xlib-2.0-0 \
     libffi-dev \
     shared-mime-info \
+    fonts-liberation2 \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv

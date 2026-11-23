@@ -1,18 +1,14 @@
 /**
  * Minimal template styles
- * Ultra-clean, modern minimalist design
+ * Ultra-clean, modern minimalist design.
+ * Colors, type sizes and decoration only; spacing comes from base.css.
  */
-
-.minimal-template {
-    /* Minimal overrides - keep it simple */
-}
 
 .minimal-template .resume-title {
     font-size: 2em;
     color: #000;
     font-weight: 300;
     letter-spacing: 0.05em;
-    margin-bottom: 1em;
 }
 
 .minimal-template h2 {
@@ -39,10 +35,6 @@
     border-bottom: 1px solid #ccc;
 }
 
-.minimal-template a:hover {
-    border-bottom-color: #000;
-}
-
 .minimal-template strong {
     color: #000;
     font-weight: 500;
@@ -55,7 +47,7 @@
     text-align: center;
 }
 
-/* Lists - clean bullets */
+/* Lists - dash bullets; the hanging indent matches the dash width */
 .minimal-template ul {
     list-style: none;
     margin-left: 1em;
@@ -72,14 +64,13 @@
 
 .minimal-template ol {
     list-style: decimal;
-    margin-left: 1.5em;
 }
 
 /* Code - minimal styling */
 .minimal-template code {
     background: #f9f9f9;
     color: #000;
-    font-family: 'Courier New', monospace;
+    font-family: 'Liberation Mono', 'Courier New', monospace;
     font-size: 0.85em;
 }
 

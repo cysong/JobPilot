@@ -1,14 +1,22 @@
-/* Base styles for cover letter templates */
+/*
+ * Base styles for cover letter templates.
+ * All sizes are relative (em) so the root font size injected by
+ * PDFGenerator from the export request's font_size scales the letter.
+ */
 @page {
     size: A4;
     margin: 20mm 18mm 20mm 18mm;
 }
 
+/* System fonts from backend/Dockerfile: Liberation Serif has Times metrics,
+   Noto Serif CJK covers Chinese. */
 body {
-    font-family: "Times New Roman", Times, serif;
-    font-size: 12pt;
+    font-family: 'Liberation Serif', 'Times New Roman', Times, 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
+    font-size: 1rem;
     line-height: 1.5;
     color: #1f2937;
+    orphans: 2;
+    widows: 2;
 }
 
 .cover-letter-container {
@@ -16,7 +24,7 @@ body {
 }
 
 .cover-letter-content p {
-    margin: 0 0 12pt 0;
+    margin: 0 0 1em 0;
 }
 
 .cover-letter-content p:last-child {
@@ -26,25 +34,26 @@ body {
 .cover-letter-content ul,
 .cover-letter-content ol {
     list-style: none;
-    margin: 0 0 12pt 0;
+    margin: 0 0 1em 0;
     padding: 0;
 }
 
 .cover-letter-content li {
-    margin: 0 0 8pt 0;
+    margin: 0 0 0.65em 0;
 }
 
 .cover-letter-content h1,
 .cover-letter-content h2,
 .cover-letter-content h3,
 .cover-letter-content h4 {
-    font-size: 12pt;
+    font-size: 1em;
     font-weight: 600;
-    margin: 0 0 12pt 0;
+    margin: 0 0 1em 0;
+    break-after: avoid;
 }
 
 .cover-letter-footer {
-    margin-top: 18pt;
-    font-size: 10pt;
+    margin-top: 1.5em;
+    font-size: 0.85em;
     color: #6b7280;
 }

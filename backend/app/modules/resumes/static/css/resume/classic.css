@@ -1,10 +1,11 @@
 /**
  * Classic template styles
- * Traditional, elegant design suitable for conservative industries
+ * Traditional, elegant design suitable for conservative industries.
+ * Colors, type sizes and decoration only; spacing comes from base.css.
  */
 
 .classic-template {
-    font-family: 'Noto Serif SC', Georgia, serif;
+    font-family: 'Liberation Serif', 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
 }
 
 .classic-template .resume-title {
@@ -19,7 +20,7 @@
     width: 100px;
     height: 2px;
     background: #2c3e50;
-    margin: 0.5em auto 1.5em;
+    margin: 0.4em auto 0;
 }
 
 .classic-template h2 {
@@ -71,7 +72,7 @@
 .classic-template code {
     background: #ecf0f1;
     color: #2c3e50;
-    font-family: 'Courier New', monospace;
+    font-family: 'Liberation Mono', 'Courier New', monospace;
 }
 
 .classic-template pre {
@@ -93,5 +94,5 @@
 /* Blockquotes */
 .classic-template blockquote {
     border-left-color: #95a5a6;
-    font-family: 'Noto Serif SC', Georgia, serif;
+    font-family: 'Liberation Serif', 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
 }

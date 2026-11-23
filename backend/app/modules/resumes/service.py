@@ -424,7 +424,7 @@ class ResumeService:
         resume_id: str,
         user_id: int,
         template: Optional[str] = None,
-        font_size: int = 12,
+        font_size: Optional[int] = None,
         include_metadata: bool = False,
     ) -> tuple[bytes, str, str]:
         """Export resume to PDF."""

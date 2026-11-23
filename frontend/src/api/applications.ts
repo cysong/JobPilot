@@ -106,7 +106,8 @@ export const applicationApi = {
     exportTailoredResumePdf: async (applicationId: string, options?: ResumeExportRequest) => {
         const result = await client.post<Blob, Blob>(`/applications/${applicationId}/resume/export`, {
             template: options?.template || 'modern',
-            font_size: options?.font_size || 12,
+            // Omitted font_size lets the backend apply the per-document default
+            font_size: options?.font_size,
             include_metadata: options?.include_metadata ?? false
         }, {
             responseType: 'blob'
@@ -130,7 +131,8 @@ export const applicationApi = {
     exportCoverLetterPdf: async (applicationId: string, options?: ResumeExportRequest) => {
         const result = await client.post<Blob, Blob>(`/applications/${applicationId}/cover-letter/export`, {
             template: options?.template || 'modern',
-            font_size: options?.font_size || 12,
+            // Omitted font_size lets the backend apply the per-document default
+            font_size: options?.font_size,
             include_metadata: options?.include_metadata ?? false
         }, {
             responseType: 'blob'

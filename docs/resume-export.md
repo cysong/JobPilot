@@ -59,17 +59,13 @@ backend/app/modules/resumes/
 ├── static/
 │   ├── css/                 # 样式文件 (按文档类型分类)
 │   │   ├── resume/          # 简历样式
-│   │   │   ├── base.css     # 基础样式 + 字体
-│   │   │   ├── modern.css
+│   │   │   ├── base.css     # 版面规则: 页面、字体栈、间距、分页
+│   │   │   ├── modern.css   # 只管颜色、字号、装饰
 │   │   │   ├── classic.css
 │   │   │   └── minimal.css
-│   │   └── cover_letter/    # 求职信样式 (待创建)
+│   │   └── cover_letter/    # 求职信样式
 │   │       ├── base.css
-│   │       └── ...
-│   └── fonts/               # 中文字体 (所有文档类型共享)
-│       ├── NotoSansSC-Regular.ttf  # 需手动下载
-│       ├── NotoSansSC-Bold.ttf
-│       └── NotoSerifSC-Regular.ttf
+│   │       └── modern.css
 ├── schemas.py               # Pydantic 数据模型
 ├── service.py               # ResumeService (调用 DocumentExportService)
 └── router.py                # Resume API 端点
@@ -186,62 +182,50 @@ RUN apt-get update && apt-get install -y \
     libgdk-pixbuf2.0-0 \
     libffi-dev \
     shared-mime-info \
+    fonts-liberation2 \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 ```
 
+`fonts-liberation2` 和 `fonts-noto-cjk` 是 PDF 用的字体, 见下一步。
+
 ---
 
-### 步骤 3: 下载和配置字体
+### 步骤 3: 字体与样式约定
 
-#### 下载 Noto 字体
+#### 字体
 
-1. **Noto Sans SC** (无衬线,现代风格)
-   - 访问: https://fonts.google.com/noto/specimen/Noto+Sans+SC
-   - 点击 "Download family"
-   - 解压后找到: `NotoSansSC-Regular.ttf` 和 `NotoSansSC-Bold.ttf`
+PDF 只用系统字体, 不再用 `@font-face` 加载仓库里的字体文件。字体由 Docker 镜像安装:
 
-2. **Noto Serif SC** (衬线,传统风格)
-   - 访问: https://fonts.google.com/noto/specimen/Noto+Serif+SC
-   - 点击 "Download family"
-   - 解压后找到: `NotoSerifSC-Regular.ttf`
+| 用途 | 字体 | Debian 包 |
+|---|---|---|
+| 英文无衬线 (modern / minimal) | Liberation Sans (与 Arial 同宽) | `fonts-liberation2` |
+| 英文衬线 (classic / cover letter) | Liberation Serif (与 Times 同宽) | `fonts-liberation2` |
+| 中文 | Noto Sans CJK SC / Noto Serif CJK SC | `fonts-noto-cjk` |
 
-#### 放置字体文件
+CSS 的 font-family 先写 Liberation, 再写 Noto CJK; 中文字符会按字形自动回退到 Noto CJK。
+后面的 Arial、PingFang SC、Microsoft YaHei 等只是让 macOS / Windows 本地预览接近线上效果。
 
-```bash
-# 在 backend 目录下
-mkdir -p app/modules/resumes/static/fonts
+镜像里缺这些字体时, WeasyPrint 会回退到 DejaVu: 字形明显更宽 (页数变多), 且没有中文字形。
 
-# 将下载的 3 个字体文件复制到该目录:
-# - NotoSansSC-Regular.ttf
-# - NotoSansSC-Bold.ttf
-# - NotoSerifSC-Regular.ttf
-```
-
-#### 验证字体
+**检查容器里的字体:**
 
 ```bash
-ls -la app/modules/resumes/static/fonts/
-# 应该看到 3 个 .ttf 文件
+docker exec jobpilot-api fc-match "Liberation Sans"
+docker exec jobpilot-api fc-match "Noto Sans CJK SC"
 ```
 
-#### 字体配置说明
+#### 字号
 
-字体在 `static/css/base.css` 中通过 `@font-face` 声明:
+- 所有 CSS 尺寸都用相对单位 (em/rem)。
+- `PDFGenerator` 把根字号 `html { font-size: Npt }` 作为最后一个样式表注入, 整个版面随之缩放。
+- 请求不传 `font_size` 时按文档类型取默认值: 简历 10pt, cover letter 11pt (`PDFGenerator.DEFAULT_FONT_SIZES`)。
 
-```css
-@font-face {
-    font-family: 'Noto Sans SC';
-    src: url('../fonts/NotoSansSC-Regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
-```
+#### 样式分工
 
-**添加自定义字体:**
-1. 下载 `.ttf` 文件
-2. 放入 `static/fonts/`
-3. 在 CSS 中添加 `@font-face` 声明
-4. 在模板 CSS 中使用
+- `resume/base.css` 定义版面规则: 页面尺寸和边距 (1.5cm / 1.8cm)、字体栈、行高 1.4、统一的间距、分页规则。
+- 分页规则: 标题 `break-after: avoid`, 正文 `orphans` / `widows` 为 2。要点 `li` 不加 `break-inside: avoid`, 否则带子列表的要点会被整块挤到下一页。
+- 模板样式 (`modern.css` 等) 只改颜色、字号和装饰, 不改间距, 保证三个模板的版面一致。
 
 ---
 
@@ -309,7 +293,7 @@ Content-Type: application/json
 
 {
   "template": "modern",        // 可选,默认使用配置中的模板
-  "font_size": 12,            // 基础字号 (10-16)
+  "font_size": 10,            // 可选, 基础字号 (10-16); 不传时简历 10, cover letter 11
   "include_metadata": false   // 是否包含生成时间
 }
 ```
@@ -337,9 +321,9 @@ from app.modules.resumes.export import PDFGenerator
 
 # 初始化生成器
 generator = PDFGenerator(
+    document_type="resume",
     template_name="modern",
-    font_size=12,
-    include_metadata=True
+    include_metadata=True,  # font_size omitted: resume 10pt, cover letter 11pt
 )
 
 # 生成 PDF
@@ -457,12 +441,12 @@ class Settings(BaseSettings):
 
 ### Q2: 中文显示为方块或乱码
 
-**原因:** 字体文件缺失或路径错误
+**原因:** 运行环境没有安装中文字体 (WeasyPrint 回退到没有中文字形的字体)
 
 **解决:**
-1. 检查 `app/modules/resumes/static/fonts/*.ttf` 是否存在
-2. 确认文件名正确 (区分大小写)
-3. 确保格式为 `.ttf` (不是 `.woff` 或 `.woff2`)
+1. 确认镜像安装了 `fonts-noto-cjk` (见 Dockerfile)
+2. 在容器里运行 `fc-match "Noto Sans CJK SC"`, 应输出 NotoSansCJK
+3. 本机直接运行时, 安装任一中文字体 (macOS 自带 PingFang SC)
 
 ### Q3: "TemplateNotFound: modern.html"
 
@@ -545,10 +529,6 @@ backend/
 │           │   │   ├── modern.css   # ✅
 │           │   │   ├── classic.css  # ✅
 │           │   │   └── minimal.css  # ✅
-│           │   └── fonts/
-│           │       ├── NotoSansSC-Regular.ttf  # ⚠️ 需手动下载
-│           │       ├── NotoSansSC-Bold.ttf     # ⚠️ 需手动下载
-│           │       └── NotoSerifSC-Regular.ttf # ⚠️ 需手动下载
 │           ├── schemas.py           # ✅ ResumeExportRequest/Response
 │           ├── service.py           # ✅ export_resume_to_pdf()
 │           └── router.py            # ✅ /export 和 /templates 端点

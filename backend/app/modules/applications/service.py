@@ -350,7 +350,7 @@ class ApplicationService:
         application_id: str,
         user: User,
         template: Optional[str] = None,
-        font_size: int = 12,
+        font_size: Optional[int] = None,
         include_metadata: bool = False,
     ) -> tuple[bytes, str, str]:
         """Export tailored resume to PDF."""
@@ -396,7 +396,7 @@ class ApplicationService:
         application_id: str,
         user: User,
         template: Optional[str] = None,
-        font_size: int = 12,
+        font_size: Optional[int] = None,
         include_metadata: bool = False,
     ) -> tuple[bytes, str, str]:
         """Export cover letter to PDF."""

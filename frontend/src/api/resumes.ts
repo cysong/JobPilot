@@ -66,7 +66,8 @@ export const resumeApi = {
     exportResume: async (id: string, options?: ResumeExportRequest) => {
         const result = await client.post<Blob, Blob>(`/resumes/${id}/export`, {
             template: options?.template || 'modern',
-            font_size: options?.font_size || 12,
+            // Omitted font_size lets the backend apply the per-document default
+            font_size: options?.font_size,
             include_metadata: options?.include_metadata ?? false
         }, {
             responseType: 'blob'

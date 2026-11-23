@@ -1,5 +1,26 @@
 # 问题修复记录
 
+## ✅ 已修复（待部署）：导出的简历 PDF 偏长（真实简历 6 页），中文无法显示
+
+### 问题描述
+生产环境导出的定制简历（约 1.09 万字符）有 6 页。
+
+### 根本原因
+- **字号参数没生效：** `font_size` 传进了模板上下文，但模板从未使用；`resume/base.css` 写死 `html { font-size: 12pt }`。前端又在两个 API 文件里各写死 `|| 12`。
+- **字体没加载：** CSS 用 `@font-face` 引用 `static/fonts/` 下的 Noto 字体，但这个目录从未提交（文档要求手动下载）；生成器也没传 `FontConfiguration`。实际出图用 DejaVu：字形偏宽，且没有中文字形。Cover letter 指定的 Times New Roman 在容器里也不存在。
+- **版面偏松：** 页边距 2cm/2.5cm；`base.css` 和 `modern.css` 各有一套间距，后者覆盖前者，正文行高 1.5。
+- **内容本身较长：** 只改样式压不到 2 页。
+
+### 修复方案
+- `PDFGenerator` 按文档类型给默认字号（简历 10pt、cover letter 11pt），以 `html { font-size }` 注入；CSS 全部用相对单位。schema 的 `font_size` 改为可选，前端不再写死默认值。
+- Dockerfile 安装 `fonts-liberation2`（Arial/Times 同宽）和 `fonts-noto-cjk`；删除失效的 `@font-face`，font-family 改为系统字体。
+- 简历边距改为 1.5cm/1.8cm，行高 1.4；间距统一定义在 `resume/base.css`，模板 CSS 只管颜色、字号和装饰。
+- 分页：标题 `break-after: avoid`，`orphans`/`widows` 2。要点不加 `break-inside: avoid`：带子列表的父级要点会被整块挤到下一页，留下大段空白（code review 发现）。
+- Cover letter 的 CSS 从 pt 改为相对单位，跟随字号。
+
+### 验证
+用新镜像在本地渲染这份真实简历：modern 4 页（第 4 页 5 行），classic / minimal 3 页；cover letter（4 段）1 页；中英文分别使用 Liberation 和 Noto CJK。
+
 ## ✅ 已修复（待部署）：DeepSeek V4.1 Flash 做 match_judge 时随机输出无效 JSON
 
 ### 问题描述

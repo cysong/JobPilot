@@ -46,13 +46,18 @@ class PDFGenerator:
     TEMPLATES_DIR = Path(__file__).parent / "templates"
     STATIC_DIR = Path(__file__).parent.parent / "static"
     CSS_DIR = STATIC_DIR / "css"
-    FONTS_DIR = STATIC_DIR / "fonts"
+
+    # Base font size (pt) when the caller does not choose one. Every size in
+    # the document CSS is relative (em/rem), so this single value scales the
+    # whole layout. Letters read better slightly larger than dense resumes.
+    DEFAULT_FONT_SIZES = {"resume": 10, "cover_letter": 11}
+    FALLBACK_FONT_SIZE = 11
 
     def __init__(
         self,
         document_type: str,
         template_name: Optional[str] = None,
-        font_size: int = 12,
+        font_size: Optional[int] = None,
         include_metadata: bool = False
     ):
         """
@@ -61,12 +66,14 @@ class PDFGenerator:
         Args:
             document_type: Type of document (resume, cover_letter, etc.)
             template_name: Template to use (modern/classic/minimal)
-            font_size: Base font size in pt
+            font_size: Base font size in pt; None uses DEFAULT_FONT_SIZES
             include_metadata: Whether to include creation date footer
         """
         self.document_type = document_type
         self.template_name = template_name or settings.EXPORT_DEFAULT_TEMPLATE
-        self.font_size = font_size
+        self.font_size = font_size or self.DEFAULT_FONT_SIZES.get(
+            document_type, self.FALLBACK_FONT_SIZE
+        )
         self.include_metadata = include_metadata
 
         # Validate document type
@@ -134,7 +141,6 @@ class PDFGenerator:
             "content": html_content,
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             "include_metadata": self.include_metadata,
-            "font_size": self.font_size,
             "language": language,
         }
         final_html = template.render(**context)
@@ -151,6 +157,9 @@ class PDFGenerator:
         template_css_path = self.CSS_DIR / self.document_type / f"{self.template_name}.css"
         if template_css_path.exists():
             stylesheets.append(CSS(filename=str(template_css_path)))
+
+        # Root font size goes last so it wins over any default in the sheets
+        stylesheets.append(CSS(string=f"html {{ font-size: {self.font_size}pt; }}"))
 
         # Step 5: Generate PDF with weasyprint
         html_obj = HTML(string=final_html, base_url=str(self.TEMPLATES_DIR))

@@ -23,7 +23,7 @@ class DocumentExportService:
         content: str,
         title: str,
         template: Optional[str] = None,
-        font_size: int = 12,
+        font_size: Optional[int] = None,
         include_metadata: bool = False,
         output_path: Optional[Path] = None
     ) -> tuple[bytes, str, str]:
@@ -35,7 +35,7 @@ class DocumentExportService:
             content: Document content in Markdown format
             title: Document title
             template: Template name (modern/classic/minimal), uses default if not specified
-            font_size: Base font size in pt (10-16)
+            font_size: Base font size in pt (10-16); None uses the document type default
             include_metadata: Include generation timestamp in footer
             output_path: Optional file path to save PDF
 

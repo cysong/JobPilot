@@ -151,7 +151,10 @@ class FormalResumeLimit(BaseModel):
 class ResumeExportRequest(BaseModel):
     """Request schema for exporting resume to PDF"""
     template: Optional[str] = Field(None, description="Template name (modern/classic/minimal)")
-    font_size: int = Field(default=12, ge=10, le=16, description="Base font size in pt")
+    font_size: Optional[int] = Field(
+        default=None, ge=10, le=16,
+        description="Base font size in pt; omitted uses the per-document default",
+    )
     include_metadata: bool = Field(default=False, description="Include creation date footer")
 
 

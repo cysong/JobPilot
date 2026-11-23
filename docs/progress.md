@@ -5,11 +5,21 @@
 **Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
 **Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-11-16
+**Last Updated:** 2026-11-23
 
 ---
 
 ## Work Log
+
+### 2026-11-23 - PDF export: font size, fonts and layout
+
+- A real tailored resume exported to 6 pages. Causes: `font_size` was never applied (CSS hardcoded 12pt), the Noto fonts were never shipped so WeasyPrint fell back to wide DejaVu without CJK glyphs, and loose margins / spacing (docs/issues.md).
+- `font_size` now drives the root font size, with per-document defaults (resume 10pt, cover letter 11pt); schema field optional, frontend no longer hardcodes 12.
+- Docker image installs `fonts-liberation2` and `fonts-noto-cjk`; broken `@font-face` rules removed.
+- Resume margins 1.5cm/1.8cm, line-height 1.4, one spacing scale in `resume/base.css` (template CSS keeps colors and decoration), pagination rules (headings kept with their content, orphans/widows 2). Cover letter CSS uses relative units.
+- Same resume rendered with the new image: modern 4 pages (last page 5 lines), classic / minimal 3. Not deployed.
+- Code review in a separate session: one medium issue (`break-inside: avoid` on `li` pushed whole nested lists to the next page) and two nits fixed.
+- Next: deploy, then decide whether tailored resumes need a length target in generation.
 
 ### 2026-11-16 - match_judge: cheaper model evaluation and OpenRouter host routing
 

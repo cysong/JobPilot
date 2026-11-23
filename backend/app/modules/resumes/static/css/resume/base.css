@@ -1,42 +1,33 @@
 /**
  * Base styles for all resume templates
  * Follows CSS Paged Media specifications for PDF generation
+ *
+ * Layout rules live here: page geometry, font stacks, the spacing scale and
+ * pagination. Template sheets (modern/classic/minimal) only change colors,
+ * type sizes and decoration, never spacing, so the three stay consistent.
+ *
+ * All sizes are relative (em/rem). The root font size is injected by
+ * PDFGenerator from the export request's font_size.
  */
 
 /* Page setup for PDF */
 @page {
     size: A4;
-    margin: 2cm 2.5cm;
+    margin: 1.5cm 1.8cm;
 
-    /* Page numbers (optional) */
     @bottom-right {
         content: counter(page) " / " counter(pages);
-        font-size: 9pt;
+        font-size: 8pt;
         color: #666;
     }
 }
 
-/* Font faces - Chinese support */
-@font-face {
-    font-family: 'Noto Sans SC';
-    src: url('../fonts/NotoSansSC-Regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: 'Noto Sans SC';
-    src: url('../fonts/NotoSansSC-Bold.ttf') format('truetype');
-    font-weight: 700;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: 'Noto Serif SC';
-    src: url('../fonts/NotoSerifSC-Regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
+/*
+ * Fonts come from the system (see backend/Dockerfile): Liberation has
+ * Arial/Times metrics for Latin text, Noto CJK covers Chinese. The Arial /
+ * Microsoft YaHei / PingFang entries keep local previews on macOS and
+ * Windows close to production.
+ */
 
 /* Reset and base styles */
 * {
@@ -45,15 +36,13 @@
     box-sizing: border-box;
 }
 
-html {
-    font-size: 12pt; /* Base font size, can be overridden */
-}
-
 body {
-    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    line-height: 1.6;
+    font-family: 'Liberation Sans', Arial, 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    line-height: 1.4;
     color: #333;
     background: white;
+    orphans: 2;
+    widows: 2;
 }
 
 /* Container */
@@ -61,48 +50,81 @@ body {
     max-width: 100%;
 }
 
+.resume-content > :first-child {
+    margin-top: 0;
+}
+
+.resume-content > :last-child {
+    margin-bottom: 0;
+}
+
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
-    line-height: 1.3;
-    margin-bottom: 0.5em;
+    line-height: 1.25;
     color: #1a1a1a;
-    page-break-after: avoid;
+    /* Keep a heading on the same page as the content it introduces */
+    break-after: avoid;
 }
 
 h1 {
     font-size: 1.8em;
+    margin-bottom: 0.4em;
 }
 
 h2 {
-    font-size: 1.5em;
-    margin-top: 1.2em;
+    font-size: 1.3em;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+    padding-bottom: 0.2em;
     border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 0.3em;
 }
 
 h3 {
-    font-size: 1.3em;
-    margin-top: 1em;
+    font-size: 1.05em;
+    margin-top: 0.7em;
+    margin-bottom: 0.2em;
 }
 
 h4 {
-    font-size: 1.1em;
-    margin-top: 0.8em;
+    font-size: 1em;
+    margin-top: 0.5em;
+    margin-bottom: 0.15em;
+}
+
+h5, h6 {
+    font-size: 1em;
+    margin-top: 0.4em;
+    margin-bottom: 0.1em;
 }
 
 p {
-    margin-bottom: 0.8em;
+    margin-bottom: 0.5em;
 }
 
 /* Lists */
 ul, ol {
-    margin-left: 1.5em;
-    margin-bottom: 0.8em;
+    margin: 0 0 0.5em 1.4em;
 }
 
+/*
+ * No break-inside: avoid on li: a parent item holding a nested list would
+ * move as one block and leave a large gap. orphans/widows on body already
+ * keep short bullets whole.
+ */
 li {
-    margin-bottom: 0.3em;
+    margin-bottom: 0.15em;
+}
+
+/* Loose markdown lists wrap each item in <p>; keep them as tight as tight lists */
+li > p {
+    margin-bottom: 0;
+}
+
+li > ul,
+li > ol {
+    margin-top: 0.15em;
+    margin-bottom: 0;
 }
 
 /* Links */
@@ -111,13 +133,9 @@ a {
     text-decoration: none;
 }
 
-a:hover {
-    text-decoration: underline;
-}
-
 /* Code */
 code {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'Liberation Mono', 'Courier New', monospace;
     background: #f5f5f5;
     padding: 0.1em 0.3em;
     border-radius: 3px;
@@ -126,11 +144,10 @@ code {
 
 pre {
     background: #f5f5f5;
-    padding: 1em;
-    border-radius: 5px;
-    overflow-x: auto;
-    margin-bottom: 1em;
-    page-break-inside: avoid;
+    padding: 0.6em 0.8em;
+    border-radius: 3px;
+    margin-bottom: 0.6em;
+    break-inside: avoid;
 }
 
 pre code {
@@ -142,13 +159,13 @@ pre code {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 1em;
-    page-break-inside: avoid;
+    margin-bottom: 0.8em;
+    break-inside: avoid;
 }
 
 th, td {
     border: 1px solid #ddd;
-    padding: 0.5em;
+    padding: 0.35em 0.5em;
     text-align: left;
 }
 
@@ -159,9 +176,9 @@ th {
 
 /* Blockquotes */
 blockquote {
-    border-left: 4px solid #e0e0e0;
-    padding-left: 1em;
-    margin: 1em 0;
+    border-left: 3px solid #e0e0e0;
+    padding-left: 0.8em;
+    margin: 0.6em 0;
     color: #666;
     font-style: italic;
 }
@@ -170,7 +187,7 @@ blockquote {
 hr {
     border: none;
     border-top: 1px solid #e0e0e0;
-    margin: 1.5em 0;
+    margin: 0.8em 0;
 }
 
 /* Strong and emphasis */
@@ -184,17 +201,17 @@ em {
 
 /* Page break utilities */
 .page-break {
-    page-break-after: always;
+    break-after: page;
 }
 
 .avoid-break {
-    page-break-inside: avoid;
+    break-inside: avoid;
 }
 
 /* Resume specific */
 .resume-header {
-    margin-bottom: 1.5em;
-    page-break-after: avoid;
+    margin-bottom: 1em;
+    break-after: avoid;
 }
 
 .resume-title {
@@ -202,13 +219,9 @@ em {
     margin-bottom: 0.3em;
 }
 
-.resume-content {
-    /* Main content area */
-}
-
 .resume-footer {
-    margin-top: 2em;
-    padding-top: 1em;
+    margin-top: 1.5em;
+    padding-top: 0.6em;
     border-top: 1px solid #e0e0e0;
     font-size: 0.85em;
     color: #666;
