@@ -17,9 +17,10 @@
 - `font_size` now drives the root font size, with per-document defaults (resume 10pt, cover letter 11pt); schema field optional, frontend no longer hardcodes 12.
 - Docker image installs `fonts-liberation2` and `fonts-noto-cjk`; broken `@font-face` rules removed.
 - Resume margins 1.5cm/1.8cm, line-height 1.4, one spacing scale in `resume/base.css` (template CSS keeps colors and decoration), pagination rules (headings kept with their content, orphans/widows 2). Cover letter CSS uses relative units.
-- Same resume rendered with the new image: modern 4 pages (last page 5 lines), classic / minimal 3. Not deployed.
+- Same resume rendered with the new image: modern 4 pages (last page 5 lines), classic / minimal 3.
+- Deployed bc81933 by hand (GitHub Actions jobs again refused to start: account locked due to billing): amd64 image built locally and loaded on the VPS, api / worker / beat recreated, frontend dist replaced (backup `/opt/jobpilot-backups/frontend-202611231604.tgz`). Verified in the production container: the same resume renders 4 / 3 / 3 pages with Liberation + Noto CJK fonts.
 - Code review in a separate session: one medium issue (`break-inside: avoid` on `li` pushed whole nested lists to the next page) and two nits fixed.
-- Next: deploy, then decide whether tailored resumes need a length target in generation.
+- Next: decide whether tailored resumes need a length target in generation.
 
 ### 2026-11-16 - match_judge: cheaper model evaluation and OpenRouter host routing
 
