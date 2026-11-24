@@ -49,8 +49,9 @@ class PDFGenerator:
 
     # Base font size (pt) when the caller does not choose one. Every size in
     # the document CSS is relative (em/rem), so this single value scales the
-    # whole layout. Letters read better slightly larger than dense resumes.
-    DEFAULT_FONT_SIZES = {"resume": 10, "cover_letter": 11}
+    # whole layout. 11pt keeps resumes readable on screen without adding
+    # pages compared with 10pt (checked on real resumes, 2026-11-24).
+    DEFAULT_FONT_SIZES = {"resume": 11, "cover_letter": 11}
     FALLBACK_FONT_SIZE = 11
 
     def __init__(

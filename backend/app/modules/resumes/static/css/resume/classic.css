@@ -8,19 +8,11 @@
     font-family: 'Liberation Serif', 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
 }
 
-.classic-template .resume-title {
-    font-size: 2.5em;
+/* The name heading at the top of the resume */
+.classic-template .resume-content > h1:first-child {
+    font-size: 2.3em;
     color: #2c3e50;
-    text-align: center;
-    font-weight: 700;
     letter-spacing: 0.02em;
-}
-
-.classic-template .header-underline {
-    width: 100px;
-    height: 2px;
-    background: #2c3e50;
-    margin: 0.4em auto 0;
 }
 
 .classic-template h2 {

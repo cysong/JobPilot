@@ -219,7 +219,7 @@ docker exec jobpilot-api fc-match "Noto Sans CJK SC"
 
 - 所有 CSS 尺寸都用相对单位 (em/rem)。
 - `PDFGenerator` 把根字号 `html { font-size: Npt }` 作为最后一个样式表注入, 整个版面随之缩放。
-- 请求不传 `font_size` 时按文档类型取默认值: 简历 10pt, cover letter 11pt (`PDFGenerator.DEFAULT_FONT_SIZES`)。
+- 请求不传 `font_size` 时按文档类型取默认值: 简历和 cover letter 都是 11pt (`PDFGenerator.DEFAULT_FONT_SIZES`)。
 
 #### 样式分工
 
@@ -293,7 +293,7 @@ Content-Type: application/json
 
 {
   "template": "modern",        // 可选,默认使用配置中的模板
-  "font_size": 10,            // 可选, 基础字号 (10-16); 不传时简历 10, cover letter 11
+  "font_size": 11,            // 可选, 基础字号 (10-16); 不传时为 11
   "include_metadata": false   // 是否包含生成时间
 }
 ```
@@ -323,7 +323,7 @@ from app.modules.resumes.export import PDFGenerator
 generator = PDFGenerator(
     document_type="resume",
     template_name="modern",
-    include_metadata=True,  # font_size omitted: resume 10pt, cover letter 11pt
+    include_metadata=True,  # font_size omitted: 11pt
 )
 
 # 生成 PDF

@@ -1,5 +1,55 @@
 # 问题修复记录
 
+## ✅ 已调整（待部署）：简历 PDF 默认字号 10pt 偏小
+
+### 问题描述
+10pt 的正文读起来吃力。
+
+### 处理
+用两份真实简历对比 10、10.5、11、11.5、12pt：
+- 11pt 两份都没有多出页数（3 页、4 页），只是最后一页填得更满；
+- 11.5pt 和 12pt 会多出一页，12pt 时联系方式那一行还会折行。
+
+所以把 `PDFGenerator.DEFAULT_FONT_SIZES` 里的简历默认值从 10 改为 11，和 cover letter 一致。
+
+## ✅ 已修复（待部署）：定制简历的岗位名称没有对齐目标岗位
+
+### 问题描述
+简历新格式里姓名是一级标题，岗位名称降为姓名下方的副标题。定制简历的副标题基本照抄模板，例如目标岗位是 "Senior Software Engineer"，生成的仍是 "Senior Full Stack Developer"。
+
+### 根本原因
+- `resume_tailor.yaml` 要求把岗位名称对齐目标岗位，但 `load_tailoring_input` 组装 `AnalyzedJob` 时没有放 `normalized_job_title`，也没有传招聘原文的岗位名称，模型不知道目标岗位叫什么。
+- prompt 只说 "candidate's title"，没有说明岗位名称写在哪一行，也没说明一级标题是姓名。结构没出错，靠的是“保留原结构”这条兜底。
+- classic / minimal 两个 PDF 模板会在正文上方再加一个 `<h1>{{ title }}</h1>`；定制简历导出时 title 固定传 "Resume"，所以 PDF 顶部会多出一个 "Resume" 大标题。
+
+### 修复方案
+- prompt 新增 `target_job_title`（招聘原文的岗位名称），`job_analysis` 补上 `normalized_job_title`。
+- `resume_tailor.yaml` 升到 v5：写明一级标题是姓名、不能改；岗位名称是姓名下方那一行，只改里面的文字，HTML 标签和样式保持原样；岗位名称以目标岗位为准，资历按经历证据确定。
+- 删除 classic / minimal 模板的标题头；三个模板都把正文的第一个 H1（姓名）居中，各自保留字号和颜色。
+
+### 验证
+- `tests/modules/workflow` 和 agent 配置测试共 35 个，全部通过。
+- 用真实简历渲染三个模板：顶部都是居中的姓名和副标题，不再出现 "Resume"。
+- 模型实际生成效果要等上线后，再重新生成一份定制简历来确认。
+
+## ✅ 已修复（待部署）：简历预览和导出的 PDF 版式不一致（一级标题对齐不同）
+
+### 问题描述
+申请详情页的简历预览里，一级标题（姓名）靠左；导出的 PDF 里是居中的。副标题和联系方式两处都居中。
+
+### 根本原因
+- 副标题和联系方式的居中写在 markdown 的内联 `style` 里，预览和 PDF 都会执行，所以两边一致。
+- 姓名的居中只写在 PDF 模板 `resume/modern.css` 的 `.resume-content > h1:first-child` 上。前端 `MarkdownPreview` 用的是 Tailwind `prose`，标题样式也是自己写的，和 PDF 的 CSS 完全是两套。
+- 同样原因的其他差异：字号（预览 16px，PDF 10pt）、行高（1.75 对 1.4）、页边距、二级标题（PDF 是紫色加下边框）、链接（预览有下划线）。
+
+### 修复方案
+- `MarkdownPreview` 新增 `variant`。简历（`resume`、`tailored_resume`）用 `resume` 变体，样式在 `components/MarkdownPreview/styles.css`；cover letter 仍用原来的 prose 样式。
+- 简历预览沿用 PDF modern 模板的版式：姓名居中、二级标题用强调色加下边框、各级标题层级、链接和列表样式、间距比例。字号、行高、边距按屏幕阅读调整（15px，行高 1.6，rem 内边距，窄屏收窄），字体用页面本身的字体，不照搬 10pt 和厘米边距。
+- 申请详情页和文档编辑页按 `business_type` 选择变体。
+
+### 验证
+用真实简历在浏览器里检查预览：姓名居中，二级标题和链接样式与同一份 markdown 导出的 PDF 一致；桌面和 375px 手机宽度都没有横向滚动；cover letter 预览不受影响。
+
 ## ✅ 已修复（待部署）：导出的简历 PDF 偏长（真实简历 6 页），中文无法显示
 
 ### 问题描述

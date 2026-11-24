@@ -4,7 +4,8 @@
  * Colors, type sizes and decoration only; spacing comes from base.css.
  */
 
-.minimal-template .resume-title {
+/* The name heading at the top of the resume */
+.minimal-template .resume-content > h1:first-child {
     font-size: 2em;
     color: #000;
     font-weight: 300;

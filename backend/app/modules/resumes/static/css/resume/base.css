@@ -208,15 +208,12 @@ em {
     break-inside: avoid;
 }
 
-/* Resume specific */
-.resume-header {
-    margin-bottom: 1em;
-    break-after: avoid;
-}
-
-.resume-title {
-    font-size: 2em;
-    margin-bottom: 0.3em;
+/*
+ * The resume's first H1 is the candidate's name; the headline title and
+ * contact line below it are centered by the resume markdown itself.
+ */
+.resume-content > h1:first-child {
+    text-align: center;
 }
 
 .resume-footer {
