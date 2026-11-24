@@ -1,0 +1,190 @@
+/*
+ * Resume preview: follows the PDF "modern" template (the export default) in
+ * structure and visual language, so what the user reviews reads like the PDF
+ * they download: centered name, accent section headings with a rule, heading
+ * hierarchy, link and list styles, and the same relative spacing scale.
+ *
+ * It is tuned for the screen rather than copied: a larger base font, roomier
+ * line height and rem padding instead of print sizes (11pt, cm margins).
+ *
+ * Visual source: backend/app/modules/resumes/static/css/resume/base.css and
+ * modern.css. Keep colors and heading treatment in step when those change.
+ *
+ * Every selector is scoped under .resume-preview, and the variant does not use
+ * the typography plugin's .prose, so nothing here leaks into other markdown.
+ */
+
+.resume-preview {
+    padding: 2rem 1.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: #111827;
+}
+
+@media (min-width: 640px) {
+    .resume-preview {
+        padding: 2.5rem 3rem;
+    }
+}
+
+.resume-preview > :first-child {
+    margin-top: 0;
+}
+
+.resume-preview > :last-child {
+    margin-bottom: 0;
+}
+
+.resume-preview h1,
+.resume-preview h2,
+.resume-preview h3,
+.resume-preview h4,
+.resume-preview h5,
+.resume-preview h6 {
+    font-weight: 700;
+    line-height: 1.25;
+    color: #1a1a1a;
+}
+
+.resume-preview h1 {
+    font-size: 1.8em;
+    margin-bottom: 0.4em;
+}
+
+/* The name heading at the top of the resume */
+.resume-preview > h1:first-child {
+    font-size: 2.1em;
+    line-height: 1.1;
+    text-align: center;
+    color: #000000;
+    letter-spacing: -0.02em;
+}
+
+.resume-preview h2 {
+    font-size: 1.35em;
+    line-height: 1.2;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+    padding-bottom: 0.2em;
+    color: #6366f1;
+    border-bottom: 1px solid #cfcfcf;
+}
+
+.resume-preview h3 {
+    font-size: 1.05em;
+    margin-top: 0.7em;
+    margin-bottom: 0.2em;
+    color: #2f2f2f;
+}
+
+.resume-preview h4 {
+    font-size: 1em;
+    margin-top: 0.5em;
+    margin-bottom: 0.15em;
+    color: #2f2f2f;
+}
+
+.resume-preview h5,
+.resume-preview h6 {
+    font-size: 1em;
+    margin-top: 0.4em;
+    margin-bottom: 0.1em;
+    color: #4b5563;
+}
+
+.resume-preview p {
+    margin: 0 0 0.5em;
+}
+
+.resume-preview ul,
+.resume-preview ol {
+    margin: 0 0 0.5em 1.4em;
+    padding: 0;
+}
+
+.resume-preview ul {
+    list-style: disc;
+}
+
+.resume-preview ol {
+    list-style: decimal;
+}
+
+.resume-preview li {
+    margin-bottom: 0.15em;
+}
+
+.resume-preview li > p {
+    margin-bottom: 0;
+}
+
+.resume-preview li > ul,
+.resume-preview li > ol {
+    margin-top: 0.15em;
+    margin-bottom: 0;
+}
+
+.resume-preview ul ul {
+    list-style: circle;
+}
+
+.resume-preview a {
+    color: #2b6cb0;
+    text-decoration: none;
+}
+
+.resume-preview a:hover {
+    text-decoration: underline;
+}
+
+.resume-preview strong {
+    font-weight: 700;
+    color: #111827;
+}
+
+.resume-preview em {
+    font-style: italic;
+    color: #374151;
+}
+
+.resume-preview hr {
+    margin: 0.8em 0;
+    border: none;
+    border-top: 1px solid #d4d4d4;
+}
+
+.resume-preview blockquote {
+    margin: 0.6em 0;
+    padding-left: 0.8em;
+    border-left: 3px solid #d1d5db;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.resume-preview table {
+    width: 100%;
+    margin-bottom: 0.8em;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.resume-preview th,
+.resume-preview td {
+    padding: 0.35em 0.5em;
+    border: 1px solid #d1d5db;
+    text-align: left;
+}
+
+.resume-preview th {
+    background: #f5f5f5;
+    font-weight: 700;
+}
+
+.resume-preview code {
+    padding: 0.1em 0.3em;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    background: #f8fafc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+}

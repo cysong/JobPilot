@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { MarkdownPreview } from '@/components/MarkdownPreview'
+import { previewVariantFor } from '@/components/MarkdownPreview/variant'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import type { DocumentEditPageProps } from './types'
 
@@ -419,7 +420,10 @@ export function DocumentEditPage<TData = any>({
               </div>
               <div className="flex-1 overflow-auto bg-slate-50 p-8">
                 <div className="bg-white shadow-sm border min-h-[297mm] w-[210mm] mx-auto">
-                  <MarkdownPreview content={form.watch('content')} />
+                  <MarkdownPreview
+                    content={form.watch('content')}
+                    variant={previewVariantFor(document?.business_type)}
+                  />
                 </div>
               </div>
             </div>
@@ -427,7 +431,10 @@ export function DocumentEditPage<TData = any>({
         ) : (
           <div className="h-full overflow-auto bg-slate-50 p-8 flex justify-center items-start">
             <div className="bg-white shadow-sm border min-h-[297mm] w-[210mm]">
-              <MarkdownPreview content={form.watch('content')} />
+              <MarkdownPreview
+                    content={form.watch('content')}
+                    variant={previewVariantFor(document?.business_type)}
+                  />
             </div>
           </div>
         )}

@@ -43,6 +43,7 @@ import {
   getApplicationStatusPresentation,
 } from '@/features/applications/components/ApplicationStatusBadge'
 import { MarkdownViewer } from '@/components/MarkdownViewer'
+import { previewVariantFor } from '@/components/MarkdownPreview/variant'
 import { JobDescriptionHtml } from '@/components/job/JobDescriptionHtml'
 import { JobLanguageSelect } from '@/components/job/JobLanguageSelect'
 import {
@@ -221,7 +222,7 @@ function DocumentReviewPanel({
           </div>
         )}
         {!isLoading && !isError && isReady && document && (
-          <MarkdownViewer content={document.content} />
+          <MarkdownViewer content={document.content} variant={previewVariantFor(document.business_type)} />
         )}
       </CardContent>
     </Card>

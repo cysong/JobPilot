@@ -1,4 +1,5 @@
 import { MarkdownPreview } from '@/components/MarkdownPreview'
+import type { MarkdownPreviewVariant } from '@/components/MarkdownPreview/variant'
 import { cn } from '@/utils/cn'
 
 interface MarkdownViewerProps {
@@ -6,6 +7,7 @@ interface MarkdownViewerProps {
   className?: string
   viewportClassName?: string
   pageClassName?: string
+  variant?: MarkdownPreviewVariant
 }
 
 export function MarkdownViewer({
@@ -13,6 +15,7 @@ export function MarkdownViewer({
   className,
   viewportClassName,
   pageClassName,
+  variant,
 }: MarkdownViewerProps) {
   return (
     <div className={cn('rounded-xl border border-slate-200 bg-slate-50', className)}>
@@ -23,7 +26,7 @@ export function MarkdownViewer({
             pageClassName,
           )}
         >
-          <MarkdownPreview content={content} />
+          <MarkdownPreview content={content} variant={variant} />
         </div>
       </div>
     </div>
