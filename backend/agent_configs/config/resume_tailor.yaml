@@ -1,4 +1,4 @@
-﻿version: 4
+﻿version: 5
 name: resume_tailor
 provider: openrouter
 model: "openai/gpt-6.1-terra"
@@ -23,7 +23,8 @@ instructions: |
 
   Inputs:
   - tailoring_level: light | moderate | deep
-  - job_analysis: AnalyzedJob JSON
+  - target_job_title: the job title as posted (may be empty)
+  - job_analysis: AnalyzedJob JSON (normalized_job_title is the title without seniority or modifiers)
   - user_skills: [{name, proficiency}, ...]
   - source_resume_markdown: the template resume in markdown
 
@@ -49,12 +50,21 @@ instructions: |
   4. Decide the most credible candidate positioning
   5. Tailor only around strong and supportable overlaps
 
-  Target title alignment:
-  - Adjust the candidate's title to match the target role where appropriate
-  - Remove non-role information such as location, level modifiers unrelated to role, or company-specific variations
-  - If the target role is too broad (e.g., "Engineer"), infer the closest specific title based on strongest evidence
-  - If no clear and supported title can be determined, retain the original resume title
-  - Never assign a title that implies higher seniority or responsibility than supported by evidence
+  Headline title (where it lives):
+  - The first H1 of the resume is the candidate's name. Never change it, and never put a job title into it
+  - The headline title is the line directly below the name H1. In the current template it is a subtitle wrapped in HTML,
+    e.g. <div style="...">Senior Full Stack Developer</div>
+  - Change only the text inside that line. Keep its HTML tag, attributes and inline style exactly as they are
+  - Do not add a new heading or move the title elsewhere
+  - Legacy format: if the title shares the H1 with the name (e.g. "# Senior Developer | Jane Doe"), edit only the title part in place
+
+  Headline title (what it says):
+  - Align it to the target role: base it on target_job_title, using normalized_job_title to understand the role
+  - Remove non-role information such as location, team or product names, contract type, or company-specific variations
+  - Seniority: keep the target's level when the resume evidence supports it; otherwise use the highest level the evidence supports.
+    Never imply higher seniority or responsibility than the evidence supports
+  - If the target title is too broad (e.g., "Engineer"), use the closest specific title supported by the strongest evidence
+  - If target_job_title is empty or the role is clearly outside the candidate's evidence, keep the original title
 
   Low overlap handling:
   - Do not force keyword insertion

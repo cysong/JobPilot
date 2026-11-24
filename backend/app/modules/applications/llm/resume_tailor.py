@@ -13,7 +13,7 @@ from agent_configs.schemas import AnalyzedJob, TailoredResume
 from app.core.llm.gateway import AgentGateway
 from app.modules.applications.config import app_module_settings
 from app.modules.applications.repositories.application_repo import ApplicationRepository
-from app.modules.jobs.repository import JobAnalysisRepository
+from app.modules.jobs.repository import JobAnalysisRepository, JobRepository
 from app.modules.resumes.repository import DocumentRepository, ResumeRepository
 from app.modules.users.repository import UserSkillRepository
 
@@ -48,6 +48,7 @@ async def load_tailoring_input(
     if not job_analysis_model:
         raise ValueError(f"Job analysis not found for job {job_id}")
     job_analysis = AnalyzedJob(
+        normalized_job_title=job_analysis_model.normalized_job_title,
         required_skills=job_analysis_model.required_skills or [],
         preferred_skills=job_analysis_model.preferred_skills or [],
         certifications=job_analysis_model.certifications or [],
@@ -64,6 +65,11 @@ async def load_tailoring_input(
     application = await ApplicationRepository.get_by_id(db, application_id)
     if not application:
         raise ValueError(f"Application {application_id} not found")
+
+    # The posted title is what the resume headline is aligned to; the analysis
+    # only carries a normalized form without seniority.
+    job = await JobRepository.get_by_id(db, job_id)
+    target_job_title = (job.title or "").strip() if job else ""
 
     # Always read from source resume (unified logic for both initial and retry)
     source_resume = await ResumeRepository.get_with_document(db, resume_id)
@@ -103,6 +109,7 @@ async def load_tailoring_input(
         prompt=_build_tailoring_prompt(
             source_content=source_resume.document.content,
             job_analysis=job_analysis,
+            target_job_title=target_job_title,
             tailoring_level=tailoring_level,
             user_skills=user_skills,
         ),
@@ -181,6 +188,7 @@ def _build_tailoring_prompt(
     job_analysis: AnalyzedJob,
     tailoring_level: str,
     user_skills: list[dict],
+    target_job_title: str = "",
 ) -> str:
     """Construct prompt for resume tailoring."""
     clipped_source = _clip_source_resume(source_content)
@@ -194,12 +202,14 @@ def _build_tailoring_prompt(
             for skill in selected_skills
         ]
     )
+    title_json = json.dumps(target_job_title, ensure_ascii=True)
     user_skills_json = json.dumps(
         normalized_skills, ensure_ascii=True, separators=(",", ":")
     )
 
     prompt = (
         f"tailoring_level: {tailoring_level}\n"
+        f"target_job_title: {title_json}\n"
         f"job_analysis: {job_json}\n\n"
         f"user_skills: {user_skills_json}\n\n"
         f"source_resume_markdown: |\n{clipped_source}\n"
@@ -213,6 +223,7 @@ def _build_tailoring_prompt(
         clipped_source = clipped_source[:trimmed_len]
         prompt = (
             f"tailoring_level: {tailoring_level}\n"
+            f"target_job_title: {title_json}\n"
             f"job_analysis: {job_json}\n\n"
             f"user_skills: {user_skills_json}\n\n"
             f"source_resume_markdown: |\n{clipped_source}\n"
