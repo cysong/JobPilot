@@ -5,11 +5,19 @@
 **Status:** Core features (auth, jobs, matching, resumes, applications, cover letters, settings, API keys, admin) are complete and deployed to the VPS with Prometheus / Grafana / Alertmanager monitoring.
 **Next Task:** Grafana SLO / Error Budget panels, then SRE Stage 2 (AWS + Terraform) or plan.md v0.5 remainder
 
-**Last Updated:** 2026-11-23
+**Last Updated:** 2026-11-24
 
 ---
 
 ## Work Log
+
+### 2026-11-24 - Resume preview, headline title, 11pt default
+
+- Resume preview (application page and editor) now follows the PDF modern layout, tuned for screen: centered name, accent section headings, same heading hierarchy; cover letters keep prose styles (fd8e436).
+- Resume tailoring passes the posted job title and `normalized_job_title`; `resume_tailor.yaml` v5 says the name H1 stays untouched and only the subtitle line below it carries the aligned title (babd5a9).
+- classic / minimal PDF templates no longer add a "Resume" `<h1>` above the content; default resume font 10pt -> 11pt (same page count on two real resumes) (63593bf).
+- Deployed 63593bf by hand (GitHub Actions still locked by billing): api / worker / beat on the new image, frontend replaced (backup `/opt/jobpilot-backups/frontend-202611241529.tgz`). Verified through the production API: Flicket resume exports 3 pages at 11pt with Liberation fonts; prompt v5 is in the container.
+- Next: regenerate one tailored resume to check the aligned headline title; the jobpilot skill in job-search still sends `--font-size 12` by default.
 
 ### 2026-11-23 - PDF export: font size, fonts and layout
 
